@@ -173,11 +173,11 @@ jobs:
           # Install Python requirements in the container
           PYTHON_VERSIONS="UV3.10 UV3.11 UV3.12 UV3.13"
           REQUIREMENTS_FILE="ansible_collections/arista/avd/requirements-dev.txt"
-          PACKAGES="mock pytest pytest-mock pytest-xdist pyyaml 'ansible-core<2.19.0'"
+          PACKAGES="mock pytest pytest-mock pytest-xdist pyyaml"
 
           # Loop through the Python versions and install requirements
           for PYTHON_VERSION in $PYTHON_VERSIONS; do
-            /$PYTHON_VERSION/bin/python -m pip install $PACKAGES -r $REQUIREMENTS_FILE --upgrade
+            /$PYTHON_VERSION/bin/python -m pip install $PACKAGES "ansible-core<2.19.0" -r $REQUIREMENTS_FILE --upgrade
           done
 
           # Create a new image from the running container
