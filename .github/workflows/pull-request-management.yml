@@ -244,7 +244,7 @@ jobs:
           echo "::set-output name=wheel_image_tag::$WHEEL_IMAGE_TAG"
 
   run-ansible-tests:
-    name: (Run Ansible: ${{ matrix.task.name }})
+    name: Run Ansible
     needs: build-pyavd
     runs-on: ubuntu-latest
     container:
