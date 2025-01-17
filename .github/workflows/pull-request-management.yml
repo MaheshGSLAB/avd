@@ -172,63 +172,76 @@ jobs:
           registry: ghcr.io
           username: ${{ steps.lowercase.outputs.lowercase }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Dockerfile dynamically
-        run: |
-          echo "Creating Dockerfile..."
-          cat <<EOF > Dockerfile
-          # Base image
-          FROM ghcr.io/maheshgslab/avd-slim-test:0.1
-          ENV PIP_CACHE_DIR=/cache
-          ARG PYTHON_VERSIONS="3.10 3.11 3.12 3.13"
-
-          RUN mkdir -p /cache
-          WORKDIR /avd
-
-          RUN apt-get update && apt-get install -y --no-install-recommends \
-              openssh-client git make python3-pip python3-dev docker.io && \
-              pip install --cache-dir=$PIP_CACHE_DIR uv --break-system-packages && \
-              uv python install 3.10 3.11 3.12 3.13
-
-          RUN if [ -d ".git" ]; then \
-            echo "Repository exists, pulling latest changes..."; \
-            git pull; \
-          else \
-            echo "Cloning repository..."; \
-            git clone https://github.com/${{ github.repository }}; \
-          fi
-          WORKDIR /
-          RUN for version in 3.10 3.11 3.12 3.13; do \
-              echo "Checking if virtual environment for Python \$version exists..." && \
-              if [ ! -d "UV\$version" ]; then \
-                  echo "Virtual environment for Python \$version does not exist. Creating it..." && \
-                  uv venv --python \$version UV\$version && \
-                  UV\$version/bin/python -m ensurepip --upgrade && \
-                  echo "Virtual environment UV\$version created and pip upgraded."; \
-              else \
-                  echo "Virtual environment for Python \$version already exists, skipping creation..."; \
-              fi && \
-              UV\$version/bin/python -m pip install --cache-dir=$PIP_CACHE_DIR \
-                  mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
-                  -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade && \
-              echo "Dependencies installed for Python \$version in virtual environment UV\$version."; \
-          done
-
-          RUN apt-get clean && \
-              rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-          CMD ["python"]
-          EOF
-          echo "Dockerfile created successfully."
-
-      - name: Build Docker Image
+      - name: Install Requirements
         id: build-image
         run: |
+          /UV3.10/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+          /UV3.11/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+          /UV3.12/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+          /UV3.13/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
           IMAGE_TAG=ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test:${{ github.run_number }}-$SHORT_SHA
-          docker build -t $IMAGE_TAG .
+          docker commit $(docker ps -q --filter ancestor=ghcr.io/maheshgslab/avd-slim-test:0.1) $IMAGE_TAG
+
+          # Push the updated image to GitHub Container Registry
           docker push $IMAGE_TAG
           echo "::set-output name=image_tag::$IMAGE_TAG"
+      # - name: Create Dockerfile dynamically
+      #   run: |
+      #     echo "Creating Dockerfile..."
+      #     cat <<EOF > Dockerfile
+      #     # Base image
+      #     FROM ghcr.io/maheshgslab/avd-slim-test:0.1
+      #     ENV PIP_CACHE_DIR=/cache
+      #     ARG PYTHON_VERSIONS="3.10 3.11 3.12 3.13"
+
+      #     RUN mkdir -p /cache
+      #     WORKDIR /avd
+
+      #     RUN apt-get update && apt-get install -y --no-install-recommends \
+      #         openssh-client git make python3-pip python3-dev docker.io && \
+      #         pip install --cache-dir=$PIP_CACHE_DIR uv --break-system-packages && \
+      #         uv python install 3.10 3.11 3.12 3.13
+
+      #     RUN if [ -d ".git" ]; then \
+      #       echo "Repository exists, pulling latest changes..."; \
+      #       git pull; \
+      #     else \
+      #       echo "Cloning repository..."; \
+      #       git clone https://github.com/${{ github.repository }}; \
+      #     fi
+      #     WORKDIR /
+      #     RUN for version in 3.10 3.11 3.12 3.13; do \
+      #         echo "Checking if virtual environment for Python \$version exists..." && \
+      #         if [ ! -d "UV\$version" ]; then \
+      #             echo "Virtual environment for Python \$version does not exist. Creating it..." && \
+      #             uv venv --python \$version UV\$version && \
+      #             UV\$version/bin/python -m ensurepip --upgrade && \
+      #             echo "Virtual environment UV\$version created and pip upgraded."; \
+      #         else \
+      #             echo "Virtual environment for Python \$version already exists, skipping creation..."; \
+      #         fi && \
+      #         UV\$version/bin/python -m pip install --cache-dir=$PIP_CACHE_DIR \
+      #             mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+      #             -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade && \
+      #         echo "Dependencies installed for Python \$version in virtual environment UV\$version."; \
+      #     done
+
+      #     RUN apt-get clean && \
+      #         rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+      #     CMD ["python"]
+      #     EOF
+      #     echo "Dockerfile created successfully."
+
+      # - name: Build Docker Image
+      #   id: build-image
+      #   run: |
+      #     SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+      #     IMAGE_TAG=ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test:${{ github.run_number }}-$SHORT_SHA
+      #     docker build -t $IMAGE_TAG .
+      #     docker push $IMAGE_TAG
+      #     echo "::set-output name=image_tag::$IMAGE_TAG"
 
   container-job-2:
     needs: container-job-1
