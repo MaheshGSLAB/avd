@@ -171,17 +171,18 @@ jobs:
         id: build-image
         run: |
           # Install Python requirements in the container
-          PYTHON_VERSIONS=("UV3.10" "UV3.11" "UV3.12" "UV3.13")
+          PYTHON_VERSIONS="UV3.10 UV3.11 UV3.12 UV3.13"
           REQUIREMENTS_FILE="ansible_collections/arista/avd/requirements-dev.txt"
           PACKAGES="mock pytest pytest-mock pytest-xdist pyyaml 'ansible-core<2.19.0'"
 
-          for PYTHON_VERSION in "${PYTHON_VERSIONS[@]}"; do
+          # Loop through the Python versions and install requirements
+          for PYTHON_VERSION in $PYTHON_VERSIONS; do
             /$PYTHON_VERSION/bin/python -m pip install $PACKAGES -r $REQUIREMENTS_FILE --upgrade
           done
 
           # Create a new image from the running container
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test:${{ github.run_number }}-$SHORT_SHA"
+          SHORT_SHA=$(echo "9f89f9bbc6f1a222870b9ad45c13fdce3a4ee1b0" | cut -c1-8)
+          IMAGE_TAG="ghcr.io/maheshgslab/avd-slim-test:10-$SHORT_SHA"
 
           # Commit the running container to create a new image
           CONTAINER_ID=$(docker ps -q --filter ancestor=ghcr.io/maheshgslab/avd-slim-test:0.1)
@@ -220,22 +221,18 @@ jobs:
         id: wheel-image-tag
         run: |
           cd python-avd
-
-          # Build the wheel package
-          echo "Building the wheel package..."
           python3 -m pip install --break-system-packages build
           python3 -m build --wheel --outdir /tmp/wheels
-          # Install pyavd
-          /UV3.10/bin/python -m pip install /tmp/wheels/*.whl
-          /UV3.11/bin/python -m pip install /tmp/wheels/*.whl
-          /UV3.12/bin/python -m pip install /tmp/wheels/*.whl
-          /UV3.13/bin/python -m pip install /tmp/wheels/*.whl
+
+          # Install the generated wheel for all required Python versions
+          for VERSION in UV3.10 UV3.11 UV3.12 UV3.13; do
+            /$VERSION/bin/python -m pip install /tmp/wheels/*.whl
+          done
           cd ../..
           cp -rT avd /avd
           # Generate a unique tag using run number and truncated commit SHA
           WHEEL_IMAGE_TAG=${{ needs.container-job-1.outputs.image_tag }}-2
-          # docker build -t $WHEEL_IMAGE_TAG .
-          # docker push $WHEEL_IMAGE_TAG
+
           # Build the updated image from the current container state
           docker commit $(docker ps -q --filter ancestor=${{ needs.container-job-1.outputs.image_tag }}) $WHEEL_IMAGE_TAG
 
