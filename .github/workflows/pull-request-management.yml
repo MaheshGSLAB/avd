@@ -143,191 +143,191 @@ jobs:
   #         docker push $IMAGE_TAG
 
 
-  container-job-1:
-    runs-on: ubuntu-latest
-    container: 
-      image: ghcr.io/maheshgslab/avd-slim-test:0.1
-      options: --cpus 1
+  # container-job-1:
+  #   runs-on: ubuntu-latest
+  #   container: 
+  #     image: ghcr.io/maheshgslab/avd-slim-test:0.1
+  #     options: --cpus 1
 
-    outputs:
-      image_tag: ${{ steps.build-image.outputs.image_tag }}
+  #   outputs:
+  #     image_tag: ${{ steps.build-image.outputs.image_tag }}
 
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
 
-      # - name: Set up Docker
-      #   run: |
-      #     apt-get update
-      #     apt-get install -y docker.io
+  #     # - name: Set up Docker
+  #     #   run: |
+  #     #     apt-get update
+  #     #     apt-get install -y docker.io
 
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+  #     - name: Convert GitHub username to lowercase
+  #       id: lowercase
+  #       run: |
+  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ steps.lowercase.outputs.lowercase }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Dockerfile dynamically
-        run: |
-          echo "Creating Dockerfile..."
-          cat <<EOF > Dockerfile
-          # Base image
-          FROM ghcr.io/maheshgslab/avd-slim-test:0.1
-          ENV PIP_CACHE_DIR=/cache
-          ARG PYTHON_VERSIONS="3.10 3.11 3.12 3.13"
+  #     - name: Create Dockerfile dynamically
+  #       run: |
+  #         echo "Creating Dockerfile..."
+  #         cat <<EOF > Dockerfile
+  #         # Base image
+  #         FROM ghcr.io/maheshgslab/avd-slim-test:0.1
+  #         ENV PIP_CACHE_DIR=/cache
+  #         ARG PYTHON_VERSIONS="3.10 3.11 3.12 3.13"
 
-          RUN mkdir -p /cache
-          WORKDIR /avd
+  #         RUN mkdir -p /cache
+  #         WORKDIR /avd
 
-          RUN apt-get update && apt-get install -y --no-install-recommends \
-              openssh-client git make python3-pip python3-dev docker.io && \
-              pip install --cache-dir=$PIP_CACHE_DIR uv --break-system-packages && \
-              uv python install 3.10 3.11 3.12 3.13
+  #         RUN apt-get update && apt-get install -y --no-install-recommends \
+  #             openssh-client git make python3-pip python3-dev docker.io && \
+  #             pip install --cache-dir=$PIP_CACHE_DIR uv --break-system-packages && \
+  #             uv python install 3.10 3.11 3.12 3.13
 
-          RUN if [ -d ".git" ]; then \
-            echo "Repository exists, pulling latest changes..."; \
-            git pull; \
-          else \
-            echo "Cloning repository..."; \
-            git clone https://github.com/${{ github.repository }}; \
-          fi
-          WORKDIR /
-          RUN for version in 3.10 3.11 3.12 3.13; do \
-              echo "Checking if virtual environment for Python \$version exists..." && \
-              if [ ! -d "UV\$version" ]; then \
-                  echo "Virtual environment for Python \$version does not exist. Creating it..." && \
-                  uv venv --python \$version UV\$version && \
-                  UV\$version/bin/python -m ensurepip --upgrade && \
-                  echo "Virtual environment UV\$version created and pip upgraded."; \
-              else \
-                  echo "Virtual environment for Python \$version already exists, skipping creation..."; \
-              fi && \
-              UV\$version/bin/python -m pip install --cache-dir=$PIP_CACHE_DIR \
-                  mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
-                  -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade && \
-              echo "Dependencies installed for Python \$version in virtual environment UV\$version."; \
-          done
+  #         RUN if [ -d ".git" ]; then \
+  #           echo "Repository exists, pulling latest changes..."; \
+  #           git pull; \
+  #         else \
+  #           echo "Cloning repository..."; \
+  #           git clone https://github.com/${{ github.repository }}; \
+  #         fi
+  #         WORKDIR /
+  #         RUN for version in 3.10 3.11 3.12 3.13; do \
+  #             echo "Checking if virtual environment for Python \$version exists..." && \
+  #             if [ ! -d "UV\$version" ]; then \
+  #                 echo "Virtual environment for Python \$version does not exist. Creating it..." && \
+  #                 uv venv --python \$version UV\$version && \
+  #                 UV\$version/bin/python -m ensurepip --upgrade && \
+  #                 echo "Virtual environment UV\$version created and pip upgraded."; \
+  #             else \
+  #                 echo "Virtual environment for Python \$version already exists, skipping creation..."; \
+  #             fi && \
+  #             UV\$version/bin/python -m pip install --cache-dir=$PIP_CACHE_DIR \
+  #                 mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+  #                 -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade && \
+  #             echo "Dependencies installed for Python \$version in virtual environment UV\$version."; \
+  #         done
 
-          RUN apt-get clean && \
-              rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+  #         RUN apt-get clean && \
+  #             rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-          CMD ["python"]
-          EOF
-          echo "Dockerfile created successfully."
+  #         CMD ["python"]
+  #         EOF
+  #         echo "Dockerfile created successfully."
 
-      - name: Build Docker Image
-        id: build-image
-        run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-          IMAGE_TAG=ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test:${{ github.run_number }}-$SHORT_SHA
-          docker build -t $IMAGE_TAG .
-          docker push $IMAGE_TAG
-          echo "::set-output name=image_tag::$IMAGE_TAG"
+  #     - name: Build Docker Image
+  #       id: build-image
+  #       run: |
+  #         SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+  #         IMAGE_TAG=ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test:${{ github.run_number }}-$SHORT_SHA
+  #         docker build -t $IMAGE_TAG .
+  #         docker push $IMAGE_TAG
+  #         echo "::set-output name=image_tag::$IMAGE_TAG"
 
-  container-job-2:
-    needs: container-job-1
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ needs.container-job-1.outputs.image_tag }}
-      #image: ghcr.io/shivani-gslab/avd/python:497-92985fc8
-      options: --cpus 1
-      # credentials:
-      #   username: shivani-gslab
-      #   password: ${{ secrets.github_token }}
-    outputs:
-      image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+  # container-job-2:
+  #   needs: container-job-1
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: ${{ needs.container-job-1.outputs.image_tag }}
+  #     #image: ghcr.io/shivani-gslab/avd/python:497-92985fc8
+  #     options: --cpus 1
+  #     # credentials:
+  #     #   username: shivani-gslab
+  #     #   password: ${{ secrets.github_token }}
+  #   outputs:
+  #     image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Convert GitHub username to lowercase
+  #       id: lowercase
+  #       run: |
+  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ steps.lowercase.outputs.lowercase }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Additional Task in Second Container
-        id: wheel-image-tag
-        run: |
-          cd python-avd
+  #     - name: Additional Task in Second Container
+  #       id: wheel-image-tag
+  #       run: |
+  #         cd python-avd
 
-          # Build the wheel package
-          echo "Building the wheel package..."
-          python3 -m pip install --break-system-packages build
-          python3 -m build --wheel --outdir /tmp/wheels
-          # Install pyavd
-          /UV3.10/bin/python -m pip install /tmp/wheels/*.whl
-          /UV3.11/bin/python -m pip install /tmp/wheels/*.whl
-          /UV3.12/bin/python -m pip install /tmp/wheels/*.whl
-          /UV3.13/bin/python -m pip install /tmp/wheels/*.whl
+  #         # Build the wheel package
+  #         echo "Building the wheel package..."
+  #         python3 -m pip install --break-system-packages build
+  #         python3 -m build --wheel --outdir /tmp/wheels
+  #         # Install pyavd
+  #         /UV3.10/bin/python -m pip install /tmp/wheels/*.whl
+  #         /UV3.11/bin/python -m pip install /tmp/wheels/*.whl
+  #         /UV3.12/bin/python -m pip install /tmp/wheels/*.whl
+  #         /UV3.13/bin/python -m pip install /tmp/wheels/*.whl
           
-          # Generate a unique tag using run number and truncated commit SHA
-          WHEEL_IMAGE_TAG=${{ needs.container-job-1.outputs.image_tag }}-2
-          # docker build -t $WHEEL_IMAGE_TAG .
-          # docker push $WHEEL_IMAGE_TAG
-          # Build the updated image from the current container state
-          docker commit $(docker ps -q --filter ancestor=${{ needs.container-job-1.outputs.image_tag }}) $WHEEL_IMAGE_TAG
+  #         # Generate a unique tag using run number and truncated commit SHA
+  #         WHEEL_IMAGE_TAG=${{ needs.container-job-1.outputs.image_tag }}-2
+  #         # docker build -t $WHEEL_IMAGE_TAG .
+  #         # docker push $WHEEL_IMAGE_TAG
+  #         # Build the updated image from the current container state
+  #         docker commit $(docker ps -q --filter ancestor=${{ needs.container-job-1.outputs.image_tag }}) $WHEEL_IMAGE_TAG
 
-          # Push the updated image to GitHub Container Registry
-          docker push $WHEEL_IMAGE_TAG
-          echo "::set-output name=wheel_image_tag::$WHEEL_IMAGE_TAG"
+  #         # Push the updated image to GitHub Container Registry
+  #         docker push $WHEEL_IMAGE_TAG
+  #         echo "::set-output name=wheel_image_tag::$WHEEL_IMAGE_TAG"
           
 
-  reuse-ghcr-image:
-    name: reuse first job
-    needs: container-job-2
-    runs-on: ubuntu-latest
-    container:
-      #image: ghcr.io/shivani-gslab/avd-slim-test:latest
-      image: ${{ needs.container-job-2.outputs.image_tag }}
-      #image: ghcr.io/shivani-gslab/avd/python:529-7c8454ae-2
-      options: --cpus 1
+  # reuse-ghcr-image:
+  #   name: reuse first job
+  #   needs: container-job-2
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     #image: ghcr.io/shivani-gslab/avd-slim-test:latest
+  #     image: ${{ needs.container-job-2.outputs.image_tag }}
+  #     #image: ghcr.io/shivani-gslab/avd/python:529-7c8454ae-2
+  #     options: --cpus 1
       
 
-    strategy:
-      matrix:
-        task:
-          - name: Execute Ansible unit tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
-          - name: Execute Ansible integration tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Execute Ansible integration tests 3.13
-            command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Execute Ansible sanity tests 3.13
-            command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Execute Ansible sanity tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Execute Ansible lint tests 3.11
-            command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
-    steps:
-      # - name: Check out repository code
-      #   uses: actions/checkout@v4
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+  #   strategy:
+  #     matrix:
+  #       task:
+  #         - name: Execute Ansible unit tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
+  #         - name: Execute Ansible integration tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
+  #         - name: Execute Ansible integration tests 3.13
+  #           command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
+  #         - name: Execute Ansible sanity tests 3.13
+  #           command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
+  #         - name: Execute Ansible sanity tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
+  #         - name: Execute Ansible lint tests 3.11
+  #           command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
+  #   steps:
+  #     # - name: Check out repository code
+  #     #   uses: actions/checkout@v4
+  #     - name: Convert GitHub username to lowercase
+  #       id: lowercase
+  #       run: |
+  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run Task - ${{ matrix.task.name }}
-        run: |
-          git config --global --add safe.directory /__w/avd/avd
-          ${{ matrix.task.command }}
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ steps.lowercase.outputs.lowercase }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Run Task - ${{ matrix.task.name }}
+  #       run: |
+  #         git config --global --add safe.directory /__w/avd/avd
+  #         ${{ matrix.task.command }}
 
   cleanup-ghcr-images:
     name: Cleanup GHCR Images
@@ -339,7 +339,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
       - name: Delete Container Job 1 Image
         run: |
-          IMAGE_TAG="${{ needs.container-job-2.outputs.image_tag }}"
+          IMAGE_TAG=ghcr.io/maheshgslab/avd-slim-test:3-11c8ad29-2
           IMAGE_REPO=$(echo "$IMAGE_TAG" | sed 's|ghcr.io/||' | cut -d':' -f1)
           TAG=$(echo "$IMAGE_TAG" | cut -d':' -f2)
 
