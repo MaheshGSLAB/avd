@@ -177,7 +177,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ../
-          file: ./Dockerfile  # Path to your Dockerfile
+          file: ../Dockerfile  # Path to your Dockerfile
           push: true
           tags: ghcr.io/maheshgslab/avd-slim-test:10-${{ github.run_number }}-${{ github.sha }}
           cache-from: type=registry,ref=ghcr.io/maheshgslab/avd-slim-test:0.1
