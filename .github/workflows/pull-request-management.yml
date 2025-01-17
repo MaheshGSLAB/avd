@@ -228,8 +228,8 @@ jobs:
           for VERSION in UV3.10 UV3.11 UV3.12 UV3.13; do
             /$VERSION/bin/python -m pip install /tmp/wheels/*.whl
           done
-          cd ../../
-          cp -rT avd /
+          cd ..
+          cp -rT ./ /avd
           # Generate a unique tag using run number and truncated commit SHA
           WHEEL_IMAGE_TAG=${{ needs.container-job-1.outputs.image_tag }}-2
 
