@@ -344,7 +344,9 @@ jobs:
           TAG=$(echo "$IMAGE_TAG" | cut -d':' -f2)
 
           echo "Fetching version ID for tag: $TAG in repository: $IMAGE_REPO"
-          response=$(gh api "repos/${IMAGE_REPO}/packages/container/avd-slim-test/versions")
+
+          # Request to fetch the versions for the container
+          response=$(gh api "repos/${IMAGE_REPO}/packages/container/avd-slim-test/versions" || echo "Error fetching API response")
 
           # Log the full API response for debugging
           echo "API Response: $response"
@@ -360,6 +362,7 @@ jobs:
           else
             echo "Version ID for tag $TAG not found. Skipping deletion."
           fi
+
 
 
 
