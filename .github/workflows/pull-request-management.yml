@@ -339,12 +339,12 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
       - name: Delete Container Job 1 Image
         run: |
-          IMAGE_TAG=ghcr.io/maheshgslab/avd-slim-test:3-11c8ad29-2
+          IMAGE_TAG="ghcr.io/maheshgslab/avd-slim-test:3-11c8ad29-2"
           IMAGE_REPO=$(echo "$IMAGE_TAG" | sed 's|ghcr.io/||' | cut -d':' -f1)
           TAG=$(echo "$IMAGE_TAG" | cut -d':' -f2)
 
           echo "Fetching version ID for tag: $TAG in repository: $IMAGE_REPO"
-          response=$(gh api "/user/packages/container/$IMAGE_REPO/versions")
+          response=$(gh api "repos/${IMAGE_REPO}/packages/container/avd-slim-test/versions")
 
           # Log the full API response for debugging
           echo "API Response: $response"
@@ -354,11 +354,12 @@ jobs:
 
           if [ -n "$VERSION_ID" ]; then
             echo "Deleting version ID $VERSION_ID for tag $TAG"
-            gh api -X DELETE "/user/packages/container/$IMAGE_REPO/versions/$VERSION_ID" \
+            gh api -X DELETE "repos/${IMAGE_REPO}/packages/container/avd-slim-test/versions/$VERSION_ID" \
               && echo "Successfully deleted tag $TAG" \
               || echo "Failed to delete tag $TAG"
           else
             echo "Version ID for tag $TAG not found. Skipping deletion."
           fi
+
 
 
