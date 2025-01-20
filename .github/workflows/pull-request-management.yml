@@ -221,7 +221,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.setup-avd.outputs.image_tag }}
-      image: ghcr.io/maheshgslab/avd-slim-test2:0.1
+      image: ghcr.io/maheshgslab/avd-slim-test2:0.2
       options: --cpus 1
     # outputs:
     #   image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
@@ -279,7 +279,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.build-pyavd.outputs.image_tag }}
-      image: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test2:0.3
+      image: ghcr.io/maheshgslab/avd-slim-test2:0.3
       options: --cpus 1
 
     strategy:
