@@ -274,7 +274,7 @@ jobs:
       #     echo "::set-output name=wheel_image_tag::$WHEEL_IMAGE_TAG"
 
   run-ansible-tests:
-    name: Run Ansible
+    name: Run Ansible Tests
     needs: build-pyavd
     runs-on: ubuntu-latest
     container:
@@ -285,17 +285,17 @@ jobs:
     strategy:
       matrix:
         task:
-          - name: Unit Tests 3.12
+          - name: Ansible Unit Tests 3.12
             command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
-          - name: Integration Tests 3.12
+          - name: Ansible Integration Tests 3.12
             command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Integration Tests 3.13
+          - name: Ansible Integration Tests 3.13
             command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Sanity Tests 3.13
+          - name: Ansible Sanity Tests 3.13
             command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Sanity Tests 3.12
+          - name: Ansible Sanity Tests 3.12
             command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Lint Tests 3.11
+          - name: Ansible Lint Tests 3.11
             command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
     steps:
       - name: Convert GitHub username to lowercase
@@ -311,6 +311,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Task - ${{ matrix.task.name }}
         run: |
+          git config --global --add safe.directory /__w/avd/avd
           ${{ matrix.task.command }}
   # # ----------------------------------- #
   # # EOS CLI CONFIG GEN MOLECULE
