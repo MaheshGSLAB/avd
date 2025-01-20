@@ -12,4 +12,3 @@ RUN uv python install 3.10 3.11 3.12 3.13 && \
     /UV3.11/bin/python -m pip install -r /requirements-dev.txt --upgrade && \
     /UV3.12/bin/python -m pip install -r /requirements-dev.txt --upgrade && \
     /UV3.13/bin/python -m pip install -r /requirements-dev.txt --upgrade
-EOF
