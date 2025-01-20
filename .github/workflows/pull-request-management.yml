@@ -85,42 +85,42 @@ jobs:
             pyavd:
               - 'python_avd/*'
               - 'python_avd/**/*'
-  # create-avd-slim2:
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: ubuntu:latest
-  #     options: --cpus 1
-  #   steps:
-  #     - name: Check out repository code
-  #       uses: actions/checkout@v4
-  #     - name: Set up Docker
-  #       run: |
-  #         apt-get update
-  #         apt-get install -y docker.io
+  create-avd-slim2:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:latest
+      options: --cpus 1
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Set up Docker
+        run: |
+          apt-get update
+          apt-get install -y docker.io
 
-  #     - name: Convert GitHub username to lowercase
-  #       id: lowercase
-  #       run: |
-  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+      - name: Convert GitHub username to lowercase
+        id: lowercase
+        run: |
+          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-  #     - name: Log in to GitHub Container Registry
-  #       uses: docker/login-action@v3
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ steps.lowercase.outputs.lowercase }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ steps.lowercase.outputs.lowercase }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-  #     - name: Build and push
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         file: .github/Dockerfile
-  #         push: true
-  #         tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test3:0.1
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          file: .github/Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:0.1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
   # create-avd-slim:
   #   runs-on: ubuntu-latest
   #   container:
@@ -215,78 +215,78 @@ jobs:
   #         cache-from: type=gha
   #         cache-to: type=gha,mode=max
 
-  build-pyavd:
-    name: Install pyavd and Build Image
-    #needs: setup-avd
-    runs-on: ubuntu-latest
-    # container:
-    #   #image: ${{ needs.setup-avd.outputs.image_tag }}
-    #   image: ghcr.io/maheshgslab/avd-slim-test3:0.1.2
-    #   options: --cpus 1
-    # outputs:
-    #   image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          file: .github/DockerfilePyavd
-          push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test3:0.1.44
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-  run-ansible-tests:
-    name: Run Ansible Tests
-    needs: build-pyavd
-    runs-on: ubuntu-latest
-    container:
-      #image: ${{ needs.build-pyavd.outputs.image_tag }}
-      image: ghcr.io/maheshgslab/avd-slim-test3:0.1.44
-      options: --cpus 1
-    strategy:
-      matrix:
-        task:
-          - name: Ansible Unit Tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
-          - name: Ansible Integration Tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Ansible Integration Tests 3.13
-            command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Ansible Sanity Tests 3.13
-            command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Ansible Sanity Tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Ansible Lint Tests 3.11
-            command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
-    steps:
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+  # build-pyavd:
+  #   name: Install pyavd and Build Image
+  #   #needs: setup-avd
+  #   runs-on: ubuntu-latest
+  #   # container:
+  #   #   #image: ${{ needs.setup-avd.outputs.image_tag }}
+  #   #   image: ghcr.io/maheshgslab/avd-slim-test3:0.1.2
+  #   #   options: --cpus 1
+  #   # outputs:
+  #   #   image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Convert GitHub username to lowercase
+  #       id: lowercase
+  #       run: |
+  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ steps.lowercase.outputs.lowercase }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Build and push
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         file: .github/DockerfilePyavd
+  #         push: true
+  #         tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:0.1.44
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
+  # run-ansible-tests:
+  #   name: Run Ansible Tests
+  #   needs: build-pyavd
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     #image: ${{ needs.build-pyavd.outputs.image_tag }}
+  #     image: ghcr.io/maheshgslab/avd-slim-test4:0.1.44
+  #     options: --cpus 1
+  #   strategy:
+  #     matrix:
+  #       task:
+  #         - name: Ansible Unit Tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
+  #         - name: Ansible Integration Tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
+  #         - name: Ansible Integration Tests 3.13
+  #           command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
+  #         - name: Ansible Sanity Tests 3.13
+  #           command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
+  #         - name: Ansible Sanity Tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
+  #         - name: Ansible Lint Tests 3.11
+  #           command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
+  #   steps:
+  #     - name: Convert GitHub username to lowercase
+  #       id: lowercase
+  #       run: |
+  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run Task - ${{ matrix.task.name }}
-        run: |
-          git config --global --add safe.directory /__w/avd/avd
-          ${{ matrix.task.command }}
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ steps.lowercase.outputs.lowercase }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Run Task - ${{ matrix.task.name }}
+  #       run: |
+  #         git config --global --add safe.directory /__w/avd/avd
+  #         ${{ matrix.task.command }}
   # # ----------------------------------- #
   # # EOS CLI CONFIG GEN MOLECULE
   # # ----------------------------------- #
