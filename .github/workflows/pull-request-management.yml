@@ -119,7 +119,6 @@ jobs:
           tags: avd-slim2:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          cache-to: type=gha,mode=max
   # create-avd-slim:
   #   runs-on: ubuntu-latest
   #   container:
