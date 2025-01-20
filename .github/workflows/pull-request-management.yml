@@ -245,7 +245,7 @@ jobs:
         with:
           file: .github/DockerfilePyavd
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4-updated:0.1.44
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4-updated1:0.1.44
           cache-from: type=gha
           cache-to: type=gha,mode=max
   run-ansible-tests:
@@ -254,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.build-pyavd.outputs.image_tag }}
-      image: ghcr.io/maheshgslab/avd-slim-test4-updated:0.1.44
+      image: ghcr.io/maheshgslab/avd-slim-test4-updated1:0.1.44
       options: --cpus 1
     strategy:
       matrix:
