@@ -111,17 +111,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
-      - name: Debug paths
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo "Contents of the current directory:"
-          ls -l
-          echo "Contents of parent directory:"
-          ls -l ../
-          echo "Contents of ansible-avd/.github:"
-          ls -l ansible-avd/.github
 
       - name: Build and push
         uses: docker/build-push-action@v6
