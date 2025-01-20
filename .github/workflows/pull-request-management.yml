@@ -244,7 +244,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          file: .github/Dockerfile
+          file: .github/DockerfilePyavd
           push: true
           tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test2:0.3
           cache-from: type=gha
