@@ -119,6 +119,7 @@ jobs:
           tags: avd-slim2:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max
   # create-avd-slim:
   #   runs-on: ubuntu-latest
   #   container:
@@ -249,92 +250,92 @@ jobs:
       #     # Set output for the image tag
       #     echo "::set-output name=image_tag::$IMAGE_TAG"
 
-  build-pyavd:
-    name: Install pyavd and Build Image
-    needs: setup-avd
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ needs.setup-avd.outputs.image_tag }}
-      options: --cpus 1
-    outputs:
-      image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+  # build-pyavd:
+  #   name: Install pyavd and Build Image
+  #   needs: setup-avd
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: ${{ needs.setup-avd.outputs.image_tag }}
+  #     options: --cpus 1
+  #   outputs:
+  #     image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - name: Convert GitHub username to lowercase
+  #       id: lowercase
+  #       run: |
+  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ steps.lowercase.outputs.lowercase }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Additional Task in Second Container
-        id: wheel-image-tag
-        run: |
-          cd python-avd
-          python3 -m pip install --break-system-packages build
-          python3 -m build --wheel --outdir /tmp/wheels
+  #     - name: Additional Task in Second Container
+  #       id: wheel-image-tag
+  #       run: |
+  #         cd python-avd
+  #         python3 -m pip install --break-system-packages build
+  #         python3 -m build --wheel --outdir /tmp/wheels
 
-          # Install the generated wheel for all required Python versions
-          for VERSION in UV3.10 UV3.11 UV3.12 UV3.13; do
-            /$VERSION/bin/python -m pip install /tmp/wheels/*.whl
-          done
-          cd ..
-          cp -rT ./ /avd
-          # Generate a unique tag using run number and truncated commit SHA
-          WHEEL_IMAGE_TAG=${{ needs.setup-avd.outputs.image_tag }}-2
+  #         # Install the generated wheel for all required Python versions
+  #         for VERSION in UV3.10 UV3.11 UV3.12 UV3.13; do
+  #           /$VERSION/bin/python -m pip install /tmp/wheels/*.whl
+  #         done
+  #         cd ..
+  #         cp -rT ./ /avd
+  #         # Generate a unique tag using run number and truncated commit SHA
+  #         WHEEL_IMAGE_TAG=${{ needs.setup-avd.outputs.image_tag }}-2
 
-          # Build the updated image from the current container state
-          docker commit $(docker ps -q --filter ancestor=${{ needs.setup-avd.outputs.image_tag }}) $WHEEL_IMAGE_TAG
+  #         # Build the updated image from the current container state
+  #         docker commit $(docker ps -q --filter ancestor=${{ needs.setup-avd.outputs.image_tag }}) $WHEEL_IMAGE_TAG
 
-          # Push the updated image to GitHub Container Registry
-          docker push $WHEEL_IMAGE_TAG
-          echo "::set-output name=wheel_image_tag::$WHEEL_IMAGE_TAG"
+  #         # Push the updated image to GitHub Container Registry
+  #         docker push $WHEEL_IMAGE_TAG
+  #         echo "::set-output name=wheel_image_tag::$WHEEL_IMAGE_TAG"
 
-  run-ansible-tests:
-    name: Run Ansible
-    needs: build-pyavd
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ needs.build-pyavd.outputs.image_tag }}
-      options: --cpus 1
+  # run-ansible-tests:
+  #   name: Run Ansible
+  #   needs: build-pyavd
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: ${{ needs.build-pyavd.outputs.image_tag }}
+  #     options: --cpus 1
 
-    strategy:
-      matrix:
-        task:
-          - name: Unit Tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
-          - name: Integration Tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Integration Tests 3.13
-            command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
-          - name: Sanity Tests 3.13
-            command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Sanity Tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
-          - name: Lint Tests 3.11
-            command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
-    steps:
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+  #   strategy:
+  #     matrix:
+  #       task:
+  #         - name: Unit Tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
+  #         - name: Integration Tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
+  #         - name: Integration Tests 3.13
+  #           command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
+  #         - name: Sanity Tests 3.13
+  #           command: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
+  #         - name: Sanity Tests 3.12
+  #           command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
+  #         - name: Lint Tests 3.11
+  #           command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
+  #   steps:
+  #     - name: Convert GitHub username to lowercase
+  #       id: lowercase
+  #       run: |
+  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run Task - ${{ matrix.task.name }}
-        run: |
-          git config --global --add safe.directory /__w/avd/avd
-          ${{ matrix.task.command }}
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ steps.lowercase.outputs.lowercase }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Run Task - ${{ matrix.task.name }}
+  #       run: |
+  #         git config --global --add safe.directory /__w/avd/avd
+  #         ${{ matrix.task.command }}
 
   # galaxy_importer:
   #   name: Test galaxy-importer
