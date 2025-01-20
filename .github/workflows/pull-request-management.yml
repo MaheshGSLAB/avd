@@ -210,6 +210,7 @@ jobs:
       - name: Set Image Tag
         id: build-image-tag
         run: |
+          git config --global --add safe.directory /__w/ansible-avd/ansible-avd
           SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test2:0.1-${SHORT_SHA}"
           echo "::set-output name=image_tag::$IMAGE_TAG"
