@@ -211,7 +211,7 @@ jobs:
         with:
           file: .github/Dockerfile
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test2:0.2
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test2:0.1
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -221,7 +221,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.setup-avd.outputs.image_tag }}
-      image: ghcr.io/maheshgslab/avd-slim-test2:0.2
+      image: ghcr.io/maheshgslab/avd-slim-test2:0.1
       options: --cpus 1
     # outputs:
     #   image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
@@ -246,7 +246,7 @@ jobs:
         with:
           file: .github/DockerfilePyavd
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test2:0.3
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test2:0.1
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -279,7 +279,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.build-pyavd.outputs.image_tag }}
-      image: ghcr.io/maheshgslab/avd-slim-test2:0.3
+      image: ghcr.io/maheshgslab/avd-slim-test2:0.1
       options: --cpus 1
 
     strategy:
