@@ -217,7 +217,7 @@ jobs:
 
   build-pyavd:
     name: Install pyavd and Build Image
-    needs: setup-avd
+    #needs: setup-avd
     runs-on: ubuntu-latest
     # container:
     #   #image: ${{ needs.setup-avd.outputs.image_tag }}
