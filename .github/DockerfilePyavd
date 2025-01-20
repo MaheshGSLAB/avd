@@ -24,7 +24,7 @@
 #     /UV3.12/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade && \
 #     /UV3.13/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade
 FROM ghcr.io/maheshgslab/avd-slim-test2:0.2
-RUN mkdir -p /avd && cp -rT ./ /avd
+COPY . /avd
 WORKDIR /avd/python-avd
 RUN python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels
