@@ -126,7 +126,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          file: ansible-avd/.github/Dockerfile
+          file: .github/Dockerfile
           push: true
           tags: avd-slim2:latest
           cache-from: type=gha
