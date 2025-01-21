@@ -246,6 +246,7 @@ jobs:
     name: Install pyavd and Build Image
     needs: setup-avd
     runs-on: ubuntu-latest
+    if: ${{ always() }}
     outputs:
       image_tag: ${{ steps.build-image-tag.outputs.image_tag }}
     steps:
@@ -279,7 +280,7 @@ jobs:
           cache-to: type=gha,mode=max
   run-ansible-tests:
     name: Run Ansible Tests
-    needs: build-pyavd
+    needs: [build-pyavd, setup-avd]
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.build-pyavd.outputs.image_tag }}
