@@ -182,7 +182,7 @@ jobs:
 
   setup-avd:
     name: Install AVD Requirements and Build Image
-    needs: [ file-changes ]
+    needs: [ file-changes, create-avd-slim2 ]
     runs-on: ubuntu-latest
 
     # outputs:
