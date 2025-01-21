@@ -23,7 +23,7 @@ pre-commit>=3.2.0
 pre-commit-hooks>=3.3.0
 referencing>=0.35.0
 ruff==0.9.1
-tox
+tox>=4.23.2
 treelib>=1.5.5
 twine
 yamllint

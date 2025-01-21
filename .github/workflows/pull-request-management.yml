@@ -185,9 +185,6 @@ jobs:
     needs: [ file-changes ]
     runs-on: ubuntu-latest
 
-    # outputs:
-    #   image_tag: ${{ steps.build-image-tag.outputs.image_tag }}
-
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -225,12 +222,6 @@ jobs:
         id: lowercase
         run: |
           echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-      # - name: Set Image Tag
-      #   id: build-image-tag
-      #   run: |
-      #     SHORT_SHA=$(git rev-parse --short HEAD)
-      #     IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:${{ github.run_number }}-${SHORT_SHA}"
-      #     echo "::set-output name=image_tag::$IMAGE_TAG"
       - name: Log in to GitHub Container Registry
         if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         uses: docker/login-action@v2
@@ -257,12 +248,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.build-image-tag.outputs.image_tag }}
-    # container:
-    #   #image: ${{ needs.setup-avd.outputs.image_tag }}
-    #   image: ghcr.io/maheshgslab/avd-slim-test3:0.1.2
-    #   options: --cpus 1
-    # outputs:
-    #image_tag: ${{ steps.wheel-image-tag.outputs.wheel_image_tag }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -292,14 +277,11 @@ jobs:
           tags: ${{ steps.build-image-tag.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # build-args: |
-          #   BASE_IMAGE_TAG=${{ needs.setup-avd.outputs.image_tag }}
   run-ansible-tests:
     name: Run Ansible Tests
     needs: build-pyavd
     runs-on: ubuntu-latest
     container:
-      #image: ${{ needs.build-pyavd.outputs.image_tag }}
       image: ${{ needs.build-pyavd.outputs.image_tag }}
       options: --cpus 1
     strategy:
