@@ -73,7 +73,6 @@ jobs:
               - 'ansible_collections/arista/avd/requirements-dev.txt'
               - 'ansible_collections/arista/avd/meta/runtime.yml'
               - '.github/requirements-ci.txt'
-              - '.github/workflows/pull-request-management.yml'
             docs:
               - '.github/workflows/pull-request-management.yml'
               - 'mkdocs.yml'
