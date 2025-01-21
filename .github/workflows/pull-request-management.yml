@@ -251,8 +251,8 @@ jobs:
           tags: ${{ needs.setup-avd.outputs.image_tag }}.2
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: # Pass the dynamic image tag as an argument
-            BASE_IMAGE_TAG: "${{ needs.setup-avd.outputs.image_tag }}"
+          build-args: |
+            BASE_IMAGE_TAG=${{ needs.setup-avd.outputs.image_tag }}
   run-ansible-tests:
     name: Run Ansible Tests
     needs: build-pyavd
