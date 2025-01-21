@@ -196,12 +196,24 @@ jobs:
       - name: Check if requirements-dev.txt has changed
         id: check-changes
         run: |
-          if git diff --quiet HEAD~1 HEAD -- ansible_collections/arista/avd/requirements-dev.txt; then
+          # Fetch the latest commit hash
+          LAST_COMMIT=$(git rev-parse HEAD)
+
+          # Compare against the last successful commit in the branch or the last commit
+          git fetch --depth=2  # Ensure we have enough history to compare
+
+          # Get the previous commit hash
+          PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
+
+          echo "Comparing changes in requirements-dev.txt between $PREVIOUS_COMMIT and $LAST_COMMIT"
+
+          # Check if there are changes in requirements-dev.txt
+          if git diff --quiet $PREVIOUS_COMMIT $LAST_COMMIT -- ansible_collections/arista/avd/requirements-dev.txt; then
             echo "No changes in requirements-dev.txt"
             echo "::set-output name=skip_job::true"
           else
             echo "Changes detected in requirements-dev.txt"
-            echo "::set-output name=skip_job::false"  
+            echo "::set-output name=skip_job::false"
           fi
         shell: /usr/bin/bash -e {0}
 
