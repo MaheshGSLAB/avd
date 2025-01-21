@@ -248,7 +248,7 @@ jobs:
         with:
           file: .github/DockerfilePyavd
           push: true
-          tags: ${{ needs.setup-avd.outputs.image_tag }}.2
+          tags: ${{ needs.setup-avd.outputs.image_tag }}-2
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -259,7 +259,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.build-pyavd.outputs.image_tag }}
-      image: ${{ needs.setup-avd.outputs.image_tag }}.2
+      image: ${{ needs.setup-avd.outputs.image_tag }}-2
       options: --cpus 1
     strategy:
       matrix:
