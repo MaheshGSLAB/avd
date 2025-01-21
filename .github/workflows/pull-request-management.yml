@@ -211,7 +211,7 @@ jobs:
         with:
           file: .github/Dockerfile
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:4.4
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:4.414
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -245,7 +245,7 @@ jobs:
         with:
           file: .github/DockerfilePyavd
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:4.5
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:4.515
           cache-from: type=gha
           cache-to: type=gha,mode=max
   run-ansible-tests:
@@ -254,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.build-pyavd.outputs.image_tag }}
-      image: ghcr.io/maheshgslab/avd-slim-test4:4.5
+      image: ghcr.io/maheshgslab/avd-slim-test4:4.515
       options: --cpus 1
     strategy:
       matrix:
