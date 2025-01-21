@@ -191,6 +191,8 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Check if requirements-dev.txt has changed
         id: check-changes
         run: |
@@ -199,14 +201,15 @@ jobs:
             echo "::set-output name=skip_job::true"
           else
             echo "Changes detected in requirements-dev.txt"
-            echo "::set-output name=skip_job::false"
+            echo "::set-output name=skip_job::false"  
           fi
+        shell: /usr/bin/bash -e {0}
 
       - name: Skip job if no changes
-        if: ${{ steps.check-changes.outputs.skip_job == 'true' }}
+        if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         run: echo "Skipping job as no changes detected in requirements-dev.txt"
       - name: Convert GitHub username to lowercase
-        if: ${{ steps.check-changes.outputs.skip_job == 'true' }}
+        if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         id: lowercase
         run: |
           echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
@@ -217,17 +220,17 @@ jobs:
       #     IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test4:${{ github.run_number }}-${SHORT_SHA}"
       #     echo "::set-output name=image_tag::$IMAGE_TAG"
       - name: Log in to GitHub Container Registry
-        if: ${{ steps.check-changes.outputs.skip_job == 'true' }}
+        if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ steps.lowercase.outputs.lowercase }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Docker Buildx
-        if: ${{ steps.check-changes.outputs.skip_job == 'true' }}
+        if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         uses: docker/setup-buildx-action@v3
       - name: Build and push
-        if: ${{ steps.check-changes.outputs.skip_job == 'true' }}
+        if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         uses: docker/build-push-action@v6
         with:
           file: .github/Dockerfile
