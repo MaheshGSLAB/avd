@@ -285,7 +285,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Task - ${{ matrix.task.name }}
         run: |
-          git config --global --add safe.directory /__w/avd/avd
           ${{ matrix.task.command }}
   # # ----------------------------------- #
   # # EOS CLI CONFIG GEN MOLECULE
