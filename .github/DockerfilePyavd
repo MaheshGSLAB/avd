@@ -23,7 +23,8 @@
 #     /UV3.11/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade && \
 #     /UV3.12/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade && \
 #     /UV3.13/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade
-FROM ghcr.io/maheshgslab/avd-slim-test4:4.414
+ARG BASE_IMAGE_TAG=ghcr.io/maheshgslab/avd-slim-test4:latest
+FROM $BASE_IMAGE_TAG
 COPY . /avd
 WORKDIR /avd/python-avd
 RUN python3 -m pip install --break-system-packages build && \
