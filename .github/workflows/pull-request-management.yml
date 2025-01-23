@@ -107,7 +107,7 @@ jobs:
       - name: Check if image exists
         id: check-image
         run: |
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test6:0.1"
+          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:0.1"
           if docker manifest inspect $IMAGE_TAG > /dev/null 2>&1; then
             echo "Image exists: $IMAGE_TAG"
             echo "::set-output name=image_exists::true"
@@ -129,7 +129,7 @@ jobs:
         with:
           file: .github/DockerfileBase
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test6:0.1
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:0.1
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -157,7 +157,7 @@ jobs:
         id: build-avd-tag
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test6:${{ github.run_number }}-${SHORT_SHA}"
+          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:${{ github.run_number }}-${SHORT_SHA}"
           echo "::set-output name=image_tag::$IMAGE_TAG"
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -187,7 +187,7 @@ jobs:
         id: build-image-tag
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test6:${{ github.run_number }}-${SHORT_SHA}-2"
+          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:${{ github.run_number }}-${SHORT_SHA}-2"
           echo "::set-output name=image_tag::$IMAGE_TAG"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
