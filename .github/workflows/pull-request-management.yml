@@ -129,6 +129,7 @@ jobs:
         with:
           file: .github/DockerfileBase
           push: true
+          target: Base
           tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:0.1
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -164,8 +165,9 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          file: .github/Dockerfile
+          file: .github/DockerfileBase
           push: true
+          target: AVDSetup
           tags: ${{ steps.build-avd-tag.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -200,13 +202,14 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          file: .github/DockerfilePyavd
+          file: .github/DockerfileBase
           push: true
+          target: pyavd
           tags: ${{ steps.build-image-tag.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
+          # build-args: |
+          #   BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
   run-ansible-tests:
     name: Run Ansible Tests
     needs: [setup-avd,build-pyavd]
