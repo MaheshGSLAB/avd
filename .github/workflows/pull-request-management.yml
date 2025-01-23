@@ -143,7 +143,6 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-
       - name: Convert GitHub username to lowercase
         id: lowercase
         run: |
