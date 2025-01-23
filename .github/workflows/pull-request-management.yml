@@ -90,6 +90,10 @@ jobs:
       image: ubuntu:latest
       options: --cpus 1
     steps:
+      - name: Set up Docker
+        run: |
+          apt-get update
+          apt-get install -y docker.io
       - name: Convert GitHub username to lowercase
         id: lowercase
         run: |
@@ -114,12 +118,6 @@ jobs:
       - name: Check out repository code
         if: steps.check-image.outputs.image_exists == 'false'
         uses: actions/checkout@v4
-
-      - name: Set up Docker
-        if: steps.check-image.outputs.image_exists == 'false'
-        run: |
-          apt-get update
-          apt-get install -y docker.io
 
       - name: Set up Docker Buildx
         if: steps.check-image.outputs.image_exists == 'false'
