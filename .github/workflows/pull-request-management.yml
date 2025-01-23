@@ -115,12 +115,6 @@ jobs:
           apt-get update
           apt-get install -y docker.io
 
-      - name: Convert GitHub username to lowercase
-        if: steps.check-image.outputs.image_exists == 'false'
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-
       - name: Log in to GitHub Container Registry
         if: steps.check-image.outputs.image_exists == 'false'
         uses: docker/login-action@v3
