@@ -129,7 +129,7 @@ jobs:
         with:
           file: .github/DockerfileBase
           push: true
-          target: Base
+          target: base
           tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:0.1
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -167,7 +167,7 @@ jobs:
         with:
           file: .github/DockerfileBase
           push: true
-          target: AVDSetup
+          target: avdsetup
           tags: ${{ steps.build-avd-tag.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

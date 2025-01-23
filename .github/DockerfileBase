@@ -1,4 +1,4 @@
-FROM ubuntu:latest AS Base
+FROM ubuntu:latest AS base
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-client git make python3-pip python3-dev docker.io && pip install uv --break-system-packages && apt-get clean && rm -rf /var/lib/apt/lists
 # Copy repository code into the image
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
@@ -9,7 +9,7 @@ RUN uv python install 3.10 3.11 3.12 3.13 && \
     uv venv --python 3.12 /UV3.12 && /UV3.12/bin/python -m ensurepip --upgrade && \
     uv venv --python 3.13 /UV3.13 && /UV3.13/bin/python -m ensurepip --upgrade
 
-FROM Base AS AVDSetup
+FROM base AS avdsetup
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 RUN uv python install 3.10 3.11 3.12 3.13 && \
     /UV3.10/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade && \
@@ -17,7 +17,7 @@ RUN uv python install 3.10 3.11 3.12 3.13 && \
     /UV3.12/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade && \
     /UV3.13/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" -r /requirements-dev.txt --upgrade
 
-FROM AVDSetup AS pyavd
+FROM avdsetup AS pyavd
 COPY . /avd
 WORKDIR /avd/python-avd
 RUN python3 -m pip install --break-system-packages build && \
