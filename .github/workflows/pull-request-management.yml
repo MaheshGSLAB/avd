@@ -175,7 +175,7 @@ jobs:
 
   build-pyavd:
     name: Install pyavd and Build Image
-    needs: [file-changes, avd-base-image]
+    needs: [setup-avd]
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.build-image-tag.outputs.image_tag }}
