@@ -84,161 +84,98 @@ jobs:
             pyavd:
               - 'python_avd/*'
               - 'python_avd/**/*'
-  # create-avd-slim2:
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: ubuntu:latest
-  #     options: --cpus 1
-  #   steps:
-  #     - name: Check out repository code
-  #       uses: actions/checkout@v4
-  #     - name: Set up Docker
-  #       run: |
-  #         apt-get update
-  #         apt-get install -y docker.io
+  create-avd-slim2:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:latest
+      options: --cpus 1
+    steps:
+      - name: Check if image exists
+        id: check-image
+        run: |
+          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test5:0.1"
+          if docker manifest inspect $IMAGE_TAG > /dev/null 2>&1; then
+            echo "Image exists: $IMAGE_TAG"
+            echo "::set-output name=image_exists::true"
+          else
+            echo "Image does not exist: $IMAGE_TAG"
+            echo "::set-output name=image_exists::false"
+          fi
+      - name: Check out repository code
+        if: steps.check-image.outputs.image_exists == 'false'
+        uses: actions/checkout@v4
 
-  #     - name: Convert GitHub username to lowercase
-  #       id: lowercase
-  #       run: |
-  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+      - name: Set up Docker
+        if: steps.check-image.outputs.image_exists == 'false'
+        run: |
+          apt-get update
+          apt-get install -y docker.io
 
-  #     - name: Log in to GitHub Container Registry
-  #       uses: docker/login-action@v3
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ steps.lowercase.outputs.lowercase }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Convert GitHub username to lowercase
+        if: steps.check-image.outputs.image_exists == 'false'
+        id: lowercase
+        run: |
+          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
 
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        if: steps.check-image.outputs.image_exists == 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ steps.lowercase.outputs.lowercase }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - name: Build and push
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         file: .github/DockerfileBase
-  #         push: true
-  #         tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test5:0.1
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
-  # create-avd-slim:
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: ubuntu:latest
-  #     options: --cpus 1
-  #   steps:
-  #     - name: Check out repository code
-  #       uses: actions/checkout@v4
-  #     - name: Set up Docker
-  #       run: |
-  #         apt-get update
-  #         apt-get install -y docker.io
+      - name: Set up Docker Buildx
+        if: steps.check-image.outputs.image_exists == 'false'
+        uses: docker/setup-buildx-action@v3
 
-  #     - name: Convert GitHub username to lowercase
-  #       id: lowercase
-  #       run: |
-  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-
-  #     - name: Log in to GitHub Container Registry
-  #       uses: docker/login-action@v2
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ steps.lowercase.outputs.lowercase }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-
-  #     - name: Create Dockerfile
-  #       run: |
-  #         cat <<EOF > Dockerfile
-  #         FROM ubuntu:latest
-  #         RUN apt-get update && apt-get install -y --no-install-recommends \\
-  #             openssh-client git make python3-pip python3-dev docker.io \\
-  #             && pip install uv --break-system-packages \\
-  #             && apt-get clean \\
-  #             && rm -rf /var/lib/apt/lists/*
-
-  #         # Copy repository code into the image
-  #         COPY . /avd
-
-  #         # Install UV and Python virtual environments
-  #         RUN uv python install 3.10 3.11 3.12 3.13 && \\
-  #             uv venv --python 3.10 /UV3.10 && /UV3.10/bin/python -m ensurepip --upgrade && \\
-  #             uv venv --python 3.11 /UV3.11 && /UV3.11/bin/python -m ensurepip --upgrade && \\
-  #             uv venv --python 3.12 /UV3.12 && /UV3.12/bin/python -m ensurepip --upgrade && \\
-  #             uv venv --python 3.13 /UV3.13 && /UV3.13/bin/python -m ensurepip --upgrade && \\
-  #             /UV3.10/bin/python -m pip install -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade && \\
-  #             /UV3.11/bin/python -m pip install -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade && \\
-  #             /UV3.12/bin/python -m pip install -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade && \\
-  #             /UV3.13/bin/python -m pip install -r /avd/ansible_collections/arista/avd/requirements-dev.txt --upgrade
-
-  #         EOF
-
-  #     - name: Build and Push Docker Image
-  #       id: build-image
-  #       run: |
-  #         IMAGE_TAG=ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test:0.1
-  #         docker build -t $IMAGE_TAG .
-  #         docker push $IMAGE_TAG
-
+      - name: Build and push
+        if: steps.check-image.outputs.image_exists == 'false'
+        uses: docker/build-push-action@v6
+        with:
+          file: .github/DockerfileBase
+          push: true
+          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test5:0.1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   setup-avd:
     name: Install AVD Requirements and Build Image
     needs: [ file-changes ]
-    #if: needs.file-changes.outputs.requirements == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.build-avd-tag.outputs.image_tag }}
 
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-      #   with:
-      #     fetch-depth: 0
-      # - name: Check if requirements-dev.txt has changed
-      #   id: check-changes
-      #   run: |
-      #     # Fetch the latest commit hash
-      #     LAST_COMMIT=$(git rev-parse HEAD)
-
-      #     # Compare against the last successful commit in the branch or the last commit
-      #     git fetch --depth=2  # Ensure we have enough history to compare
-
-      #     # Get the previous commit hash
-      #     PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
-
-      #     echo "Comparing changes in requirements-dev.txt between $PREVIOUS_COMMIT and $LAST_COMMIT"
-
-      #     # Check if there are changes in requirements-dev.txt
-      #     if git diff --quiet $PREVIOUS_COMMIT $LAST_COMMIT -- ansible_collections/arista/avd/requirements-dev.txt; then
-      #       echo "No changes in requirements-dev.txt"
-      #       echo "::set-output name=skip_job::true"
-      #     else
-      #       echo "Changes detected in requirements-dev.txt"
-      #       echo "::set-output name=skip_job::false"
-      #     fi
-      #   shell: /usr/bin/bash -e {0}
 
       - name: Skip job if no changes
-        #if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         run: echo "Skipping job as no changes detected in requirements-dev.txt"
       - name: Convert GitHub username to lowercase
-        #if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         id: lowercase
         run: |
           echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
       - name: Log in to GitHub Container Registry
-        #if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ steps.lowercase.outputs.lowercase }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set Image Tag
+        id: build-avd-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test5:${{ github.run_number }}-${SHORT_SHA}"
+          echo "::set-output name=image_tag::$IMAGE_TAG"
       - name: Set up Docker Buildx
-        #if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         uses: docker/setup-buildx-action@v3
       - name: Build and push
-        #if: ${{ steps.check-changes.outputs.skip_job == 'false' }}
         uses: docker/build-push-action@v6
         with:
           file: .github/Dockerfile
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test5:0.1
+          tags: ${{ steps.build-avd-tag.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -246,7 +183,6 @@ jobs:
     name: Install pyavd and Build Image
     needs: setup-avd
     runs-on: ubuntu-latest
-    #if: ${{ always() }}
     outputs:
       image_tag: ${{ steps.build-image-tag.outputs.image_tag }}
     steps:
@@ -260,7 +196,7 @@ jobs:
         id: build-image-tag
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test5:${{ github.run_number }}-${SHORT_SHA}"
+          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test5:${{ github.run_number }}-${SHORT_SHA}-2"
           echo "::set-output name=image_tag::$IMAGE_TAG"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
@@ -278,6 +214,8 @@ jobs:
           tags: ${{ steps.build-image-tag.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            BASE_IMAGE_TAG=${{ needs.setup-avd.outputs.image_tag }}
   run-ansible-tests:
     name: Run Ansible Tests
     needs: [build-pyavd]
