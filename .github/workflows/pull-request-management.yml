@@ -210,8 +210,8 @@ jobs:
           cache-to: type=gha,mode=max
           # build-args: |
           #   BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
-  run-ansible-tests:
-    name: Run Ansible Tests
+  run-container:
+    name: Run All Tests
     needs: [setup-avd,build-pyavd]
     runs-on: ubuntu-latest
     container:
@@ -232,6 +232,8 @@ jobs:
             command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
           - name: Ansible Lint Tests 3.11
             command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
+          - name: Molecule(eos_cli_config_gen) Tests 3.11
+            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule  test --scenario-name eos_cli_config_gen"
     steps:
       - name: Convert GitHub username to lowercase
         id: lowercase
@@ -247,6 +249,7 @@ jobs:
       - name: Run Task - ${{ matrix.task.name }}
         run: |
           ${{ matrix.task.command }}
+
   # # ----------------------------------- #
   # # EOS CLI CONFIG GEN MOLECULE
   # # ----------------------------------- #
