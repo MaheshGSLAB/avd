@@ -90,6 +90,10 @@ jobs:
       image: ubuntu:latest
       options: --cpus 1
     steps:
+      - name: Convert GitHub username to lowercase
+        id: lowercase
+        run: |
+          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
       - name: Check if image exists
         id: check-image
         run: |
@@ -141,7 +145,7 @@ jobs:
 
   setup-avd:
     name: Install AVD Requirements and Build Image
-    needs: [ file-changes ]
+    needs: [ file-changes, create-avd-slim2 ]
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.build-avd-tag.outputs.image_tag }}
