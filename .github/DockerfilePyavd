@@ -1,4 +1,4 @@
-ARG BASE_IMAGE_TAG=ghcr.io/maheshgslab/avd-slim-test6:0.1
+ARG BASE_IMAGE_TAG
 FROM $BASE_IMAGE_TAG
 COPY . /avd
 WORKDIR /avd/python-avd

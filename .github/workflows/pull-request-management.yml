@@ -144,8 +144,6 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      - name: Skip job if no changes
-        run: echo "Skipping job as no changes detected in requirements-dev.txt"
       - name: Convert GitHub username to lowercase
         id: lowercase
         run: |
@@ -209,7 +207,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            BASE_IMAGE_TAG: "${{ needs.setup-avd.outputs.image_tag }}"
+            BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
   run-ansible-tests:
     name: Run Ansible Tests
     needs: [setup-avd,build-pyavd]
