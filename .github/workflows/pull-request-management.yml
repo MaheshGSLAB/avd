@@ -347,8 +347,8 @@ jobs:
           - avd_scenario: 'eos_designs_unit_tests'
             ansible_version: 'ansible-core<2.19.0 --upgrade'
             #pip_requirements: '.github/requirements-ci.txt'
-    needs: [ build-pyavd ]
-    if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
+    #needs: [ build-pyavd ]
+    #if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
     steps:
       - name: Build minimum requirements
         run: >
