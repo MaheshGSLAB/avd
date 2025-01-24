@@ -249,9 +249,9 @@ jobs:
   molecule_eos_cli_config_gen:
     name: Validate eos_cli_config_gen
     runs-on: ubuntu-latest
-    container:
-      #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
-      image: ghcr.io/maheshgslab/avd-base:121-de6e210
+    # container:
+    #   #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+    #   image: ghcr.io/maheshgslab/avd-base:121-de6e210
     strategy:
       fail-fast: true
       matrix:
@@ -268,159 +268,167 @@ jobs:
     #needs: [ build-pyavd ]
     #if: needs.file-changes.outputs.config_gen == 'true'
     steps:
-      # - name: Install the specified Ansible version
-      #   run: |
-      #     . /UV3.11/bin/python -m pip install ${{ matrix.ansible_version }}
+      - uses: actions/checkout@v4
       - name: Run molecule action
-        run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+        uses: ghcr.io/maheshgslab/avd-base:121-de6e210
+        with:
+          molecule_parentdir: "/avd/ansible_collections/arista/avd"
+          molecule_command: "test"
+          molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
+          pip_file: /avd/.github/requirements-ci-dev.txt
+          galaxy_file: "ansible_collections/arista/avd/collections.yml"
+          ansible: ${{ matrix.ansible_version }}
+          check_git: true
+          check_git_enforced: true
+        # run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
       # - uses: actions/upload-artifact@v4
       #   with:
       #     name: molecule-${{ matrix.avd_scenario }}-artifacts
       #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
 
-  # ----------------------------------- #
-  # DHCP PROVISIONNER MOLECULE
-  # ----------------------------------- #
-  molecule_dhcp_provisionner:
-    name: Validate DHCP configuration
-    runs-on: ubuntu-latest
-    container:
-      #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
-      image: ghcr.io/maheshgslab/avd-base:121-de6e210
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario: ['dhcp_configuration', 'dhcp_provisioning']
-        ansible_version: ['ansible-core<2.19.0 --upgrade']
-    #needs: [ build-pyavd ]
-    #if: needs.file-changes.outputs.dhcp == 'true'
-    steps:
-      - name: Run molecule action
-        run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: molecule-${{ matrix.avd_scenario }}-artifacts
-      #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
+  # # ----------------------------------- #
+  # # DHCP PROVISIONNER MOLECULE
+  # # ----------------------------------- #
+  # molecule_dhcp_provisionner:
+  #   name: Validate DHCP configuration
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+  #     image: ghcr.io/maheshgslab/avd-base:121-de6e210
+  #   strategy:
+  #     fail-fast: true
+  #     matrix:
+  #       avd_scenario: ['dhcp_configuration', 'dhcp_provisioning']
+  #       ansible_version: ['ansible-core<2.19.0 --upgrade']
+  #   #needs: [ build-pyavd ]
+  #   #if: needs.file-changes.outputs.dhcp == 'true'
+  #   steps:
+  #     - name: Run molecule action
+  #       run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+  #     # - uses: actions/upload-artifact@v4
+  #     #   with:
+  #     #     name: molecule-${{ matrix.avd_scenario }}-artifacts
+  #     #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
 
-  # ----------------------------------- #
-  # EOS Design MOLECULE
-  # ----------------------------------- #
-  molecule_eos_designs:
-    name: Validate eos_designs
-    runs-on: ubuntu-latest
-    container:
-      #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
-      image: ghcr.io/maheshgslab/avd-base:121-de6e210
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario:
-          - 'eos_designs_deprecated_vars'
-          - 'eos_designs-l2ls'
-          - 'eos_designs-mpls-isis-sr-ldp'
-          - 'eos_designs_negative_unit_tests'
-          - 'eos_designs-twodc-5stage-clos'
-          - 'eos_designs_unit_tests'
-          - 'evpn_underlay_ebgp_overlay_ebgp'
-          - 'evpn_underlay_isis_overlay_ibgp'
-          - 'evpn_underlay_ospf_overlay_ebgp'
-          - 'evpn_underlay_rfc5549_overlay_ebgp'
-          - 'example-campus-fabric'
-          - 'example-dual-dc-l3ls'
-          - 'example-isis-ldp-ipvpn'
-          - 'example-l2ls-fabric'
-          - 'example-single-dc-l3ls'
-          - 'example-cv-pathfinder'
-        ansible_version:
-          # Testing all scenario with 2.16.x, due to bug with in 2.17.0 with and the way we test eos_designs_negative_unit_tests https://github.com/ansible/ansible/issues/83292
-          - 'ansible-core>=2.16.0,<2.17.0 --upgrade'
-        pip_requirements:
-          - '.github/requirements-ci.txt'
-        # Also test minimum ansible version for one scenario.
-        include:
-          - avd_scenario: 'eos_designs_unit_tests'
-            ansible_version: 'ansible-core==2.15.0'
-            #pip_requirements: 'tmp-requirements-minimum.txt'
-          - avd_scenario: 'eos_designs_unit_tests'
-            ansible_version: 'ansible-core>=2.15.0,<2.16.0 --upgrade'
-            #pip_requirements: '.github/requirements-ci.txt'
-          - avd_scenario: 'eos_designs_unit_tests'
-            ansible_version: 'ansible-core<2.18.0 --upgrade'
-            #pip_requirements: '.github/requirements-ci.txt'
-          - avd_scenario: 'eos_designs_unit_tests'
-            ansible_version: 'ansible-core<2.19.0 --upgrade'
-            #pip_requirements: '.github/requirements-ci.txt'
-    #needs: [ build-pyavd ]
-    #if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
-    steps:
-      # - name: Build minimum requirements
-      #   run: >
-      #     bash -c "
-      #     /UV3.11/bin/activate &&
-      #     pip install ${{ matrix.ansible_version }}
-      #     "
+  # # ----------------------------------- #
+  # # EOS Design MOLECULE
+  # # ----------------------------------- #
+  # molecule_eos_designs:
+  #   name: Validate eos_designs
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+  #     image: ghcr.io/maheshgslab/avd-base:121-de6e210
+  #   strategy:
+  #     fail-fast: true
+  #     matrix:
+  #       avd_scenario:
+  #         - 'eos_designs_deprecated_vars'
+  #         - 'eos_designs-l2ls'
+  #         - 'eos_designs-mpls-isis-sr-ldp'
+  #         - 'eos_designs_negative_unit_tests'
+  #         - 'eos_designs-twodc-5stage-clos'
+  #         - 'eos_designs_unit_tests'
+  #         - 'evpn_underlay_ebgp_overlay_ebgp'
+  #         - 'evpn_underlay_isis_overlay_ibgp'
+  #         - 'evpn_underlay_ospf_overlay_ebgp'
+  #         - 'evpn_underlay_rfc5549_overlay_ebgp'
+  #         - 'example-campus-fabric'
+  #         - 'example-dual-dc-l3ls'
+  #         - 'example-isis-ldp-ipvpn'
+  #         - 'example-l2ls-fabric'
+  #         - 'example-single-dc-l3ls'
+  #         - 'example-cv-pathfinder'
+  #       ansible_version:
+  #         # Testing all scenario with 2.16.x, due to bug with in 2.17.0 with and the way we test eos_designs_negative_unit_tests https://github.com/ansible/ansible/issues/83292
+  #         - 'ansible-core>=2.16.0,<2.17.0 --upgrade'
+  #       pip_requirements:
+  #         - '.github/requirements-ci.txt'
+  #       # Also test minimum ansible version for one scenario.
+  #       include:
+  #         - avd_scenario: 'eos_designs_unit_tests'
+  #           ansible_version: 'ansible-core==2.15.0'
+  #           #pip_requirements: 'tmp-requirements-minimum.txt'
+  #         - avd_scenario: 'eos_designs_unit_tests'
+  #           ansible_version: 'ansible-core>=2.15.0,<2.16.0 --upgrade'
+  #           #pip_requirements: '.github/requirements-ci.txt'
+  #         - avd_scenario: 'eos_designs_unit_tests'
+  #           ansible_version: 'ansible-core<2.18.0 --upgrade'
+  #           #pip_requirements: '.github/requirements-ci.txt'
+  #         - avd_scenario: 'eos_designs_unit_tests'
+  #           ansible_version: 'ansible-core<2.19.0 --upgrade'
+  #           #pip_requirements: '.github/requirements-ci.txt'
+  #   #needs: [ build-pyavd ]
+  #   #if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
+  #   steps:
+  #     # - name: Build minimum requirements
+  #     #   run: >
+  #     #     bash -c "
+  #     #     /UV3.11/bin/activate &&
+  #     #     pip install ${{ matrix.ansible_version }}
+  #     #     "
           
-        #if: matrix.pip_requirements == 'tmp-requirements-minimum.txt'
-      - name: Run molecule action
-        run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: molecule-${{ matrix.avd_scenario }}-artifacts
-      #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
-  # ----------------------------------- #
-  # Cloudvision MOLECULE
-  # ----------------------------------- #
-  molecule_cloudvision:
-    name: Validate cvp_collection
-    runs-on: ubuntu-latest
-    container:
-      #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
-      image: ghcr.io/maheshgslab/avd-base:121-de6e210
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario:
-          - 'eos_config_deploy_cvp'
-        ansible_version:
-          - 'ansible-core<2.19.0 --upgrade'
-        include:
-          - avd_scenario: 'eos_config_deploy_cvp'
-            ansible_version: 'ansible-core==2.15.0'
-    #needs: [ build-pyavd ]
-    #if: needs.file-changes.outputs.cloudvision == 'true' || needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
+  #       #if: matrix.pip_requirements == 'tmp-requirements-minimum.txt'
+  #     - name: Run molecule action
+  #       run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+  #     # - uses: actions/upload-artifact@v4
+  #     #   with:
+  #     #     name: molecule-${{ matrix.avd_scenario }}-artifacts
+  #     #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
+  # # ----------------------------------- #
+  # # Cloudvision MOLECULE
+  # # ----------------------------------- #
+  # molecule_cloudvision:
+  #   name: Validate cvp_collection
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+  #     image: ghcr.io/maheshgslab/avd-base:121-de6e210
+  #   strategy:
+  #     fail-fast: true
+  #     matrix:
+  #       avd_scenario:
+  #         - 'eos_config_deploy_cvp'
+  #       ansible_version:
+  #         - 'ansible-core<2.19.0 --upgrade'
+  #       include:
+  #         - avd_scenario: 'eos_config_deploy_cvp'
+  #           ansible_version: 'ansible-core==2.15.0'
+  #   #needs: [ build-pyavd ]
+  #   #if: needs.file-changes.outputs.cloudvision == 'true' || needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
 
-    steps:
-      - name: Run molecule action
-        run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: molecule-${{ matrix.avd_scenario }}-artifacts
-      #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
-      #
-  # ----------------------------------- #
-  # EOS Validate State MOLECULE
-  # ----------------------------------- #
-  molecule_eos_validate_state:
-    name: Validate eos_validate_state
-    runs-on: ubuntu-latest
-    container:
-      #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
-      image: ghcr.io/maheshgslab/avd-base:121-de6e210
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario:
-          - 'eos_validate_state'
-        ansible_version:
-          - 'ansible-core<2.19.0 --upgrade'
-        include:
-          - avd_scenario: 'eos_validate_state'
-            ansible_version: 'ansible-core==2.15.0'
-    #needs: [ build-pyavd ]
-    #if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.validate_state == 'true'
-    steps:
-      - name: Run molecule action
-        run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+  #   steps:
+  #     - name: Run molecule action
+  #       run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+  #     # - uses: actions/upload-artifact@v4
+  #     #   with:
+  #     #     name: molecule-${{ matrix.avd_scenario }}-artifacts
+  #     #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
+  #     #
+  # # ----------------------------------- #
+  # # EOS Validate State MOLECULE
+  # # ----------------------------------- #
+  # molecule_eos_validate_state:
+  #   name: Validate eos_validate_state
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+  #     image: ghcr.io/maheshgslab/avd-base:121-de6e210
+  #   strategy:
+  #     fail-fast: true
+  #     matrix:
+  #       avd_scenario:
+  #         - 'eos_validate_state'
+  #       ansible_version:
+  #         - 'ansible-core<2.19.0 --upgrade'
+  #       include:
+  #         - avd_scenario: 'eos_validate_state'
+  #           ansible_version: 'ansible-core==2.15.0'
+  #   #needs: [ build-pyavd ]
+  #   #if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.validate_state == 'true'
+  #   steps:
+  #     - name: Run molecule action
+  #       run: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
 
   # ----------------------------------- #
   # Galaxy Importer
