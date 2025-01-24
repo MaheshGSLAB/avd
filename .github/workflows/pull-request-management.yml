@@ -101,19 +101,19 @@ jobs:
           HASH_OF_REQS=$(sha256sum ansible_collections/arista/avd/requirements-dev.txt | cut -d' ' -f1)
           echo "Hash of requirements: $HASH_OF_REQS"
           echo "::set-output name=hash_of_reqs::$HASH_OF_REQS"
+      - name: Convert GitHub username to lowercase
+        id: lowercase
+        run: |
+          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
       - name: Set Base Image Tag
         id: set-base-tag
         run: |
-          BASE_IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/avd-base:${{ steps.hash-reqs.outputs.hash_of_reqs }}"
+          BASE_IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-base:${{ steps.hash-reqs.outputs.hash_of_reqs }}"
           echo "::set-output name=base_image_tag::$BASE_IMAGE_TAG"
       - name: Set up Docker
         run: |
           apt-get update
           apt-get install -y docker.io
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -155,16 +155,16 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-      - name: Set Build Image Tag
-        id: set-build-tag
-        run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          BUILD_IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
-          echo "::set-output name=build_image_tag::$BUILD_IMAGE_TAG"
       - name: Convert GitHub username to lowercase
         id: lowercase
         run: |
           echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+      - name: Set Build Image Tag
+        id: set-build-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BUILD_IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
+          echo "::set-output name=build_image_tag::$BUILD_IMAGE_TAG"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
