@@ -195,23 +195,23 @@ jobs:
       matrix:
         task:
           - name: Ansible Unit Tests 3.12
-            python: /UV3.12/bin/python
+            python: . /UV3.12/bin/python
             dir: /avd/ansible_collections/arista/avd
             command: ansible-test units -vv
           - name: Ansible Integration Tests 3.12
-            python: /UV3.12/bin/python
+            python: . /UV3.12/bin/python
             dir: /avd/ansible_collections/arista/avd
             command: ansible-test integration -vv
           - name: Ansible Integration Tests 3.13
-            python: /UV3.13/bin/python
+            python: . /UV3.13/bin/python
             dir: /avd/ansible_collections/arista/avd
             command: ansible-test integration -vv
           - name: Ansible Sanity Tests 3.13
-            python: /UV3.13/bin/python
+            python: . /UV3.13/bin/python
             dir: /avd/ansible_collections/arista/avd
             command: ansible-test sanity --color yes -v
           - name: Ansible Lint Tests 3.11
-            python: /UV3.11/bin/python
+            python: . /UV3.11/bin/python
             dir: /avd/ansible_collections/arista/avd
             command: |
               ansible-galaxy collection install -r collections.yml &&
