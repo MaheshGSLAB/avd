@@ -186,7 +186,7 @@ jobs:
           #   BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
   run-container:
     name: Run All Tests
-    needs: [setup-avd,build-pyavd]
+    needs: [build-pyavd]
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.build-pyavd.outputs.build_image_tag }}
