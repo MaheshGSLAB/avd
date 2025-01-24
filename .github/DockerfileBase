@@ -20,7 +20,7 @@ RUN uv python install 3.10 3.11 3.12 3.13 && \
 FROM base AS build
 LABEL stage=build
 #COPY . /avd
-WORKDIR python-avd/
+RUN cd python-avd/
 RUN python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
