@@ -265,7 +265,7 @@ jobs:
         include:
           - avd_scenario: 'eos_cli_config_gen'
             ansible_version: 'ansible-core==2.15.0'
-    needs: [ build-pyavd ]
+    #needs: [ build-pyavd ]
     #if: needs.file-changes.outputs.config_gen == 'true'
     steps:
       # - name: Install the specified Ansible version
