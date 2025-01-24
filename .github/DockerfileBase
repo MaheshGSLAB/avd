@@ -29,9 +29,9 @@ RUN python3 -m pip install --break-system-packages build && \
 
 FROM base AS run
 LABEL stage=run
-# Selectively copy necessary parts of virtual environments
-COPY --from=build /UV3.10/lib/python3.10/site-packages/pyavd /UV3.10/lib/python3.10/site-packages
-COPY --from=build /UV3.11/lib/python3.11/site-packages/pyavd /UV3.11/lib/python3.11/site-packages
-COPY --from=build /UV3.12/lib/python3.12/site-packages/pyavd /UV3.12/lib/python3.12/site-packages
-COPY --from=build /UV3.13/lib/python3.13/site-packages/pyavd /UV3.13/lib/python3.13/site-packages
+# Copy virtual environments from the build stage
+COPY --from=build /UV3.10 /UV3.10
+COPY --from=build /UV3.11 /UV3.11
+COPY --from=build /UV3.12 /UV3.12
+COPY --from=build /UV3.13 /UV3.13
 COPY --from=build /avd /avd
