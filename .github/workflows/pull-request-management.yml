@@ -195,7 +195,10 @@ jobs:
       matrix:
         task:
           - name: Ansible Unit Tests 3.12
-            command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
+            command: |
+              ". /UV3.12/bin/activate"
+              "cd /avd/ansible_collections/arista/avd"
+              "ansible-test units -vv"
           - name: Ansible Integration Tests 3.12
             command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
           - name: Ansible Integration Tests 3.13
