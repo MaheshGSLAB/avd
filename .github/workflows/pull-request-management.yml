@@ -269,11 +269,11 @@ jobs:
       - name: Run molecule action
         uses: docker://ghcr.io/maheshgslab/avd-base:121-de6e210
         with:
-          molecule_parentdir: "ansible_collections/arista/avd"
+          molecule_parentdir: "/avd/ansible_collections/arista/avd"
           molecule_command: "test"
           molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
-          pip_file: .github/requirements-ci-dev.txt
-          galaxy_file: "ansible_collections/arista/avd/collections.yml"
+          pip_file: /avd/.github/requirements-ci-dev.txt
+          galaxy_file: "/avd/ansible_collections/arista/avd/collections.yml"
           ansible: ${{ matrix.ansible_version }}
           check_git: true
           check_git_enforced: true
