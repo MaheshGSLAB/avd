@@ -249,33 +249,30 @@ jobs:
   molecule_eos_cli_config_gen:
     name: Validate eos_cli_config_gen
     runs-on: ubuntu-latest
-    # container:
-    #   #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
-    #   image: ghcr.io/maheshgslab/avd-base:121-de6e210
     strategy:
       fail-fast: true
       matrix:
         avd_scenario:
-          - 'eos_cli_config_gen'
-          - 'eos_cli_config_gen_deprecated_vars'
-          - 'eos_cli_config_gen_negative_unit_tests'
+          - "eos_cli_config_gen"
+          - "eos_cli_config_gen_deprecated_vars"
+          - "eos_cli_config_gen_negative_unit_tests"
         ansible_version:
-          - 'ansible-core<2.19.0 --upgrade'
+          - "ansible-core<2.19.0 --upgrade"
         # Also test minimum ansible version for one scenario.
         include:
-          - avd_scenario: 'eos_cli_config_gen'
-            ansible_version: 'ansible-core==2.15.0'
-    #needs: [ build-pyavd ]
+          - avd_scenario: "eos_cli_config_gen"
+            ansible_version: "ansible-core==2.16.0"
+    #needs: [file-changes]
     #if: needs.file-changes.outputs.config_gen == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Run molecule action
         uses: ghcr.io/maheshgslab/avd-base:121-de6e210
         with:
-          molecule_parentdir: "/avd/ansible_collections/arista/avd"
+          molecule_parentdir: "ansible_collections/arista/avd"
           molecule_command: "test"
           molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
-          pip_file: /avd/.github/requirements-ci-dev.txt
+          pip_file: .github/requirements-ci-dev.txt
           galaxy_file: "ansible_collections/arista/avd/collections.yml"
           ansible: ${{ matrix.ansible_version }}
           check_git: true
