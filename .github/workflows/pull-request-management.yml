@@ -272,7 +272,7 @@ jobs:
       #   run: |
       #     . /UV3.11/bin/python -m pip install ${{ matrix.ansible_version }}
       - name: Run molecule action
-        run: "/UV3.11/bin/python -m pip --version"
+        run: "/UV3.11/bin/python -m pip install 'ansible-core==2.15.0'"
         #run: " . /UV3.11/bin/activate && /UV3.11/bin/python -m pip install ${{ matrix.ansible_version }} && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
       # - uses: actions/upload-artifact@v4
       #   with:
