@@ -267,7 +267,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run molecule action
-        uses: ghcr.io/maheshgslab/avd-base:121-de6e210
+        uses: docker://ghcr.io/maheshgslab/avd-base:121-de6e210
         with:
           molecule_parentdir: "ansible_collections/arista/avd"
           molecule_command: "test"
