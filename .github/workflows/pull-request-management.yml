@@ -139,7 +139,7 @@ jobs:
         if: steps.check-base-image.outputs.image_exists == 'false'
         uses: docker/build-push-action@v6
         with:
-          file: Dockerfile
+          file: .github/DockerfileBase
           target: base
           push: true
           tags: ${{ steps.set-base-tag.outputs.base_image_tag }}
