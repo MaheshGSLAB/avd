@@ -409,6 +409,8 @@ jobs:
     container:
       image: ${{ needs.build-pyavd.outputs.build_image_tag }}
     steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
       - name: "Run ansible-test integration test cases"
         run: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
 
