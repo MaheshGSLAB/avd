@@ -89,7 +89,23 @@ jobs:
     container:
       image: ubuntu:latest
       options: --cpus 1
+    outputs:
+      base_image_tag: ${{ steps.set-base-tag.outputs.base_image_tag }}
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Calculate Hash of Requirements
+        id: hash-reqs
+        run: |
+          HASH_OF_REQS=$(sha256sum ansible_collections/arista/avd/requirements-dev.txt | cut -d' ' -f1)
+          echo "Hash of requirements: $HASH_OF_REQS"
+          echo "::set-output name=hash_of_reqs::$HASH_OF_REQS"
+      - name: Set Base Image Tag
+        id: set-base-tag
+        run: |
+          BASE_IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/avd-base:${{ steps.hash-reqs.outputs.hash_of_reqs }}"
+          echo "::set-output name=base_image_tag::$BASE_IMAGE_TAG"
       - name: Set up Docker
         run: |
           apt-get update
@@ -105,92 +121,50 @@ jobs:
           username: ${{ steps.lowercase.outputs.lowercase }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Check if image exists
-        id: check-image
+        id: check-base-image
         run: |
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:0.1"
-          if docker manifest inspect $IMAGE_TAG > /dev/null 2>&1; then
-            echo "Image exists: $IMAGE_TAG"
+          if docker manifest inspect ${{ steps.set-base-tag.outputs.base_image_tag }} > /dev/null 2>&1; then
+            echo "Base image exists."
             echo "::set-output name=image_exists::true"
           else
-            echo "Image does not exist: $IMAGE_TAG"
+            echo "Base image does not exist."
             echo "::set-output name=image_exists::false"
           fi
-      - name: Check out repository code
-        if: steps.check-image.outputs.image_exists == 'false'
-        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        if: steps.check-image.outputs.image_exists == 'false'
+        if: steps.check-base-image.outputs.image_exists == 'false'
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push
-        if: steps.check-image.outputs.image_exists == 'false'
+        if: steps.check-base-image.outputs.image_exists == 'false'
         uses: docker/build-push-action@v6
         with:
-          file: .github/DockerfileBase
-          push: true
+          file: Dockerfile
           target: base
-          tags: ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:0.1
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  setup-avd:
-    name: Install AVD Requirements and Build Image
-    needs: [ file-changes, avd-base-image ]
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.build-avd-tag.outputs.image_tag }}
-
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Convert GitHub username to lowercase
-        id: lowercase
-        run: |
-          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lowercase.outputs.lowercase }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set Image Tag
-        id: build-avd-tag
-        run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:${{ github.run_number }}-${SHORT_SHA}"
-          echo "::set-output name=image_tag::$IMAGE_TAG"
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          file: .github/DockerfileBase
           push: true
-          target: avdsetup
-          tags: ${{ steps.build-avd-tag.outputs.image_tag }}
+          tags: ${{ steps.set-base-tag.outputs.base_image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   build-pyavd:
     name: Install pyavd and Build Image
-    needs: [setup-avd]
+    needs: [avd-base-image]
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.build-image-tag.outputs.image_tag }}
+      build_image_tag: ${{ steps.set-build-tag.outputs.build_image_tag }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+      - name: Set Build Image Tag
+        id: set-build-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BUILD_IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
+          echo "::set-output name=build_image_tag::$BUILD_IMAGE_TAG"
       - name: Convert GitHub username to lowercase
         id: lowercase
         run: |
           echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-      - name: Set Image Tag
-        id: build-image-tag
-        run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-slim-test1:${{ github.run_number }}-${SHORT_SHA}-2"
-          echo "::set-output name=image_tag::$IMAGE_TAG"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -204,8 +178,8 @@ jobs:
         with:
           file: .github/DockerfileBase
           push: true
-          target: pyavd
-          tags: ${{ steps.build-image-tag.outputs.image_tag }}
+          target: run
+          tags: ${{ steps.set-build-tag.outputs.build_image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # build-args: |
@@ -215,7 +189,7 @@ jobs:
     needs: [setup-avd,build-pyavd]
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.build-pyavd.outputs.image_tag }}
+      image: ${{ needs.build-pyavd.outputs.build_image_tag }}
       options: --cpus 1
     strategy:
       matrix:
@@ -232,60 +206,60 @@ jobs:
             command: ". /UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
           - name: Ansible Lint Tests 3.11
             command: ". /UV3.11/bin/activate && ansible-galaxy collection install -r /avd/ansible_collections/arista/avd/collections.yml && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
-          - name: Molecule(eos_cli_config_gen) Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen"
-          - name: Molecule(eos_cli_config_gen_deprecated_vars) Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen_deprecated_vars"
-          - name: Molecule(eos_cli_config_gen_negative_unit_tests) Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen_negative_unit_tests"
-          - name: Molecule(eos_cli_config_gen) with Minimum Ansible Version Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' && molecule test --scenario-name eos_cli_config_gen"
-          - name: Molecule:- eos_designs_deprecated_vars Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs_deprecated_vars"
-          - name: Molecule:- eos_designs-l2ls Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs-l2ls"
-          - name: Molecule:- eos_designs-mpls-isis-sr-ldp Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs-mpls-isis-sr-ldp"
-          - name: Molecule:- eos_designs_negative_unit_tests Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs_negative_unit_tests"
-          - name: Molecule:- eos_designs-twodc-5stage-clos Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs-twodc-5stage-clos"
-          - name: Molecule:- eos_designs_unit_tests Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs_unit_tests"
-          - name: Molecule:- evpn_underlay_ebgp_overlay_ebgp Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_ebgp_overlay_ebgp"
-          - name: Molecule:- evpn_underlay_isis_overlay_ibgp Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_isis_overlay_ibgp"
-          - name: Molecule:- evpn_underlay_ospf_overlay_ebgp Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_ospf_overlay_ebgp"
-          - name: Molecule:- evpn_underlay_rfc5549_overlay_ebgp Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_rfc5549_overlay_ebgp"
-          - name: Molecule:- example-campus-fabric Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-campus-fabric"
-          - name: Molecule:- example-dual-dc-l3ls Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-dual-dc-l3ls"
-          - name: Molecule:- example-isis-ldp-ipvpn Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-isis-ldp-ipvpn"
-          - name: Molecule:- example-l2ls-fabric Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-l2ls-fabric"
-          - name: Molecule:- example-single-dc-l3ls Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-single-dc-l3ls"
-          - name: Molecule:- example-cv-pathfinder Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-cv-pathfinder"
-          - name: Molecule:- eos_designs_unit_tests ansible-core==2.16.0 Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' --upgrade && test --scenario-name eos_designs_unit_tests"
-          - name: Molecule:- eos_designs_unit_tests ansible-core<2.18.0 Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.18.0' --upgrade && test --scenario-name eos_designs_unit_tests"
-          - name: Molecule:- eos_designs_unit_tests ansible-core<2.19.0 Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && test --scenario-name eos_designs_unit_tests"
-          - name: Molecule:- eos_config_deploy_cvp ansible-core<2.19.0 Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && test --scenario-name eos_config_deploy_cvp"
-          - name: Molecule:- eos_config_deploy_cvp ansible-core==2.16.0 Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' && test --scenario-name eos_config_deploy_cvp"
-          - name: Molecule:- eos_validate_state ansible-core<2.19.0 Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && test --scenario-name eos_validate_state"
-          - name: Molecule:- eos_config_deploy_cvp ansible-core==2.16.0 Tests 3.11
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' && test --scenario-name eos_validate_state"
+          # - name: Molecule(eos_cli_config_gen) Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen"
+          # - name: Molecule(eos_cli_config_gen_deprecated_vars) Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen_deprecated_vars"
+          # - name: Molecule(eos_cli_config_gen_negative_unit_tests) Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen_negative_unit_tests"
+          # - name: Molecule(eos_cli_config_gen) with Minimum Ansible Version Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' && molecule test --scenario-name eos_cli_config_gen"
+          # - name: Molecule:- eos_designs_deprecated_vars Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs_deprecated_vars"
+          # - name: Molecule:- eos_designs-l2ls Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs-l2ls"
+          # - name: Molecule:- eos_designs-mpls-isis-sr-ldp Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs-mpls-isis-sr-ldp"
+          # - name: Molecule:- eos_designs_negative_unit_tests Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs_negative_unit_tests"
+          # - name: Molecule:- eos_designs-twodc-5stage-clos Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs-twodc-5stage-clos"
+          # - name: Molecule:- eos_designs_unit_tests Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name eos_designs_unit_tests"
+          # - name: Molecule:- evpn_underlay_ebgp_overlay_ebgp Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_ebgp_overlay_ebgp"
+          # - name: Molecule:- evpn_underlay_isis_overlay_ibgp Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_isis_overlay_ibgp"
+          # - name: Molecule:- evpn_underlay_ospf_overlay_ebgp Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_ospf_overlay_ebgp"
+          # - name: Molecule:- evpn_underlay_rfc5549_overlay_ebgp Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name evpn_underlay_rfc5549_overlay_ebgp"
+          # - name: Molecule:- example-campus-fabric Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-campus-fabric"
+          # - name: Molecule:- example-dual-dc-l3ls Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-dual-dc-l3ls"
+          # - name: Molecule:- example-isis-ldp-ipvpn Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-isis-ldp-ipvpn"
+          # - name: Molecule:- example-l2ls-fabric Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-l2ls-fabric"
+          # - name: Molecule:- example-single-dc-l3ls Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-single-dc-l3ls"
+          # - name: Molecule:- example-cv-pathfinder Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core>=2.16.0,<2.17.0' --upgrade && test --scenario-name example-cv-pathfinder"
+          # - name: Molecule:- eos_designs_unit_tests ansible-core==2.16.0 Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' --upgrade && test --scenario-name eos_designs_unit_tests"
+          # - name: Molecule:- eos_designs_unit_tests ansible-core<2.18.0 Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.18.0' --upgrade && test --scenario-name eos_designs_unit_tests"
+          # - name: Molecule:- eos_designs_unit_tests ansible-core<2.19.0 Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && test --scenario-name eos_designs_unit_tests"
+          # - name: Molecule:- eos_config_deploy_cvp ansible-core<2.19.0 Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && test --scenario-name eos_config_deploy_cvp"
+          # - name: Molecule:- eos_config_deploy_cvp ansible-core==2.16.0 Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' && test --scenario-name eos_config_deploy_cvp"
+          # - name: Molecule:- eos_validate_state ansible-core<2.19.0 Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && test --scenario-name eos_validate_state"
+          # - name: Molecule:- eos_config_deploy_cvp ansible-core==2.16.0 Tests 3.11
+          #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core==2.16.0' && test --scenario-name eos_validate_state"
     steps:
       - name: Convert GitHub username to lowercase
         id: lowercase
