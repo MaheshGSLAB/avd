@@ -84,106 +84,106 @@ jobs:
             pyavd:
               - 'python_avd/*'
               - 'python_avd/**/*'
-  # avd-base-image:
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: ubuntu:latest
-  #     options: --cpus 1
-  #   outputs:
-  #     base_image_tag: ${{ steps.set-base-tag.outputs.base_image_tag }}
-  #   steps:
-  #     - name: Check out repository
-  #       uses: actions/checkout@v4
+  avd-base-image:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:latest
+      options: --cpus 1
+    outputs:
+      base_image_tag: ${{ steps.set-base-tag.outputs.base_image_tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-  #     - name: Calculate Hash of Requirements
-  #       id: hash-reqs
-  #       run: |
-  #         HASH_OF_REQS=$(sha256sum ansible_collections/arista/avd/requirements-dev.txt | cut -d' ' -f1)
-  #         echo "Hash of requirements: $HASH_OF_REQS"
-  #         echo "::set-output name=hash_of_reqs::$HASH_OF_REQS"
-  #     - name: Convert GitHub username to lowercase
-  #       id: lowercase
-  #       run: |
-  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-  #     - name: Set Base Image Tag
-  #       id: set-base-tag
-  #       run: |
-  #         BASE_IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-base:${{ steps.hash-reqs.outputs.hash_of_reqs }}"
-  #         echo "::set-output name=base_image_tag::$BASE_IMAGE_TAG"
-  #     - name: Set up Docker
-  #       run: |
-  #         apt-get update
-  #         apt-get install -y docker.io
-  #     - name: Log in to GitHub Container Registry
-  #       uses: docker/login-action@v3
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ steps.lowercase.outputs.lowercase }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Check if image exists
-  #       id: check-base-image
-  #       run: |
-  #         if docker manifest inspect ${{ steps.set-base-tag.outputs.base_image_tag }} > /dev/null 2>&1; then
-  #           echo "Base image exists."
-  #           echo "::set-output name=image_exists::true"
-  #         else
-  #           echo "Base image does not exist."
-  #           echo "::set-output name=image_exists::false"
-  #         fi
+      - name: Calculate Hash of Requirements
+        id: hash-reqs
+        run: |
+          HASH_OF_REQS=$(sha256sum ansible_collections/arista/avd/requirements-dev.txt | cut -d' ' -f1)
+          echo "Hash of requirements: $HASH_OF_REQS"
+          echo "::set-output name=hash_of_reqs::$HASH_OF_REQS"
+      - name: Convert GitHub username to lowercase
+        id: lowercase
+        run: |
+          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+      - name: Set Base Image Tag
+        id: set-base-tag
+        run: |
+          BASE_IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-base:${{ steps.hash-reqs.outputs.hash_of_reqs }}"
+          echo "::set-output name=base_image_tag::$BASE_IMAGE_TAG"
+      - name: Set up Docker
+        run: |
+          apt-get update
+          apt-get install -y docker.io
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ steps.lowercase.outputs.lowercase }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check if image exists
+        id: check-base-image
+        run: |
+          if docker manifest inspect ${{ steps.set-base-tag.outputs.base_image_tag }} > /dev/null 2>&1; then
+            echo "Base image exists."
+            echo "::set-output name=image_exists::true"
+          else
+            echo "Base image does not exist."
+            echo "::set-output name=image_exists::false"
+          fi
 
-  #     - name: Set up Docker Buildx
-  #       if: steps.check-base-image.outputs.image_exists == 'false'
-  #       uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        if: steps.check-base-image.outputs.image_exists == 'false'
+        uses: docker/setup-buildx-action@v3
 
-  #     - name: Build and push
-  #       if: steps.check-base-image.outputs.image_exists == 'false'
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         file: .github/DockerfileBase
-  #         target: base
-  #         push: true
-  #         tags: ${{ steps.set-base-tag.outputs.base_image_tag }}
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
+      - name: Build and push
+        if: steps.check-base-image.outputs.image_exists == 'false'
+        uses: docker/build-push-action@v6
+        with:
+          file: .github/DockerfileBase
+          target: base
+          push: true
+          tags: ${{ steps.set-base-tag.outputs.base_image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  # build-pyavd:
-  #   name: Install pyavd and Build Image
-  #   needs: [avd-base-image]
-  #   runs-on: ubuntu-latest
-  #   outputs:
-  #     build_image_tag: ${{ steps.set-build-tag.outputs.build_image_tag }}
-  #   steps:
-  #     - name: Check out repository code
-  #       uses: actions/checkout@v4
-  #     - name: Convert GitHub username to lowercase
-  #       id: lowercase
-  #       run: |
-  #         echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-  #     - name: Set Build Image Tag
-  #       id: set-build-tag
-  #       run: |
-  #         SHORT_SHA=$(git rev-parse --short HEAD)
-  #         BUILD_IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
-  #         echo "::set-output name=build_image_tag::$BUILD_IMAGE_TAG"
-  #     - name: Log in to GitHub Container Registry
-  #       uses: docker/login-action@v2
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ steps.lowercase.outputs.lowercase }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
-  #     - name: Build and push
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         file: .github/DockerfileBase
-  #         push: true
-  #         target: run
-  #         tags: ${{ steps.set-build-tag.outputs.build_image_tag }}
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
-  #         # build-args: |
-  #         #   BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
+  build-pyavd:
+    name: Install pyavd and Build Image
+    needs: [avd-base-image]
+    runs-on: ubuntu-latest
+    outputs:
+      build_image_tag: ${{ steps.set-build-tag.outputs.build_image_tag }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Convert GitHub username to lowercase
+        id: lowercase
+        run: |
+          echo "::set-output name=lowercase::$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+      - name: Set Build Image Tag
+        id: set-build-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BUILD_IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
+          echo "::set-output name=build_image_tag::$BUILD_IMAGE_TAG"
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ steps.lowercase.outputs.lowercase }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          file: .github/DockerfileBase
+          push: true
+          target: run
+          tags: ${{ steps.set-build-tag.outputs.build_image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # build-args: |
+          #   BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
   # run-anisble-tests:
   #   name: Run Ansible Tests
   #   needs: [build-pyavd]
@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       #image: ${{ needs.build-pyavd.outputs.build_image_tag }}
-      image: ghcr.io/maheshgslab/avd-base:121-de6e210
+      image: ${{ needs.build-pyavd.outputs.build_image_tag }}
     strategy:
       fail-fast: true
       matrix:
@@ -265,7 +265,7 @@ jobs:
         include:
           - avd_scenario: 'eos_cli_config_gen'
             ansible_version: 'ansible-core==2.15.0'
-    #needs: [ build-pyavd ]
+    needs: [ build-pyavd ]
     #if: needs.file-changes.outputs.config_gen == 'true'
     steps:
       # - name: Install the specified Ansible version
