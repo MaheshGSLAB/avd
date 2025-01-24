@@ -353,7 +353,7 @@ jobs:
       - name: Build minimum requirements
         run: >
           bash -c "
-          . /UV3.11/bin/activate &&
+          /UV3.11/bin/activate &&
           pip install ${{ matrix.ansible_version }}
           "
           
