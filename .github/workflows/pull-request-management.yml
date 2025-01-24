@@ -219,7 +219,7 @@ jobs:
               cd /avd/ansible_collections/arista/avd &&
               molecule test --scenario-name eos_cli_config_gen
               "
-            command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen"
+            #command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install 'ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen"
           # - name: Molecule(eos_cli_config_gen_deprecated_vars) Tests 3.11
           #   command: ". /UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && pip install ansible-core<2.19.0' --upgrade && molecule test --scenario-name eos_cli_config_gen_deprecated_vars"
           # - name: Molecule(eos_cli_config_gen_negative_unit_tests) Tests 3.11
