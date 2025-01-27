@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements file
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 
+RUN mkdir -p /targets && cd /targets
 # Install Python versions and dependencies
 RUN uv python install 3.10 3.11 3.12 3.13 && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
@@ -25,10 +26,7 @@ FROM ubuntu:latest AS base_run
 LABEL stage=base_run
 
 # Copy virtual environments from the base build stage
-COPY --from=base_build /UV3.10 /UV3.10
-COPY --from=base_build /UV3.11 /UV3.11
-COPY --from=base_build /UV3.12 /UV3.12
-COPY --from=base_build /UV3.13 /UV3.13
+COPY --from=base_build /targets /targets
 
 # Stage 3: Python AVD build stage
 FROM base_build AS pyavd_build
@@ -42,7 +40,7 @@ WORKDIR /avd/python-avd
 RUN python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
-      /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
+      /targets/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
 # Stage 4: Final runtime environment
@@ -50,11 +48,7 @@ FROM base_run AS run
 LABEL stage=run
 
 # Copy updated virtual environments from the pyavd_build stage
-COPY --from=pyavd_build /UV3.10 /UV3.10
-COPY --from=pyavd_build /UV3.11 /UV3.11
-COPY --from=pyavd_build /UV3.12 /UV3.12
-COPY --from=pyavd_build /UV3.13 /UV3.13
+COPY --from=pyavd_build /targets /targets
 
 # Copy application code from the pyavd_build stage
 COPY --from=pyavd_build /avd /avd
-ENV PATH="/UV3.10/bin:/UV3.11/bin:/UV3.12/bin:/UV3.13/bin:$PATH"
