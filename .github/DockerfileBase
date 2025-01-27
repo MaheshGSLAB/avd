@@ -1,5 +1,5 @@
-FROM ubuntu:latest AS base
-#LABEL stage=base
+FROM ubuntu:latest AS base_build
+LABEL stage=base_build
 # Install essential packages and UV
 RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client git make python3-pip python3-dev docker.io && \
@@ -16,9 +16,14 @@ RUN uv python install 3.10 3.11 3.12 3.13 && \
       /UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
+FROM ubuntu:latest AS base_run
+COPY --from=base_build /UV3.10 /UV3.10
+COPY --from=base_build /UV3.11 /UV3.11
+COPY --from=base_build /UV3.12 /UV3.12
+COPY --from=base_build /UV3.13 /UV3.13
 
-FROM base AS build
-LABEL stage=build
+FROM base_build AS pyavd_build
+LABEL stage=pyavd_build
 COPY . /avd
 WORKDIR /avd/python-avd
 RUN python3 -m pip install --break-system-packages build && \
@@ -27,11 +32,11 @@ RUN python3 -m pip install --break-system-packages build && \
       /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
-FROM base AS run
+FROM base_run AS run
 LABEL stage=run
 # Copy virtual environments from the build stage
-COPY --from=build /UV3.10 /UV3.10
-COPY --from=build /UV3.11 /UV3.11
-COPY --from=build /UV3.12 /UV3.12
-COPY --from=build /UV3.13 /UV3.13
-COPY --from=build /avd /avd
+COPY --from=pyavd_build /UV3.10 /UV3.10
+COPY --from=pyavd_build /UV3.11 /UV3.11
+COPY --from=pyavd_build /UV3.12 /UV3.12
+COPY --from=pyavd_build /UV3.13 /UV3.13
+COPY --from=pyavd_build /avd /avd
