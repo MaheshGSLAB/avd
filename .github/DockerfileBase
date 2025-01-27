@@ -15,9 +15,9 @@ RUN mkdir -p /targets && cd /targets
 # Install Python versions and dependencies
 RUN uv python install 3.10 3.11 3.12 3.13 && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
-      uv venv --python $VERSION /UV$VERSION && \
-      /UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+      uv venv --python $VERSION /targets/UV$VERSION && \
+      /targets/UV$VERSION/bin/python -m ensurepip --upgrade && \
+      /targets/UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
 
@@ -34,8 +34,7 @@ LABEL stage=pyavd_build
 
 # Copy application source code
 COPY . /avd
-WORKDIR /
-RUN ls -l && cd /targets && ls -l
+WORKDIR /avd/python-avd
 
 # Build Python wheels and install them in all Python versions
 RUN python3 -m pip install --break-system-packages build && \
