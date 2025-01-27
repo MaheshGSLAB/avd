@@ -1,14 +1,17 @@
+# Stage 1: Base build environment
 FROM ubuntu:latest AS base_build
 LABEL stage=base_build
+
 # Install essential packages and UV
 RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client git make python3-pip python3-dev docker.io && \
     pip install uv --break-system-packages && \
     apt-get clean && rm -rf /var/lib/apt/lists
 
-# Copy requirements file after installing essential tools
+# Copy requirements file
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
-# Install Python versions and dependencies in a single step
+
+# Install Python versions and dependencies
 RUN uv python install 3.10 3.11 3.12 3.13 && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       uv venv --python $VERSION /UV$VERSION && \
@@ -16,27 +19,42 @@ RUN uv python install 3.10 3.11 3.12 3.13 && \
       /UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
+
+# Stage 2: Base runtime environment
 FROM ubuntu:latest AS base_run
+LABEL stage=base_run
+
+# Copy virtual environments from the base build stage
 COPY --from=base_build /UV3.10 /UV3.10
 COPY --from=base_build /UV3.11 /UV3.11
 COPY --from=base_build /UV3.12 /UV3.12
 COPY --from=base_build /UV3.13 /UV3.13
 
+# Stage 3: Python AVD build stage
 FROM base_build AS pyavd_build
 LABEL stage=pyavd_build
+
+# Copy application source code
 COPY . /avd
 WORKDIR /avd/python-avd
+
+# Build Python wheels and install them in all Python versions
 RUN python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
+# Stage 4: Final runtime environment
 FROM base_run AS run
 LABEL stage=run
-# Copy virtual environments from the build stage
+
+# Copy updated virtual environments from the pyavd_build stage
 COPY --from=pyavd_build /UV3.10 /UV3.10
 COPY --from=pyavd_build /UV3.11 /UV3.11
 COPY --from=pyavd_build /UV3.12 /UV3.12
 COPY --from=pyavd_build /UV3.13 /UV3.13
+
+# Copy application code from the pyavd_build stage
 COPY --from=pyavd_build /avd /avd
+ENV PATH="/UV3.10/bin:/UV3.11/bin:/UV3.12/bin:/UV3.13/bin:$PATH"
