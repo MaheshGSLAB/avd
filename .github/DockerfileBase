@@ -29,7 +29,7 @@ LABEL stage=base_run
 COPY --from=base_build /targets /targets
 
 # Stage 3: Python AVD build stage
-FROM base_build AS pyavd_build
+FROM base_run AS pyavd_build
 LABEL stage=pyavd_build
 
 # Copy application source code
