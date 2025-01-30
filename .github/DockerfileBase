@@ -11,8 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 FROM base AS uv-cache
 RUN uv python install 3.10 3.11 3.12 3.13
 
+# Ensure the .uv directory exists and list contents for debugging
+RUN ls -la /root/.uv || echo "Warning: /root/.uv not found in uv-cache"
+
 # Base image with cached Python installs
-FROM base AS base
+FROM base AS prepared_base
 COPY --from=uv-cache /root/.uv /root/.uv  
 
 # Install dependencies inside the UV virtual environments
@@ -26,7 +29,7 @@ RUN for VERSION in 3.10 3.11 3.12 3.13; do \
     done
 
 # Build stage
-FROM base AS build
+FROM prepared_base AS build
 COPY . /avd
 WORKDIR /avd/python-avd
 RUN python3 -m pip install build && \
@@ -36,6 +39,6 @@ RUN python3 -m pip install build && \
     done
 
 # Final runtime image
-FROM base AS run
+FROM prepared_base AS run
 COPY --from=build /UV* /
 COPY --from=build /avd /avd
