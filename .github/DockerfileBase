@@ -1,38 +1,41 @@
-# Stage 1: Base Dependencies (Installs system dependencies)
-FROM ubuntu:latest AS base-deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        openssh-client git make python3-pip python3-dev docker.io && \
-    pip install uv --break-system-packages && \
-    apt-get clean && rm -rf /var/lib/apt/lists
+# Use a lightweight base image
+FROM python:3.12-slim AS base
 
-# Stage 2: Base (Installs Python versions and dependencies)
-FROM base-deps AS base
+# Install dependencies in a single RUN layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openssh-client git make docker.io && \
+    pip install --no-cache-dir --upgrade pip uv && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Cache Python versions using a separate stage
+FROM base AS uv-cache
+RUN uv python install 3.10 3.11 3.12 3.13
+
+# Base image with cached Python installs
+FROM base AS base
+COPY --from=uv-cache /root/.uv /root/.uv  
+
+# Install dependencies inside the UV virtual environments
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
-RUN uv python install 3.10 3.11 3.12 3.13 && \
-    for VERSION in 3.10 3.11 3.12 3.13; do \
+RUN for VERSION in 3.10 3.11 3.12 3.13; do \
       uv venv --python $VERSION /UV$VERSION && \
       /UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+      /UV$VERSION/bin/python -m pip install --no-cache-dir \
+      mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
 
-# Stage 3: Build (Builds the Python package and requires UV virtual environments)
+# Build stage
 FROM base AS build
-LABEL stage=build
 COPY . /avd
 WORKDIR /avd/python-avd
-RUN python3 -m pip install --break-system-packages build && \
+RUN python3 -m pip install build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
-# Stage 4: Run (Final runtime environment)
+# Final runtime image
 FROM base AS run
-LABEL stage=run
-# Copy virtual environments from the build stage
-COPY --from=build /UV3.10 /UV3.10
-COPY --from=build /UV3.11 /UV3.11
-COPY --from=build /UV3.12 /UV3.12
-COPY --from=build /UV3.13 /UV3.13
+COPY --from=build /UV* /
 COPY --from=build /avd /avd
