@@ -1,37 +1,43 @@
+# Stage 1: Base
 FROM python:3.12-slim AS base
-#LABEL stage=base
-# Install essential packages and UV
 RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client git make docker.io && \
     pip install uv --break-system-packages && \
     apt-get clean && rm -rf /var/lib/apt/lists
 
-# Copy requirements file after installing essential tools
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
-# Install Python versions and dependencies in a single step
+
 RUN uv python install 3.10 3.11 3.12 3.13 && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       uv venv --python $VERSION /UV$VERSION && \
       /UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+      /UV$VERSION/bin/python -m pip install --no-cache-dir \
+      mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
 
-From python:3.12-slim AS base_run
-COPY --from=base /UV* /
+# Stage 2: Base Runtime Image (Minimal)
+FROM python:3.12-slim AS base_run
+COPY --from=base /UV3.10 /UV3.10
+COPY --from=base /UV3.11 /UV3.11
+COPY --from=base /UV3.12 /UV3.12
+COPY --from=base /UV3.13 /UV3.13
 
+# Stage 3: Build (For PyAVD)
 FROM base_run AS build
-LABEL stage=build
-COPY . /avd
 WORKDIR /avd/python-avd
+COPY . /avd
 RUN python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
+# Stage 4: Final Run Image (Minimal)
 FROM base_run AS run
-LABEL stage=run
-# Copy virtual environments from the build stage
-COPY --from=build /UV* /
+COPY --from=build /UV3.10 /UV3.10
+COPY --from=build /UV3.11 /UV3.11
+COPY --from=build /UV3.12 /UV3.12
+COPY --from=build /UV3.13 /UV3.13
 COPY --from=build /avd /avd
+WORKDIR /avd
