@@ -25,8 +25,8 @@ COPY --from=base /UV3.13 /UV3.13
 
 # Stage 3: Build (For PyAVD)
 FROM base_run AS build
-WORKDIR /avd/python-avd
 COPY . /avd
+WORKDIR /avd/python-avd
 RUN apt-get install make && \
     python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
