@@ -140,7 +140,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: .github/DockerfileBase
-          target: prepared_base
+          target: base
           push: true
           tags: ${{ steps.set-base-tag.outputs.base_image_tag }}
           cache-from: type=gha
