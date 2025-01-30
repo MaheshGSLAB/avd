@@ -1,54 +1,38 @@
-# Stage 1: Base build environment
-FROM ubuntu:latest AS base_build
-LABEL stage=base_build
-
-# Install essential packages and UV
+# Stage 1: Base Dependencies (Installs system dependencies)
+FROM ubuntu:latest AS base-deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client git make python3-pip python3-dev docker.io && \
     pip install uv --break-system-packages && \
     apt-get clean && rm -rf /var/lib/apt/lists
 
-# Copy requirements file
+# Stage 2: Base (Installs Python versions and dependencies)
+FROM base-deps AS base
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
-
-RUN mkdir -p /targets && cd /targets
-# Install Python versions and dependencies
 RUN uv python install 3.10 3.11 3.12 3.13 && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
-      uv venv --python $VERSION /targets/UV$VERSION && \
-      /targets/UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /targets/UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+      uv venv --python $VERSION /UV$VERSION && \
+      /UV$VERSION/bin/python -m ensurepip --upgrade && \
+      /UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
 
-# Stage 2: Base runtime environment
-FROM ubuntu:latest AS base_run
-LABEL stage=base_run
-
-# Copy virtual environments from the base build stage
-COPY --from=base_build /targets /targets
-
-# Stage 3: Python AVD build stage
-FROM base_run AS pyavd_build
-LABEL stage=pyavd_build
-
-# Copy application source code
+# Stage 3: Build (Builds the Python package and requires UV virtual environments)
+FROM base AS build
+LABEL stage=build
 COPY . /avd
 WORKDIR /avd/python-avd
-
-# Build Python wheels and install them in all Python versions
 RUN python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
-      /targets/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
+      /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
-# Stage 4: Final runtime environment
-FROM base_run AS run
+# Stage 4: Run (Final runtime environment)
+FROM base AS run
 LABEL stage=run
-
-# Copy updated virtual environments from the pyavd_build stage
-COPY --from=pyavd_build /targets /targets
-
-# Copy application code from the pyavd_build stage
-COPY --from=pyavd_build /avd /avd
+# Copy virtual environments from the build stage
+COPY --from=build /UV3.10 /UV3.10
+COPY --from=build /UV3.11 /UV3.11
+COPY --from=build /UV3.12 /UV3.12
+COPY --from=build /UV3.13 /UV3.13
+COPY --from=build /avd /avd
