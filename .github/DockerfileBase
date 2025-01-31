@@ -14,7 +14,7 @@ COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 # Create all virtual environments in a single root folder
 RUN mkdir /venvs && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
-      uv venv --python $VERSION /venvs/$VERSION && \
+      uv venv --python $VERSION /venvs/UV$VERSION && \
       /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
       /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir \
       mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
