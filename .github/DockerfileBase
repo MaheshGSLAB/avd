@@ -3,14 +3,14 @@ FROM python:3.12-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client git make docker.io && \
     pip install uv --break-system-packages && \
+    uv python install 3.10 3.11 3.12 3.13 && \
     apt-get clean && rm -rf /var/lib/apt/lists
 
 # Stage 2: Base Runtime Image (Minimal)
 FROM base AS base_run
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 
-RUN uv python install 3.10 3.11 3.12 3.13 && \
-    for VERSION in 3.10 3.11 3.12 3.13; do \
+RUN for VERSION in 3.10 3.11 3.12 3.13; do \
       uv venv --python $VERSION /UV$VERSION && \
       /UV$VERSION/bin/python -m ensurepip --upgrade && \
       /UV$VERSION/bin/python -m pip install --no-cache-dir \
