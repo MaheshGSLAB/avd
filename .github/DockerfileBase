@@ -1,13 +1,13 @@
 # Stage 1: Base
 FROM python:3.12-slim AS base
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        openssh-client git make docker.io && \
-    pip install uv --break-system-packages && \
-    uv python install 3.10 3.11 3.12 3.13 && \
-    apt-get clean && rm -rf /var/lib/apt/lists
+RUN pip install uv --break-system-packages && \
+    uv python install 3.10 3.11 3.12 3.13
 
 # Stage 2: Base Runtime Image (Minimal)
 FROM base AS base_run
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openssh-client git make docker.io && \
+    apt-get clean && rm -rf /var/lib/apt/lists
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 
 RUN for VERSION in 3.10 3.11 3.12 3.13; do \
@@ -19,7 +19,11 @@ RUN for VERSION in 3.10 3.11 3.12 3.13; do \
     done
 
 # Stage 3: Build (For PyAVD)
-FROM base_run AS build
+FROM base AS build
+COPY --from=base_run /UV3.10 /UV3.10
+COPY --from=base_run /UV3.11 /UV3.11
+COPY --from=base_run /UV3.12 /UV3.12
+COPY --from=base_run /UV3.13 /UV3.13
 COPY . /avd
 WORKDIR /avd/python-avd
 RUN python3 -m pip install --break-system-packages build && \
