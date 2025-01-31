@@ -22,12 +22,17 @@ COPY --from=base /UV3.10 /UV3.10
 COPY --from=base /UV3.11 /UV3.11
 COPY --from=base /UV3.12 /UV3.12
 COPY --from=base /UV3.13 /UV3.13
+# Copy system libraries (ensure compatibility)
+COPY --from=base /usr/lib /usr/lib
+COPY --from=base /lib /lib
+COPY --from=base /lib64 /lib64
 
 # Stage 3: Build (For PyAVD)
 FROM base_run AS build
+RUN ldd /UV3.11/bin/python
 COPY . /avd
 WORKDIR /avd/python-avd
-RUN apt-get update && apt-get install -y --no-install-recommends make libpython3.11 libpython3.10 libpython3.12 libpython3.13 && \
+RUN apt-get update && apt-get install -y --no-install-recommends make && \
     python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
