@@ -25,6 +25,7 @@ COPY --from=base /UV3.13 /UV3.13
 
 # Stage 3: Build (For PyAVD)
 FROM base_run AS build
+RUN ls -al /
 COPY . /avd
 WORKDIR /avd/python-avd
 RUN apt-get update && apt-get install -y --no-install-recommends make && \
