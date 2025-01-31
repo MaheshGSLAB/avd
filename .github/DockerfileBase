@@ -26,7 +26,8 @@ COPY --from=base_run /UV3.12 /UV3.12
 COPY --from=base_run /UV3.13 /UV3.13
 COPY . /avd
 WORKDIR /avd/python-avd
-RUN python3 -m pip install --break-system-packages build && \
+RUN apt-get install -y --no-install-recommends make && \
+    python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
