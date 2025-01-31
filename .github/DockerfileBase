@@ -15,8 +15,8 @@ COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 RUN mkdir /venvs && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       uv venv --python $VERSION /venvs/$VERSION && \
-      /venvs/$VERSION/bin/python -m ensurepip --upgrade && \
-      /venvs/$VERSION/bin/python -m pip install --no-cache-dir \
+      /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
+      /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir \
       mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
     python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
-      /venvs/$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
+      /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
 # Stage 4: Final Run Image (Minimal)

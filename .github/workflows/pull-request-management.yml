@@ -390,7 +390,7 @@ jobs:
       image: ${{ needs.build-pyavd.outputs.build_image_tag }}
     steps:
       - name: "Run ansible-test sanity"
-        run: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
+        run: ". /venvs/UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test sanity --color yes -v"
 
   ansible_test_units:
     name: Run ansible-test units test cases
@@ -399,10 +399,8 @@ jobs:
     container:
       image: ${{ needs.build-pyavd.outputs.build_image_tag }}
     steps:
-      - name: check venvs
-        run: ls -l /venvs
       - name: "Run ansible-test units test cases"
-        run: ". venvs/UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
+        run: ". /venvs/UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
 
   ansible_test_integration:
     name: Run ansible-test integration test cases
@@ -414,7 +412,7 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
       - name: "Run ansible-test integration test cases"
-        run: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
+        run: ". /venvs/UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test integration -vv"
 
   ansible_lint:
     name: Run ansible-lint test case
@@ -424,7 +422,7 @@ jobs:
       image: ${{ needs.build-pyavd.outputs.build_image_tag }}
     steps:
       - name: "Run ansible-test integration test cases"
-        run: ". /UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
+        run: ". /venvs/UV3.13/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-lint --force-color --strict -v"
 
   # ----------------------------------- #
   # Galaxy Importer
