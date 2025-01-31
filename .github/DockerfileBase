@@ -7,37 +7,42 @@ RUN pip install uv --break-system-packages && \
 FROM base AS base_run
 RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client git make docker.io && \
-    apt-get clean && rm -rf /var/lib/apt/lists
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 
-RUN for VERSION in 3.10 3.11 3.12 3.13; do \
-      uv venv --python $VERSION /UV$VERSION && \
-      /UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /UV$VERSION/bin/python -m pip install --no-cache-dir \
+# Create all virtual environments in a single root folder
+RUN mkdir /venvs && \
+    for VERSION in 3.10 3.11 3.12 3.13; do \
+      uv venv --python $VERSION /venvs/$VERSION && \
+      /venvs/$VERSION/bin/python -m ensurepip --upgrade && \
+      /venvs/$VERSION/bin/python -m pip install --no-cache-dir \
       mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
 
 # Stage 3: Build (For PyAVD)
 FROM base AS build
-COPY --from=base_run /UV3.10 /UV3.10
-COPY --from=base_run /UV3.11 /UV3.11
-COPY --from=base_run /UV3.12 /UV3.12
-COPY --from=base_run /UV3.13 /UV3.13
+# Copy the virtual environments folder from base_run
+COPY --from=base_run /venvs /venvs
+
+# Copy the application code
 COPY . /avd
 WORKDIR /avd/python-avd
+
+# Install build dependencies and build the wheel
 RUN apt-get update && apt-get install -y --no-install-recommends make && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
     python3 -m pip install --break-system-packages build && \
     python3 -m build --wheel --outdir /tmp/wheels && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
-      /UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
+      /venvs/$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
 # Stage 4: Final Run Image (Minimal)
 FROM base AS run
-COPY --from=build /UV3.10 /UV3.10
-COPY --from=build /UV3.11 /UV3.11
-COPY --from=build /UV3.12 /UV3.12
-COPY --from=build /UV3.13 /UV3.13
+# Copy the virtual environments folder from build
+COPY --from=build /venvs /venvs
+
+# Copy the application code
 COPY --from=build /avd /avd
-WORKDIR /avd

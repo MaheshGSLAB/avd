@@ -399,8 +399,10 @@ jobs:
     container:
       image: ${{ needs.build-pyavd.outputs.build_image_tag }}
     steps:
+      - name: check venvs
+        run: ls -l /venvs
       - name: "Run ansible-test units test cases"
-        run: ". targets/UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
+        run: ". venvs/UV3.12/bin/activate && cd /avd/ansible_collections/arista/avd && ansible-test units -vv"
 
   ansible_test_integration:
     name: Run ansible-test integration test cases
