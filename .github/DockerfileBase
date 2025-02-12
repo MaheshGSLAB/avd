@@ -1,29 +1,30 @@
+# Stage 1: Base with UV installation
 FROM ubuntu:latest AS base
-#LABEL stage=base
-# Install essential packages and UV
 RUN apt-get update && apt-get install -y --no-install-recommends make curl ca-certificates && \
-        update-ca-certificates && \
-        curl -LsSf https://astral.sh/uv/install.sh | sh
+    update-ca-certificates && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Copy requirements file after installing essential tools
+# Copy requirements early to benefit from Docker layer caching
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 
-# Install Python versions and dependencies in a single step
-RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
+# Stage 2: Prebuild Virtual Environments
+FROM base AS venvs
+RUN mkdir -p /venvs && \
+    for VERSION in 3.10 3.11 3.12 3.13; do \
       UV_PYTHON_INSTALL_DIR=/venvs/python-versions uv venv --python $VERSION /venvs/UV$VERSION && \
-      . /venvs/UV$VERSION/bin/activate && which python && \
       /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /venvs/UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
-      -r /requirements-dev.txt --upgrade; \
+      /venvs/UV$VERSION/bin/python -m pip install --upgrade pip && \
+      /venvs/UV$VERSION/bin/python -m pip install \
+        mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+        -r /requirements-dev.txt; \
     done
 
+# Stage 3: Base Runtime
 FROM ubuntu:latest AS base_run
-COPY --from=base /venvs /venvs
+COPY --from=venvs /venvs /venvs
 
 # Stage 3: Build (For PyAVD)
-FROM base AS build
-# Copy the virtual environments folder from base_run
-COPY --from=base_run /venvs /venvs
+FROM base_run AS build
 
 # Copy the application code
 COPY . /avd
@@ -38,10 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
       /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
-# Stage 4: Final Run Image (Minimal)
+# Stage 5: Final Run Image (Minimal)
 FROM ubuntu:latest AS run
-# Copy the virtual environments folder from build
 COPY --from=build /venvs /venvs
-
-# Copy the application code
 COPY --from=build /avd /avd
