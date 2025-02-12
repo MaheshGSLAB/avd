@@ -19,6 +19,7 @@ FROM ubuntu:latest AS build
 COPY --from=base_run /venvs /venvs
 # Copy the application code
 COPY . /avd
+RUN du -sh /
 WORKDIR /avd/python-avd
 
 # Install build dependencies and build the wheel
