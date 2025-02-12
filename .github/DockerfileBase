@@ -15,10 +15,11 @@ FROM ubuntu:latest AS base_run
 COPY --from=venvs /venvs /venvs
 
 # Stage 3: Build (For PyAVD)
-FROM base_run AS build
-
+FROM ubuntu:latest AS build
+COPY --from=base_run /venvs /venvs
 # Copy the application code
-RUN cd python-avd
+COPY . /avd
+WORKDIR /avd/python-avd
 
 # Install build dependencies and build the wheel
 RUN apt-get update && apt-get install -y --no-install-recommends make && \
@@ -27,8 +28,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
-
-COPY ../ /avd
 
 # Stage 5: Final Run Image (Minimal)
 FROM ubuntu:latest AS run
