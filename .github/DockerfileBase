@@ -1,15 +1,8 @@
-# Stage 1: Base with UV installation
-FROM ubuntu:latest AS base
+FROM ubuntu:latest AS venvs
 RUN apt-get update && apt-get install -y --no-install-recommends make curl ca-certificates && \
     update-ca-certificates && \
     curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Copy requirements early to benefit from Docker layer caching
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
-
-# Stage 2: Prebuild Virtual Environments
-FROM base AS venvs
-# Install Python versions and dependencies in a single step
 RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
       UV_PYTHON_INSTALL_DIR=/venvs/python-versions uv venv --python $VERSION /venvs/UV$VERSION && \
       /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
@@ -17,7 +10,6 @@ RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
       -r /requirements-dev.txt --upgrade; \
     done
 
-# Stage 3: Base Runtime
 FROM ubuntu:latest AS base_run
 COPY --from=venvs /venvs /venvs
 
