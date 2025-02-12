@@ -13,7 +13,6 @@ RUN mkdir -p /venvs && \
     for VERSION in 3.10 3.11 3.12 3.13; do \
       UV_PYTHON_INSTALL_DIR=/venvs/python-versions uv venv --python $VERSION /venvs/UV$VERSION && \
       /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /venvs/UV$VERSION/bin/python -m pip install --upgrade pip && \
       /venvs/UV$VERSION/bin/python -m pip install \
         mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
         -r /requirements-dev.txt; \
