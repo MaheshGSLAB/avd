@@ -18,7 +18,7 @@ COPY --from=venvs /venvs /venvs
 FROM base_run AS build
 
 # Copy the application code
-WORKDIR python-avd
+RUN cd python-avd
 
 # Install build dependencies and build the wheel
 RUN apt-get update && apt-get install -y --no-install-recommends make && \
