@@ -1,25 +1,23 @@
 # Stage 1: Base
-FROM python:3.12-slim AS base
-RUN pip install uv --break-system-packages && \
-    uv python install 3.10 3.11 3.12 3.13
-
-# Stage 2: Base Runtime Image (Minimal)
-FROM base AS base_run
+FROMubuntu:latest AS base
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        openssh-client git make docker.io && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+        curl ca-certificates && \
+        update-ca-certificates && \
+        curl -LsSf https://astral.sh/uv/install.sh | sh
 
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 
-# Create all virtual environments in a single root folder
-RUN mkdir /venvs && \
-    for VERSION in 3.10 3.11 3.12 3.13; do \
-      uv venv --python $VERSION /venvs/UV$VERSION && \
+# Install Python versions and dependencies in a single step
+RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
+      UV_PYTHON_INSTALL_DIR=/venvs/python-versions uv venv --python $VERSION /venvs/UV$VERSION --upgrade-pip && \
       /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
-      /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir \
-      mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+      . /venvs/UV$VERSION/bin/activate && which python && \
+      /venvs/UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
       -r /requirements-dev.txt --upgrade; \
     done
+
+FROM ubuntu:latest AS base_run
+COPY --from=base /venvs /venvs
 
 # Stage 3: Build (For PyAVD)
 FROM base AS build
@@ -40,7 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
     done
 
 # Stage 4: Final Run Image (Minimal)
-FROM base AS run
+FROM ubuntu:latest AS run
 # Copy the virtual environments folder from build
 COPY --from=build /venvs /venvs
 
