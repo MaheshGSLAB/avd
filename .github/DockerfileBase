@@ -1,7 +1,6 @@
 # Stage 1: Base
 FROM ubuntu:latest AS base
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
         update-ca-certificates && \
         curl -LsSf https://astral.sh/uv/install.sh | sh
 
