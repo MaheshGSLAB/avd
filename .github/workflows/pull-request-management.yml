@@ -158,6 +158,7 @@ jobs:
         run: echo "lowercase=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
       
       - name: Set Build Image Tag
+        id: set-build-tag
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
@@ -183,8 +184,7 @@ jobs:
           echo "Setting up cache for Docker layers..."
           mkdir -p /tmp/.buildx-cache
         
-
-      - name: Build and push PyAVD Image (without re-installing dependencies)
+      - name: Build and push PyAVD Image
         uses: docker/build-push-action@v6
         with:
           file: .github/DockerfileBuild
