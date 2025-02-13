@@ -87,7 +87,7 @@ jobs:
   avd-base-image:
     runs-on: ubuntu-latest
     outputs:
-      base_image_tag: ${{ steps.set-base-tag.outputs.base_image_tag }}
+      base_image_tag: ${{ env.base_image_tag }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -107,8 +107,7 @@ jobs:
       - name: Set Base Image Tag
         id: set-base-tag
         run: |
-          BASE_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/avd-base:${{ env.hash_of_reqs }}"
-          echo "Base image tag: $BASE_IMAGE_TAG"
+          BASE_IMAGE_TAG="ghcr.io/${{ steps.lowercase.outputs.lowercase }}/avd-base:${{ steps.hash-reqs.outputs.hash_of_reqs }}"
           echo "base_image_tag=$BASE_IMAGE_TAG" >> $GITHUB_ENV
 
       - name: Log in to GitHub Container Registry
@@ -179,7 +178,12 @@ jobs:
 
       - name: Pull Pre-Built Base Image
         run: |
-          docker pull ${{ needs.avd-base-image.outputs.base_image_tag }}
+          if [[ -n "${{ needs.avd-base-image.outputs.base_image_tag }}" ]]; then
+            docker pull ${{ needs.avd-base-image.outputs.base_image_tag }}
+          else
+            echo "Error: base_image_tag is empty!"
+            exit 1
+          fi
 
       - name: Build and push PyAVD Image (without re-installing dependencies)
         uses: docker/build-push-action@v6
