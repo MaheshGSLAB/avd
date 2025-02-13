@@ -180,35 +180,35 @@ jobs:
         with:
           file: .github/DockerfileBuild
           push: true
-          target: build
+          target: run
           tags: ${{ env.build_image_tag }}
           build-args: 
             BASE_RUN_IMAGE=${{ needs.avd-base-image.outputs.base_image_tag }}  # This ensures it uses the correct base image
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  run-pyavd:
-    needs: [build-pyavd]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+  # run-pyavd:
+  #   needs: [build-pyavd]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push Run Image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: .github/DockerfileBase
-          push: true
-          target: run
-          build-args: |
-            BUILD_IMAGE=${{ needs.build-pyavd.outputs.build_image_tag }}
-          tags: ghcr.io/${{ github.repository_owner }}/avd-run:latest
-          cache-from: type=gha,scope=run
-          cache-to: type=gha,mode=max,scope=run
+  #     - name: Build and Push Run Image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: .
+  #         file: .github/DockerfileBase
+  #         push: true
+  #         target: run
+  #         build-args: |
+  #           BUILD_IMAGE=${{ needs.build-pyavd.outputs.build_image_tag }}
+  #         tags: ghcr.io/${{ github.repository_owner }}/avd-run:latest
+  #         cache-from: type=gha,scope=run
+  #         cache-to: type=gha,mode=max,scope=run
           # build-args: |
           #   BASE_IMAGE_TAG: ${{ needs.setup-avd.outputs.image_tag }}
   # run-anisble-tests:
