@@ -1,10 +1,15 @@
-FROM ubuntu:latest AS base
+# Stage 1: Build Virtual Environments
+FROM ubuntu:latest AS builder
+
+# Install required dependencies for building venvs
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
     update-ca-certificates && \
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
-FROM base AS base_run
+# Copy requirements file
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
+
+# Create Python Virtual Environments
 RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
       UV_PYTHON_INSTALL_DIR=/venvs/python-versions uv venv --python $VERSION /venvs/UV$VERSION && \
       /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
@@ -13,26 +18,8 @@ RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
       -r /requirements-dev.txt --upgrade; \
     done
 
+# Stage 2: Create Final Base Image (Only Ubuntu + Venvs)
+FROM ubuntu:latest AS base_run
 
-# Stage 3: Build (For PyAVD)
-FROM ubuntu:latest AS build
-COPY --from=base_run /venvs /venvs
-# Copy the application code
-COPY . /avd
-WORKDIR /avd/python-avd
-
-# Install build dependencies and build the wheel
-RUN apt-get update && apt-get install -y --no-install-recommends make && \
-    /venvs/UV3.11/bin/python -m pip install --break-system-packages build && \
-    /venvs/UV3.11/bin/python -m build --wheel --outdir /tmp/wheels && \
-    for VERSION in 3.10 3.11 3.12 3.13; do \
-      /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
-    done
-
-# Stage 5: Final Run Image (Minimal)
-FROM ubuntu:latest AS run
-RUN apt-get update && apt-get install -y --no-install-recommends openssh-client ca-certificates && \
-    update-ca-certificates && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-COPY --from=build /venvs /venvs
-COPY --from=build /avd /avd
+# Copy only the /venvs directory from the builder stage
+COPY --from=builder /venvs /venvs
