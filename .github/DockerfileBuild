@@ -1,8 +1,17 @@
+# Stage 1: Base Run Image
 ARG BASE_RUN_IMAGE
 FROM ${BASE_RUN_IMAGE} AS base_run
-# Stage 3: Build (For PyAVD)
+
+# Stage 2: Build (For PyAVD)
 FROM ubuntu:latest AS build
+# Use BuildKit cache mount to avoid redundant COPY steps
+RUN --mount=type=cache,target=/venvs \
+    mkdir -p /venvs && \
+    echo "Using BuildKit cache for /venvs"
+
 COPY --from=base_run /venvs /venvs
+
+# Copy the application code
 COPY . /avd
 WORKDIR /avd/python-avd
 
@@ -14,11 +23,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
       /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
-# Stage 5: Final Run Image (Minimal)
+# Stage 3: Final Run Image (Minimal)
 FROM ubuntu:latest AS run
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-client ca-certificates && \
     update-ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Use --mount instead of COPY to avoid extra disk I/O and speed up builds
+RUN --mount=type=cache,target=/venvs \
+    mkdir -p /venvs && \
+    echo "Using BuildKit cache for /venvs"
 
 COPY --from=build /venvs /venvs
 COPY --from=build /avd /avd
