@@ -187,7 +187,7 @@ jobs:
       - name: Build and push PyAVD Image
         uses: docker/build-push-action@v6
         with:
-          file: .github/DockerfileBuild
+          file: .github/DockerfileBase
           push: true
           target: run
           tags: ${{ env.build_image_tag }}
