@@ -1,13 +1,15 @@
 # Stage 1: Base Run Image
 ARG BASE_RUN_IMAGE
-# Stage 2: Build (For PyAVD)
-FROM ${BASE_RUN_IMAGE} AS build
-# Use BuildKit cache mount to avoid redundant COPY steps
-# RUN --mount=type=cache,target=/venvs \
-#     mkdir -p /venvs && \
-#     echo "Using BuildKit cache for /venvs"
+FROM ${BASE_RUN_IMAGE} AS base_run
 
-# COPY --from=base_run /venvs /venvs
+# Stage 2: Build (For PyAVD)
+FROM ubuntu:latest AS build
+# Use BuildKit cache mount to avoid redundant COPY steps
+RUN --mount=type=cache,target=/venvs \
+    mkdir -p /venvs && \
+    echo "Using BuildKit cache for /venvs"
+
+COPY --from=base_run /venvs /venvs
 
 # Copy the application code
 COPY . /avd
