@@ -2,7 +2,7 @@
 FROM ubuntu:latest AS builder
 
 # Install required dependencies for building venvs
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates  && \
     update-ca-certificates && \
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
@@ -19,7 +19,7 @@ RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
     done
 
 # Stage 2: Create Final Base Image (Only Ubuntu + Venvs)
-FROM ubuntu:latest AS base_venvs
+FROM ubuntu:latest AS base_run
 
 # Copy only the /venvs directory from the builder stage
 COPY --from=builder /venvs /venvs
