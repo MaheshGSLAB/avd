@@ -146,7 +146,7 @@ jobs:
 
   build-pyavd:
     name: Install pyavd and Build Image
-    needs: [avd-base-image]  # Ensures we use the base image from the previous job
+    needs: [avd-base-image]
     runs-on: ubuntu-latest
     outputs:
       build_image_tag: ${{ steps.set-build-tag.outputs.build_image_tag }}
@@ -164,7 +164,6 @@ jobs:
           BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
           echo "build_image_tag=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
           echo "build_image_tag=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
-      
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2

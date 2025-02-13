@@ -1,10 +1,13 @@
 # Stage 1: Build Virtual Environments
-FROM ubuntu:latest AS builder
+FROM debian:bookworm-slim AS builder
 
-# Install required dependencies for building venvs
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates  && \
-    update-ca-certificates && \
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install necessary dependencies for venv creation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && update-ca-certificates \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
@@ -18,8 +21,8 @@ RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
       -r /requirements-dev.txt --upgrade; \
     done
 
-# Stage 2: Create Final Base Image (Only Ubuntu + Venvs)
-FROM ubuntu:latest AS base_run
+# Stage 2: Create Final Base Image (Only OS + venvs)
+FROM debian:bookworm-slim AS base_run
 
 # Copy only the /venvs directory from the builder stage
 COPY --from=builder /venvs /venvs
