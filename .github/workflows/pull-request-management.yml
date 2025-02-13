@@ -146,12 +146,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=base-run
 
   build-pyavd:
-    needs: [avd-base-image]
+    name: Install pyavd and Build Image
+    needs: [avd-base-image]  # Ensures we use the base image from the previous job
     runs-on: ubuntu-latest
     outputs:
       build_image_tag: ${{ steps.set-build-tag.outputs.build_image_tag }}
     steps:
-      - name: Check out repository
+      - name: Check out repository code
         uses: actions/checkout@v4
 
       - name: Convert GitHub username to lowercase
@@ -164,31 +165,34 @@ jobs:
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/avd-build:${{ github.run_number }}-${SHORT_SHA}"
-          echo "Build image tag: $BUILD_IMAGE_TAG"
           echo "build_image_tag=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ env.lowercase }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push Build Image
+      - name: Pull Pre-Built Base Image
+        run: |
+          docker pull ${{ needs.avd-base-image.outputs.base_image_tag }}
+
+      - name: Build and push PyAVD Image (without re-installing dependencies)
         uses: docker/build-push-action@v6
         with:
-          context: .
           file: .github/DockerfileBase
           push: true
           target: build
-          build-args: |
-            BASE_IMAGE=${{ needs.avd-base-image.outputs.base_image_tag }}
           tags: ${{ env.build_image_tag }}
-          cache-from: type=gha,scope=build
-          cache-to: type=gha,mode=max,scope=build
+          build-args: 
+            BASE_RUN_IMAGE=${{ needs.avd-base-image.outputs.base_image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
 
   run-pyavd:
     needs: [build-pyavd]
