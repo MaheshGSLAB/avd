@@ -25,17 +25,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
     done
 
 # Stage 3: Final Run Image (Minimal)
-FROM debian:bookworm-slim AS run
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssh-client \
-    ca-certificates \
-    && update-ca-certificates \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+FROM ubuntu:latest AS run
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     openssh-client \
+#     ca-certificates \
+#     && update-ca-certificates \
+#     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Use --mount instead of COPY to avoid extra disk I/O and speed up builds
-RUN --mount=type=cache,target=/venvs \
-    mkdir -p /venvs && \
-    echo "Using BuildKit cache for /venvs"
+# # Use --mount instead of COPY to avoid extra disk I/O and speed up builds
+# RUN --mount=type=cache,target=/venvs \
+#     mkdir -p /venvs && \
+#     echo "Using BuildKit cache for /venvs"
 
 COPY --from=build /venvs /venvs
 COPY --from=build /avd /avd
