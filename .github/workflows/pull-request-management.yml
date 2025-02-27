@@ -160,10 +160,10 @@
         matrix:
           python_version: ["3.10", "3.11", "3.12", "3.13"]
       outputs:
-        build_image_tag_3.10: ${{ steps.set-build-tag.outputs.build_image_tag_3_10 }}
-        build_image_tag_3.11: ${{ steps.set-build-tag.outputs.build_image_tag_3_11 }}
-        build_image_tag_3.12: ${{ steps.set-build-tag.outputs.build_image_tag_3_12 }}
-        build_image_tag_3.13: ${{ steps.set-build-tag.outputs.build_image_tag_3_13 }}
+        build_image_tag_3_10: ${{ steps.set-build-tag.outputs.build_image_tag_3_10 }}
+        build_image_tag_3_11: ${{ steps.set-build-tag.outputs.build_image_tag_3_11 }}
+        build_image_tag_3_12: ${{ steps.set-build-tag.outputs.build_image_tag_3_12 }}
+        build_image_tag_3_13: ${{ steps.set-build-tag.outputs.build_image_tag_3_13 }}
       steps:
         - name: Check out repository code
           uses: actions/checkout@v4
@@ -205,7 +205,7 @@
               PYTHON_VERSION=${{ matrix.python_version }}
             cache-from: type=gha
             cache-to: type=gha,mode=max
-            tags: ${{ needs.build-pyavd.outputs[format('build_image_tag_{0}', matrix.python_version)] }}
+            tags: ${{ env.BUILD_IMAGE_TAG }}
 
     # ----------------------------------- #
     # Test Requirements
