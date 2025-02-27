@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
 
 FROM ubuntu:latest AS run
 # Copy virtual environments from the build stage
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
-        update-ca-certificates && \
+RUN curl -O http://archive.ubuntu.com/ubuntu/pool/main/c/ca-certificates/ca-certificates_20230311ubuntu0.22.04.1_all.deb && \
+        dpkg -i ca-certificates_20230311ubuntu0.22.04.1_all.deb && \
+        update-ca-certificates
 COPY --from=build /venvs /venvs
