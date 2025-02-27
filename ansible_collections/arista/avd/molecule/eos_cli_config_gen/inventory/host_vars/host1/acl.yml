@@ -4,7 +4,7 @@ access_lists:
   - name: acl_qos_tc0_v4
     sequence_numbers:
       - sequence: 10
-        action: "permit ip any 192.0.2.0/29"
+        action: "permit ip any 192.0.21.0/29"
   - name: acl_qos_tc5_v4
     sequence_numbers:
       - sequence: 10
