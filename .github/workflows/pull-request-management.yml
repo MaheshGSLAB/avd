@@ -169,16 +169,17 @@
           uses: actions/checkout@v4
 
         - name: Convert GitHub username to lowercase
+          id: lowercase
           run: echo "lowercase=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
         - name: Set Build Image Tag
           id: set-build-tag
           run: |
             SHORT_SHA=$(git rev-parse --short HEAD)
-            BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/pyavd:${{ matrix.python_version }}-${{ github.run_number }}-${SHORT_SHA}"
-            IMAGE_OUTPUT_KEY="build_image_tag_${{ matrix.python_version | replace('.', '_') }}"
-            echo "$IMAGE_OUTPUT_KEY=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
-            echo "$IMAGE_OUTPUT_KEY=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
+            PYTHON_VERSION_UNDERSCORE=$(echo "${{ matrix.python_version }}" | tr '.' '_')
+            BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/pyavd:${PYTHON_VERSION_UNDERSCORE}-${{ github.run_number }}-${SHORT_SHA}"
+            echo "build_image_tag_${PYTHON_VERSION_UNDERSCORE}=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
+            echo "build_image_tag_${PYTHON_VERSION_UNDERSCORE}=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
 
         - name: Log in to GitHub Container Registry
           uses: docker/login-action@v2
