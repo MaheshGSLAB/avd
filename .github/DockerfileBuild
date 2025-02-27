@@ -6,9 +6,7 @@ WORKDIR /avd/python-avd
 RUN apt-get update && apt-get install -y --no-install-recommends make && \
     /venvs/UV3.11/bin/python -m pip install --break-system-packages build && \
     /venvs/UV3.11/bin/python -m build --wheel --outdir /tmp/wheels && \
-    for VERSION in 3.10 3.11 3.12 3.13; do \
-      /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
-    done
+    /venvs/UV3.11/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl
 
 FROM ubuntu:latest AS run
 # Copy virtual environments from the build stage
