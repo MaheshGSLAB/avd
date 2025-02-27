@@ -12,4 +12,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
 
 FROM ubuntu:latest AS run
 # Copy virtual environments from the build stage
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+        update-ca-certificates && \
 COPY --from=build /venvs /venvs
