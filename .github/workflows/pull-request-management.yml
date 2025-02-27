@@ -205,7 +205,7 @@
               PYTHON_VERSION=${{ matrix.python_version }}
             cache-from: type=gha
             cache-to: type=gha,mode=max
-            tags: ${{ steps.set-build-tag.outputs.build_image_tag }}
+            tags: ${{ steps.set-build-tag.outputs.build_image_tag_${{ matrix.python_version.replace('.', '_') }} }}
 
     # ----------------------------------- #
     # Test Requirements
