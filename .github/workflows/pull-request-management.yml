@@ -256,7 +256,7 @@
         - name: Install the specified Ansible version
           run: "/venvs/UV3.11/bin/python -m pip install ${{ matrix.ansible_version }}"
         - name: Run molecule action
-          run: " . /venvs/UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          run: " . /venvs/UV3.11/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
         # - uses: actions/upload-artifact@v4
         #   with:
         #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -282,7 +282,7 @@
         - name: Install the specified Ansible version
           run: "/venvs/UV3.11/bin/python -m pip install ${{ matrix.ansible_version }}"
         - name: Run molecule action
-          run: ". /venvs/UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          run: ". /venvs/UV3.11/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
         # - uses: actions/upload-artifact@v4
         #   with:
         #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -339,7 +339,7 @@
         - name: Install the specified Ansible version
           run: "/venvs/UV3.11/bin/python -m pip install ${{ matrix.ansible_version }}"
         - name: Run molecule action
-          run: ". /venvs/UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          run: ". /venvs/UV3.11/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
         # - uses: actions/upload-artifact@v4
         #   with:
         #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -370,7 +370,7 @@
         - name: Install the specified Ansible version
           run: "/venvs/UV3.11/bin/python -m pip install ${{ matrix.ansible_version }}"
         - name: Run molecule action
-          run: ". /venvs/UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          run: ". /venvs/UV3.11/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
         # - uses: actions/upload-artifact@v4
         #   with:
         #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -401,7 +401,7 @@
         - name: Install the specified Ansible version
           run: "/venvs/UV3.11/bin/python -m pip install ${{ matrix.ansible_version }}"
         - name: Run molecule action
-          run: ". /venvs/UV3.11/bin/activate && cd /avd/ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          run: ". /venvs/UV3.11/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
   
     # ----------------------------------- #
     # Ansible tests
