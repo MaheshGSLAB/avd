@@ -8,13 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends make curl ca-ce
 # Copy requirements file after installing essential tools
 COPY ansible_collections/arista/avd/requirements-dev.txt /requirements-dev.txt
 
-# Install Python 3.11 and dependencies in a single step
-RUN . $HOME/.local/bin/env && \
-    UV_PYTHON_INSTALL_DIR=/venvs/python-versions uv venv --python 3.11 /venvs/UV3.11 && \
-    /venvs/UV3.11/bin/python -m ensurepip --upgrade && \
-    /venvs/UV3.11/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
-    -r /requirements-dev.txt --upgrade
-
+# Install Python versions and dependencies in a single step
+RUN . $HOME/.local/bin/env && for VERSION in 3.10 3.11 3.12 3.13; do \
+      UV_PYTHON_INSTALL_DIR=/venvs/python-versions uv venv --python $VERSION /venvs/UV$VERSION && \
+      /venvs/UV$VERSION/bin/python -m ensurepip --upgrade && \
+      /venvs/UV$VERSION/bin/python -m pip install --upgrade pip setuptools && \
+      /venvs/UV$VERSION/bin/python -m pip install mock pytest pytest-mock pytest-xdist pyyaml "ansible-core<2.19.0" \
+      -r /requirements-dev.txt --upgrade; \
+    done
 
 FROM ubuntu:latest AS base_run
 COPY --from=base /venvs /venvs

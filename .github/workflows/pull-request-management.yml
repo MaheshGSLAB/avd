@@ -152,25 +152,32 @@
             cache-to: type=gha,mode=max,scope=base-run
 
     build-pyavd:
-      name: Install pyavd and Build Image
+      name: Build PyAVD Images in Parallel
       needs: [avd-base-image]
       runs-on: ubuntu-latest
+      strategy:
+        fail-fast: false
+        matrix:
+          python_version: ["3.10", "3.11", "3.12", "3.13"]
       outputs:
-        build_image_tag: ${{ steps.set-build-tag.outputs.build_image_tag }}
+        build_image_tag_3.10: ${{ steps.set-build-tag.outputs.build_image_tag_3.10 }}
+        build_image_tag_3.11: ${{ steps.set-build-tag.outputs.build_image_tag_3.11 }}
+        build_image_tag_3.12: ${{ steps.set-build-tag.outputs.build_image_tag_3.12 }}
+        build_image_tag_3.13: ${{ steps.set-build-tag.outputs.build_image_tag_3.13 }}
       steps:
         - name: Check out repository code
           uses: actions/checkout@v4
 
         - name: Convert GitHub username to lowercase
           run: echo "lowercase=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-        
+
         - name: Set Build Image Tag
           id: set-build-tag
           run: |
             SHORT_SHA=$(git rev-parse --short HEAD)
-            BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
-            echo "build_image_tag=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
-            echo "build_image_tag=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
+            BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/pyavd:${{ matrix.python_version }}-${{ github.run_number }}-${SHORT_SHA}"
+            echo "build_image_tag_${{ matrix.python_version }}=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
+            echo "build_image_tag_${{ matrix.python_version }}=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
 
         - name: Log in to GitHub Container Registry
           uses: docker/login-action@v2
@@ -185,23 +192,19 @@
             install: true
             driver-opts: network=host
 
-        - name: Enable Caching
-          run: |
-            echo "Setting up cache for Docker layers..."
-            mkdir -p /tmp/.buildx-cache
-          
-        - name: Build and push PyAVD Image
+        - name: Build and Push PyAVD Image for Python ${{ matrix.python_version }}
           uses: docker/build-push-action@v6
           with:
             file: .github/DockerfileBuild
             push: true
             target: run
-            tags: ${{ env.build_image_tag }}
             build-args: 
               BASE_IMAGE_TAG=${{ needs.avd-base-image.outputs.base_image_tag }}
+              PYTHON_VERSION=${{ matrix.python_version }}
             cache-from: type=gha
             cache-to: type=gha,mode=max
-    
+            tags: ghcr.io/${{ env.lowercase }}/pyavd:${{ matrix.python_version }}-${{ github.run_number }}-${SHORT_SHA}
+
     # ----------------------------------- #
     # Test Requirements
     # ----------------------------------- #
@@ -235,7 +238,7 @@
       name: Validate eos_cli_config_gen
       runs-on: ubuntu-latest
       container:
-        image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+        image: ${{ needs.build-pyavd.outputs.build_image_tag_3.11 }}
       strategy:
         fail-fast: true
         matrix:
@@ -269,7 +272,7 @@
       name: Validate DHCP configuration
       runs-on: ubuntu-latest
       container:
-        image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+        image: ${{ needs.build-pyavd.outputs.build_image_tag_3.11 }}
       strategy:
         fail-fast: true
         matrix:
@@ -295,7 +298,7 @@
       name: Validate eos_designs
       runs-on: ubuntu-latest
       container:
-        image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+        image: ${{ needs.build-pyavd.outputs.build_image_tag_3.11 }}
       strategy:
         fail-fast: true
         matrix:
@@ -351,7 +354,7 @@
       name: Validate cvp_collection
       runs-on: ubuntu-latest
       container:
-        image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+        image: ${{ needs.build-pyavd.outputs.build_image_tag_3.11 }}
       strategy:
         fail-fast: true
         matrix:
@@ -383,7 +386,7 @@
       name: Validate eos_validate_state
       runs-on: ubuntu-latest
       container:
-        image: ${{ needs.build-pyavd.outputs.build_image_tag }}
+        image: ${{ needs.build-pyavd.outputs.build_image_tag_3.11 }}
       strategy:
         fail-fast: true
         matrix:
