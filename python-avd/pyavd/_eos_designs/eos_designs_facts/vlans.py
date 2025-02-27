@@ -5,17 +5,17 @@ from __future__ import annotations
 
 import re
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from pyavd.j2filters import list_compress, range_expand
 
 if TYPE_CHECKING:
     from pyavd._eos_designs.schema import EosDesigns
 
-    from . import EosDesignsFacts
+    from . import EosDesignsFactsProtocol
 
 
-class VlansMixin:
+class VlansMixin(Protocol):
     """
     Mixin Class used to generate some of the EosDesignsFacts.
 
@@ -24,7 +24,7 @@ class VlansMixin:
     """
 
     @cached_property
-    def vlans(self: EosDesignsFacts) -> str:
+    def vlans(self: EosDesignsFactsProtocol) -> str:
         """
         Exposed in avd_switch_facts.
 
@@ -38,13 +38,13 @@ class VlansMixin:
         return list_compress(self._vlans)
 
     def _parse_adapter_settings(
-        self: EosDesignsFacts,
+        self: EosDesignsFactsProtocol,
         adapter_settings: EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem.AdaptersItem | EosDesigns.NetworkPortsItem,
     ) -> tuple[set, set]:
         """Parse the given adapter_settings and return relevant vlans and trunk_groups."""
         vlans = set()
         trunk_groups = set(adapter_settings.trunk_groups)
-        if adapter_settings.vlans not in ["all", "", None]:
+        if adapter_settings.vlans and adapter_settings.vlans != "all":
             vlans.update(map(int, range_expand(adapter_settings.vlans)))
         elif adapter_settings.mode == "trunk" and not trunk_groups:
             # No vlans or trunk_groups defined, but this is a trunk, so default is all vlans allowed
@@ -72,7 +72,7 @@ class VlansMixin:
         return vlans, trunk_groups
 
     @cached_property
-    def _local_endpoint_vlans_and_trunk_groups(self: EosDesignsFacts) -> tuple[set, set]:
+    def _local_endpoint_vlans_and_trunk_groups(self: EosDesignsFactsProtocol) -> tuple[set, set]:
         """
         Return list of vlans and list of trunk groups used by connected_endpoints on this switch.
 
@@ -90,7 +90,7 @@ class VlansMixin:
         for connected_endpoints_key in self.inputs._dynamic_keys.connected_endpoints:
             for connected_endpoint in connected_endpoints_key.value:
                 for index, adapter in enumerate(connected_endpoint.adapters):
-                    adapter._context = f"{connected_endpoints_key.key}[name={connected_endpoint.name}].adapters[{index}]"
+                    adapter._internal_data.context = f"{connected_endpoints_key.key}[name={connected_endpoint.name}].adapters[{index}]"
                     adapter_settings = self.shared_utils.get_merged_adapter_settings(adapter)
                     if self.shared_utils.hostname not in adapter_settings.switches:
                         # This switch is not connected to this endpoint. Skipping.
@@ -114,7 +114,7 @@ class VlansMixin:
                     # Skip entry if no match
                     continue
 
-                network_port_item._context = f"network_ports[{index}]"
+                network_port_item._internal_data.context = f"network_ports[{index}]"
                 adapter_settings = self.shared_utils.get_merged_adapter_settings(network_port_item)
                 adapter_vlans, adapter_trunk_groups = self._parse_adapter_settings(adapter_settings)
                 vlans.update(adapter_vlans)
@@ -128,7 +128,7 @@ class VlansMixin:
         return vlans, trunk_groups
 
     @cached_property
-    def _downstream_switch_endpoint_vlans_and_trunk_groups(self: EosDesignsFacts) -> tuple[set, set]:
+    def _downstream_switch_endpoint_vlans_and_trunk_groups(self: EosDesignsFactsProtocol) -> tuple[set, set]:
         """
         Return set of vlans and set of trunk groups used by downstream switches.
 
@@ -140,7 +140,7 @@ class VlansMixin:
         vlans = set()
         trunk_groups = set()
         for fabric_switch in self.shared_utils.all_fabric_devices:
-            fabric_switch_facts: EosDesignsFacts = self.shared_utils.get_peer_facts(fabric_switch, required=True)
+            fabric_switch_facts = self.get_peer_facts_cls(fabric_switch)
             if fabric_switch_facts.shared_utils.uplink_type == "port-channel" and self.shared_utils.hostname in fabric_switch_facts.uplink_peers:
                 fabric_switch_endpoint_vlans, fabric_switch_endpoint_trunk_groups = fabric_switch_facts._endpoint_vlans_and_trunk_groups
                 vlans.update(fabric_switch_endpoint_vlans)
@@ -149,7 +149,7 @@ class VlansMixin:
         return vlans, trunk_groups
 
     @cached_property
-    def _mlag_peer_endpoint_vlans_and_trunk_groups(self: EosDesignsFacts) -> tuple[set, set]:
+    def _mlag_peer_endpoint_vlans_and_trunk_groups(self: EosDesignsFactsProtocol) -> tuple[set, set]:
         """
         Return set of vlans and set of trunk groups used by connected_endpoints on the MLAG peer.
 
@@ -158,12 +158,10 @@ class VlansMixin:
         if not self.shared_utils.mlag:
             return set(), set()
 
-        mlag_peer_facts: EosDesignsFacts = self.shared_utils.mlag_peer_facts
-
-        return mlag_peer_facts._endpoint_vlans_and_trunk_groups
+        return self._mlag_peer_facts._endpoint_vlans_and_trunk_groups
 
     @cached_property
-    def _endpoint_vlans_and_trunk_groups(self: EosDesignsFacts) -> tuple[set, set]:
+    def _endpoint_vlans_and_trunk_groups(self: EosDesignsFactsProtocol) -> tuple[set, set]:
         """
         Return set of vlans and set of trunk groups.
 
@@ -175,7 +173,7 @@ class VlansMixin:
         return local_endpoint_vlans.union(downstream_switch_endpoint_vlans), local_endpoint_trunk_groups.union(downstream_switch_endpoint_trunk_groups)
 
     @cached_property
-    def _endpoint_vlans(self: EosDesignsFacts) -> set[int]:
+    def _endpoint_vlans(self: EosDesignsFactsProtocol) -> set[int]:
         """
         Return set of vlans in use by endpoints connected to this switch, downstream switches or MLAG peer.
 
@@ -193,7 +191,7 @@ class VlansMixin:
         return endpoint_vlans.union(mlag_endpoint_vlans)
 
     @cached_property
-    def endpoint_vlans(self: EosDesignsFacts) -> str | None:
+    def endpoint_vlans(self: EosDesignsFactsProtocol) -> str | None:
         """
         Return compressed list of vlans in use by endpoints connected to this switch or MLAG peer.
 
@@ -205,7 +203,7 @@ class VlansMixin:
         return None
 
     @cached_property
-    def _endpoint_trunk_groups(self: EosDesignsFacts) -> set[str]:
+    def _endpoint_trunk_groups(self: EosDesignsFactsProtocol) -> set[str]:
         """Return set of trunk_groups in use by endpoints connected to this switch, downstream switches or MLAG peer."""
         if not self.shared_utils.node_config.filter.only_vlans_in_use:
             return set()
@@ -218,7 +216,7 @@ class VlansMixin:
         return endpoint_trunk_groups.union(mlag_endpoint_trunk_groups)
 
     @cached_property
-    def local_endpoint_trunk_groups(self: EosDesignsFacts) -> list[str]:
+    def local_endpoint_trunk_groups(self: EosDesignsFactsProtocol) -> list[str]:
         """
         Return list of trunk_groups in use by endpoints connected to this switch only.
 
@@ -232,7 +230,7 @@ class VlansMixin:
         return []
 
     @cached_property
-    def endpoint_trunk_groups(self: EosDesignsFacts) -> list[str]:
+    def endpoint_trunk_groups(self: EosDesignsFactsProtocol) -> list[str]:
         """
         Return list of trunk_groups in use by endpoints connected to this switch, downstream switches or MLAG peer.
 
@@ -241,7 +239,7 @@ class VlansMixin:
         return list(self._endpoint_trunk_groups)
 
     @cached_property
-    def _vlans(self: EosDesignsFacts) -> list[int]:
+    def _vlans(self: EosDesignsFactsProtocol) -> list[int]:
         """
         Return list of vlans after filtering network services.
 
@@ -249,52 +247,37 @@ class VlansMixin:
 
         Ex. [1, 2, 3 ,4 ,201, 3021]
         """
-        if self.shared_utils.any_network_services:
-            vlans = []
-            match_tags = self.shared_utils.filter_tags
+        if not self.shared_utils.any_network_services:
+            return []
 
-            if self.shared_utils.node_config.filter.only_vlans_in_use:
-                # Only include the vlans that are used by connected endpoints
-                endpoint_trunk_groups = self._endpoint_trunk_groups
-                endpoint_vlans = self._endpoint_vlans
+        vlans = []
+        for network_services_key in self.inputs._dynamic_keys.network_services:
+            tenants = network_services_key.value
+            for tenant in tenants:
+                if not set(self.shared_utils.node_config.filter.tenants).intersection([tenant.name, "all"]):
+                    # Not matching tenant filters. Skipping this tenant.
+                    continue
 
-            for network_services_key in self.inputs._dynamic_keys.network_services:
-                tenants = network_services_key.value
-                for tenant in tenants:
-                    if not set(self.shared_utils.node_config.filter.tenants).intersection([tenant.name, "all"]):
-                        # Not matching tenant filters. Skipping this tenant.
-                        continue
+                vlans.extend(svi.id for vrf in tenant.vrfs for svi in vrf.svis if self._is_accepted_vlan(svi))
+                vlans.extend(l2vlan.id for l2vlan in tenant.l2vlans if self._is_accepted_vlan(l2vlan))
 
-                    for vrf in tenant.vrfs:
-                        for svi in vrf.svis:
-                            if "all" in match_tags or set(svi.tags).intersection(match_tags):
-                                if self.shared_utils.node_config.filter.only_vlans_in_use:
-                                    # Check if vlan is in use
-                                    if svi.id in endpoint_vlans:
-                                        vlans.append(svi.id)
-                                        continue
-                                    # Check if vlan has a trunk group defined which is in use
-                                    if self.inputs.enable_trunk_groups and svi.trunk_groups and endpoint_trunk_groups.intersection(svi.trunk_groups):
-                                        vlans.append(svi.id)
-                                        continue
-                                    # Skip since the vlan is not in use
-                                    continue
-                                vlans.append(svi.id)
+        return vlans
 
-                    for l2vlan in tenant.l2vlans:
-                        if "all" in match_tags or set(l2vlan.tags).intersection(match_tags):
-                            if self.shared_utils.node_config.filter.only_vlans_in_use:
-                                # Check if vlan is in use
-                                if l2vlan.id in endpoint_vlans:
-                                    vlans.append(l2vlan.id)
-                                    continue
-                                # Check if vlan has a trunk group defined which is in use
-                                if self.inputs.enable_trunk_groups and l2vlan.trunk_groups and endpoint_trunk_groups.intersection(l2vlan.trunk_groups):
-                                    vlans.append(l2vlan.id)
-                                    continue
-                                # Skip since the vlan is not in use
-                                continue
-                            vlans.append(l2vlan.id)
+    def _is_accepted_vlan(
+        self: EosDesignsFactsProtocol,
+        vlan: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.VrfsItem.SvisItem
+        | EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.L2vlansItem,
+    ) -> bool:
+        if "all" not in self.shared_utils.filter_tags and not set(vlan.tags).intersection(self.shared_utils.filter_tags):
+            return False
 
-            return vlans
-        return []
+        if not self.shared_utils.node_config.filter.only_vlans_in_use:
+            # Nothing else to filter
+            return True
+
+        # Check if vlan is in use
+        if vlan.id in self._endpoint_vlans:
+            return True
+
+        # Check if vlan has a trunk group defined which is in use
+        return bool(self.inputs.enable_trunk_groups and vlan.trunk_groups and self._endpoint_trunk_groups.intersection(vlan.trunk_groups))

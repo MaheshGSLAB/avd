@@ -28,8 +28,19 @@ keys:
               group:
                 description: Group Name.
                 type: str
+                deprecation:
+                  warning: true
+                  new_key: methods.group
+                  remove_in_version: 6.0.0
               logging:
                 type: bool
+                deprecation:
+                  warning: true
+                  new_key: methods.method
+                  remove_in_version: 6.0.0
+              methods:
+                type: list
+                $ref: eos_cli_config_gen#/$defs/methods
           default:
             type: dict
             keys:
@@ -42,8 +53,19 @@ keys:
               group:
                 description: Group Name.
                 type: str
+                deprecation:
+                  warning: true
+                  new_key: methods.group
+                  remove_in_version: 6.0.0
               logging:
                 type: bool
+                deprecation:
+                  warning: true
+                  new_key: methods.method
+                  remove_in_version: 6.0.0
+              methods:
+                type: list
+                $ref: eos_cli_config_gen#/$defs/methods
       system:
         type: dict
         keys:
@@ -59,6 +81,13 @@ keys:
               group:
                 description: Group Name.
                 type: str
+                deprecation:
+                  warning: true
+                  new_key: methods.group
+                  remove_in_version: 6.0.0
+              methods:
+                type: list
+                $ref: eos_cli_config_gen#/$defs/methods
       dot1x:
         type: dict
         keys:
@@ -73,6 +102,24 @@ keys:
               group:
                 description: Group Name.
                 type: str
+                deprecation:
+                  warning: true
+                  new_key: methods.group
+                  remove_in_version: 6.0.0
+              methods:
+                type: list
+                min_length: 1
+                items:
+                  type: dict
+                  $ref: eos_cli_config_gen#/$defs/methods/items
+                  keys:
+                    multicast:
+                      type: bool
+                      description: 'Forward accounting packets to all servers within
+                        the specified group.
+
+                        This option is applicable only when the `method` key is explicitly
+                        set to `group`.'
       commands:
         type: dict
         keys:
@@ -96,8 +143,19 @@ keys:
                 group:
                   description: Group Name.
                   type: str
+                  deprecation:
+                    warning: true
+                    new_key: methods.group
+                    remove_in_version: 6.0.0
                 logging:
                   type: bool
+                  deprecation:
+                    warning: true
+                    new_key: methods.method
+                    remove_in_version: 6.0.0
+                methods:
+                  type: list
+                  $ref: eos_cli_config_gen#/$defs/methods
           default:
             type: list
             items:
@@ -118,8 +176,19 @@ keys:
                 group:
                   description: Group Name.
                   type: str
+                  deprecation:
+                    warning: true
+                    new_key: methods.group
+                    remove_in_version: 6.0.0
                 logging:
                   type: bool
+                  deprecation:
+                    warning: true
+                    new_key: methods.method
+                    remove_in_version: 6.0.0
+                methods:
+                  type: list
+                  $ref: eos_cli_config_gen#/$defs/methods
   aaa_authentication:
     type: dict
     keys:
@@ -842,6 +911,10 @@ keys:
       qos:
         type: list
         primary_key: name
+        description: 'The keys `vlan`, `cos`, `ip`, `ipv6`, `dscp`, `ecn` are mutually
+          exclusive,
+
+          except `dscp` and `ecn` which can be given separate or together.'
         items:
           type: dict
           keys:
@@ -874,6 +947,22 @@ keys:
                   description: IPv6 Access-List Name.
                   convert_types:
                   - int
+            dscp:
+              type: str
+              description: "Match packets based on the DSCP value(s).\nAccepted formats:\n
+                \ - Single AF/CS/EF DSCP name like \"af12\".\n  - Single decimal DSCP
+                value. Example: \"23\".\n  - Range of decimal DSCP values. Examples:
+                \"1,3-10\"."
+            ecn:
+              type: str
+              valid_values:
+              - ce
+              - ect
+              - ect-ce
+              - non-ect
+              description: "Match packets based on the ECN value.\nAccepted values:\n
+                \ - non-ect (matches 00).\n  - ect (matches 01 an 10).\n  - ce (matches
+                11).\n  - ect-ce (matches 01, 10 and 11)."
   clock:
     type: dict
     keys:
@@ -4468,20 +4557,45 @@ keys:
                   - percent
             min_delay_static:
               type: dict
+              description: Mutually exclusive with min_delay_dynamic, if both are
+                defined min_delay_static takes precedence.
               keys:
                 number:
                   type: int
+                  description: Valid values are 1-16777215 microseconds. This is regardless
+                    of whether the specified unit is milliseconds or microseconds.
                   required: true
                   convert_types:
                   - str
-                  min: 1
-                  max: 16777215
                 unit:
                   type: str
                   required: true
                   valid_values:
                   - microseconds
                   - milliseconds
+            min_delay_dynamic:
+              type: dict
+              description: Mutually exclusive with min_delay_static, if both are defined
+                min_delay_static takes precedence.
+              keys:
+                twamp_light_fallback:
+                  type: dict
+                  keys:
+                    number:
+                      type: int
+                      description: 'Valid values are 1-16777215 microseconds.
+
+                        This is regardless of whether the specified unit is milliseconds
+                        or microseconds.'
+                      required: true
+                      convert_types:
+                      - str
+                    unit:
+                      type: str
+                      required: true
+                      valid_values:
+                      - microseconds
+                      - milliseconds
         eos_cli:
           type: str
           description: Multiline EOS CLI rendered directly on the ethernet interface
@@ -7369,6 +7483,8 @@ keys:
         type: bool
       enable_https:
         type: bool
+      enable_unix:
+        type: bool
       https_ssl_profile:
         description: SSL Profile Name.
         type: str
@@ -8705,15 +8821,16 @@ keys:
         - inner-packet
   monitor_sessions:
     type: list
+    primary_key: name
     items:
       type: dict
       keys:
         name:
           type: str
-          required: true
           description: Session Name.
         sources:
           type: list
+          primary_key: name
           items:
             type: dict
             keys:
@@ -9016,6 +9133,81 @@ keys:
                             type: str
                             convert_types:
                             - int
+  monitor_twamp:
+    documentation_options:
+      table: monitor-twamp
+    type: dict
+    keys:
+      twamp_light:
+        type: dict
+        keys:
+          reflector_defaults:
+            type: dict
+            keys:
+              listen_port:
+                type: int
+                min: 1
+                max: 65535
+                convert_types:
+                - str
+          sender_defaults:
+            type: dict
+            keys:
+              destination_port:
+                type: int
+                min: 1
+                max: 65535
+                convert_types:
+                - str
+              source_port:
+                type: int
+                min: 1
+                max: 65535
+                convert_types:
+                - str
+          sender_profiles:
+            type: list
+            primary_key: name
+            items:
+              type: dict
+              keys:
+                name:
+                  type: str
+                measurement_interval:
+                  type: int
+                  min: 1
+                  max: 255
+                  convert_types:
+                  - str
+                  description: Measurement interval in seconds.
+                measurement_samples:
+                  type: int
+                  min: 1
+                  max: 65535
+                  convert_types:
+                  - str
+                  description: Number of samples used to calculate TWAMP light metrics.
+                significance:
+                  type: dict
+                  keys:
+                    value:
+                      type: int
+                      required: true
+                      min: 1
+                      max: 1000000
+                      convert_types:
+                      - str
+                      description: Significance value in microseconds.
+                    offset:
+                      type: int
+                      required: true
+                      min: 1
+                      max: 999999
+                      convert_types:
+                      - str
+                      description: Offset in microseconds, used to round up calculated
+                        TWAMP light delay statistics. Must be lower than the significance
+                        value.
   mpls:
     type: dict
     keys:
@@ -9298,6 +9490,51 @@ keys:
           shutdown:
             type: bool
             description: Make `shutdown` key false for `no shutdown` cli.
+      tunnel:
+        description: Configure MPLS tunnel.
+        type: dict
+        keys:
+          termination:
+            description: Controls selection of the TTL/DSCP values by LER when decapsulating
+              MPLS packets.
+            type: dict
+            keys:
+              model:
+                type: dict
+                keys:
+                  ttl:
+                    type: str
+                    required: true
+                    valid_values:
+                    - pipe
+                    - uniform
+                  dscp:
+                    description: The DSCP model `uniform` is supported only on specific
+                      hardware platforms.
+                    type: str
+                    required: true
+                    valid_values:
+                    - pipe
+                    - uniform
+              php_model:
+                description: Used on PHP router in the absence of any VPN routes and
+                  explicit null VRF labels.
+                type: dict
+                keys:
+                  ttl:
+                    type: str
+                    required: true
+                    valid_values:
+                    - pipe
+                    - uniform
+                  dscp:
+                    description: The DSCP model `uniform` is supported only on specific
+                      hardware platforms.
+                    type: str
+                    required: true
+                    valid_values:
+                    - pipe
+                    - uniform
   name_server:
     documentation_options:
       table: ip-name-servers
@@ -9737,6 +9974,64 @@ keys:
             - str
             min: 1
             max: 128
+          interface:
+            type: dict
+            description: Configure interface related settings for Sfe platform.
+            keys:
+              profiles:
+                type: list
+                primary_key: name
+                description: 'Configure one or more Receive Side Scaling (RSS) interface
+                  profiles.
+
+                  This is supported on specific platforms.'
+                items:
+                  type: dict
+                  keys:
+                    name:
+                      type: str
+                      description: RSS interface profile name.
+                    interfaces:
+                      type: list
+                      description: Interfaces within RSS profile.
+                      primary_key: name
+                      items:
+                        type: dict
+                        keys:
+                          name:
+                            type: str
+                            description: Interface name such as 'Ethernet2'.
+                          rx_queue:
+                            type: dict
+                            description: Receive queue parameters for the selected
+                              interface.
+                            keys:
+                              count:
+                                type: int
+                                min: 1
+                                convert_types:
+                                - str
+                                description: 'Number of receive queues.
+
+                                  The maximum value is platform dependent.'
+                              worker:
+                                type: str
+                                description: 'Worker ids specified as combination
+                                  of range and/or comma separated values
+
+                                  such as 0-4,7.'
+                              mode:
+                                type: str
+                                description: Mode applicable to the workers. Default
+                                  mode is 'shared'.
+                                valid_values:
+                                - shared
+                                - exclusive
+              interface_profile:
+                type: str
+                description: 'RSS interface profile name to apply for the platform.
+
+                  Needs system reload or Sfe agent restart for change to take effect.'
   poe:
     type: dict
     keys:
@@ -10823,6 +11118,10 @@ keys:
         ip_nat:
           type: dict
           $ref: eos_cli_config_gen#/$defs/interface_ip_nat
+          keys:
+            service_profile:
+              type: str
+              description: NAT interface profile.
         ipv6_enable:
           type: bool
         ipv6_address:
@@ -11442,20 +11741,47 @@ keys:
                   - percent
             min_delay_static:
               type: dict
+              description: Mutually exclusive with min_delay_dynamic, if both are
+                defined min_delay_static takes precedence.
               keys:
                 number:
                   type: int
+                  description: 'Valid values are 1-16777215 microseconds.
+
+                    This is regardless of whether the specified unit is milliseconds
+                    or microseconds.'
                   required: true
                   convert_types:
                   - str
-                  min: 1
-                  max: 16777215
                 unit:
                   type: str
                   required: true
                   valid_values:
                   - microseconds
                   - milliseconds
+            min_delay_dynamic:
+              description: Mutually exclusive with min_delay_static, if both are defined
+                min_delay_static takes precedence.
+              type: dict
+              keys:
+                twamp_light_fallback:
+                  type: dict
+                  keys:
+                    number:
+                      type: int
+                      description: 'Valid values are 1-16777215 microseconds.
+
+                        This is regardless of whether the specified unit is milliseconds
+                        or microseconds.'
+                      required: true
+                      convert_types:
+                      - str
+                    unit:
+                      type: str
+                      required: true
+                      valid_values:
+                      - microseconds
+                      - milliseconds
         validate_state:
           type: bool
           description: Set to false to disable interface state and LLDP topology validation
@@ -20670,6 +20996,88 @@ keys:
                                     type: int
                                     convert_types:
                                     - str
+      twamp_light_sender_profile:
+        type: str
+        description: Apply a twamp-light sender profile, defined under monitor_twamp.twamp_light.sender_profiles.
+      flex_algos:
+        type: list
+        primary_key: number
+        unique_keys:
+        - name
+        items:
+          type: dict
+          keys:
+            number:
+              type: int
+              min: 128
+              max: 255
+              description: Flex-algo number, must be unique across all flex-algo definitions.
+              convert_types:
+              - str
+            name:
+              type: str
+              required: true
+              description: Flex-algo name, must be unique across all flex-algo definitions.
+            administrative_group:
+              type: dict
+              keys:
+                include_all:
+                  type: str
+                  description: Comma-separated list of individual group numbers in
+                    decimal (0-127), hexadecimal, named or decimal range (A-B, where
+                    value of A must be less than the value of B) formats. Example.
+                    0xA,RED,31-33,127
+                  convert_types:
+                  - int
+                include_any:
+                  type: str
+                  description: Comma-separated list of individual group numbers in
+                    decimal (0-127), hexadecimal, named or decimal range (A-B, where
+                    value of A must be less than the value of B) formats. Example.
+                    0xA,RED,31-33,127
+                  convert_types:
+                  - int
+                exclude:
+                  type: str
+                  description: Comma-separated list of individual group numbers in
+                    decimal (0-127), hexadecimal, named or decimal range (A-B, where
+                    value of A must be less than the value of B) formats. Example.
+                    0xA,RED,31-33,127
+                  convert_types:
+                  - int
+            metric:
+              type: str
+              description: Metric can be specified as an integer or named type, 0
+                = igp-metric, 1 = min-delay, 2 = te-metric. Device CLI will show the
+                name regardless.
+              convert_types:
+              - int
+              valid_values:
+              - '0'
+              - '1'
+              - '2'
+              - igp-metric
+              - min-delay
+              - te-metric
+            priority:
+              type: int
+              convert_types:
+              - str
+              min: 0
+              max: 255
+            color:
+              type: int
+              convert_types:
+              - str
+              min: 0
+              max: 4294967295
+            srlg_exclude:
+              type: str
+              description: Comma-separated list of individual SRLG numbers in decimal
+                (0-4294967295), named or decimal range (A-B, where value of A must
+                be less than the value of B) formats. Example. 30-34,55,RED
+              convert_types:
+              - int
   service_routing_configuration_bgp:
     type: dict
     keys:
@@ -22900,9 +23308,31 @@ keys:
                       '
                   map_dscp_to_traffic_class_decapsulation:
                     type: bool
+              vlan_range:
+                type: dict
+                description: 'Set VNI on range of VLANs. Number of VLANs must equal
+                  number of VNIs.
+
+                  If a VNI is set for a VLAN using `vlan_range`, VNI setting in `vxlan_interface.vxlan1.vxlan.vlans`
+                  is ignored for that VLAN.'
+                keys:
+                  vlans:
+                    type: str
+                    required: true
+                    description: e.g. "94,96,100-110".
+                  vnis:
+                    type: str
+                    required: true
+                    description: 'Set `vnis` in the correct sequence as `vlans`.
+
+                      e.g. "10094,10096,10100-10110".'
               vlans:
                 type: list
                 primary_key: id
+                description: 'Set VNI/multicast group/remote vtep on a vlan.
+
+                  If a VNI is set for a VLAN using `vlan_range`, VNI setting in `vxlan_interface.vxlan1.vxlan.vlans`
+                  is ignored for that VLAN.'
                 items:
                   type: dict
                   keys:
@@ -22962,6 +23392,24 @@ keys:
         type: dict
         $ref: eos_cli_config_gen#/keys/vxlan_interface/keys/vxlan1
 $defs:
+  methods:
+    type: list
+    min_length: 1
+    items:
+      type: dict
+      keys:
+        method:
+          type: str
+          required: true
+          valid_values:
+          - logging
+          - group
+        group:
+          type: str
+          description: 'Specify the server group to be used.
+
+            This option is applicable only when the `method` key is explicitly set
+            to `group`.'
   application_traffic_recognition_application:
     type: dict
     keys:

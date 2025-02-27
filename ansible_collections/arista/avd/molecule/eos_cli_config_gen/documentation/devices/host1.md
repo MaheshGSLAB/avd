@@ -84,6 +84,7 @@
   - [Object Tracking](#object-tracking)
   - [Monitor Telemetry Postcard Policy](#monitor-telemetry-postcard-policy)
   - [Monitor Server Radius Summary](#monitor-server-radius-summary)
+  - [Monitor TWAMP](#monitor-twamp)
 - [Monitor Connectivity](#monitor-connectivity)
   - [Global Configuration](#global-configuration)
   - [VRF Configuration](#vrf-configuration)
@@ -922,9 +923,9 @@ management console
 
 #### Management API HTTP Summary
 
-| HTTP | HTTPS | Default Services |
-| ---- | ----- | ---------------- |
-| False | True | True |
+| HTTP | HTTPS | UNIX-Socket | Default Services |
+| ---- | ----- | ----------- | ---------------- |
+| False | True | True | True |
 
 Management HTTPS is using the SSL profile SSL_PROFILE
 
@@ -944,6 +945,7 @@ HTTPS certificate and private key are configured.
 management api http-commands
    protocol https
    no protocol http
+   protocol unix-socket
    default-services
    protocol https ssl profile SSL_PROFILE
    no shutdown
@@ -1432,38 +1434,38 @@ aaa authorization commands 10,15 default group tacacs+ local
 
 #### AAA Accounting Summary
 
-| Type | Commands | Record type | Group | Logging |
-| ---- | -------- | ----------- | ----- | ------- |
-| Exec - Console | - | start-stop | TACACS | True |
-| Commands - Console | all | start-stop | TACACS | True |
-| Commands - Console | 0 | start-stop |  -  | True |
-| Commands - Console | 1 | start-stop | TACACS1 | False |
-| Commands - Console | 2 | none |  -  | True |
-| Commands - Console | 3 | start-stop |  -  | False |
-| Exec - Default | - | start-stop | TACACS | True |
-| System - Default | - | start-stop | TACACS | - |
-| Dot1x - Default  | - | start-stop | RADIUS | - |
-| Commands - Default | all | start-stop | TACACS | True |
+| Type | Commands | Record type | Groups | Logging |
+| ---- | -------- | ----------- | ------ | ------- |
+| Exec - Console | - | start-stop | TACACS, RADIUS | True |
+| Commands - Console | all | start-stop | TACACS, RADIUS | True |
+| Commands - Console | 0 | start-stop | RADIUS, TACACS | True |
+| Commands - Console | 1 | start-stop | TACACS1, RADIUS | False |
+| Commands - Console | 2 | none | - | - |
+| Exec - Default | - | start-stop | TACACS, RADIUS | True |
+| System - Default | - | start-stop | TACACS, RADIUS | True |
+| Dot1x - Default | - | start-stop | RADIUS(multicast), TACACS | True |
+| Commands - Default | all | start-stop | TACACS, RADIUS | True |
 | Commands - Default | 0 | start-stop | - | True |
-| Commands - Default | 1 | start-stop | TACACS | False |
-| Commands - Default | 2 | none | - | True |
-| Commands - Default | 3 | start-stop | - | False |
+| Commands - Default | 1 | start-stop | TACACS, RADIUS | False |
+| Commands - Default | 2 | none | - | - |
+| Commands - Default | 3 | start-stop | - | True |
 
 #### AAA Accounting Device Configuration
 
 ```eos
-aaa accounting exec console start-stop group TACACS logging
-aaa accounting commands all console start-stop group TACACS logging
-aaa accounting commands 0 console start-stop logging
-aaa accounting commands 1 console start-stop group TACACS1
+aaa accounting exec console start-stop group TACACS group RADIUS logging
+aaa accounting commands all console start-stop group TACACS group RADIUS logging
+aaa accounting commands 0 console start-stop group RADIUS group TACACS logging
+aaa accounting commands 1 console start-stop group TACACS1 group RADIUS
 aaa accounting commands 2 console none
-aaa accounting exec default start-stop group TACACS logging
-aaa accounting system default start-stop group TACACS
-aaa accounting dot1x default start-stop group RADIUS
-aaa accounting commands all default start-stop group TACACS logging
+aaa accounting exec default start-stop group TACACS group RADIUS logging
+aaa accounting system default start-stop group TACACS group RADIUS logging
+aaa accounting dot1x default start-stop group RADIUS multicast group TACACS logging
+aaa accounting commands all default start-stop group TACACS group RADIUS logging
 aaa accounting commands 0 default start-stop logging
-aaa accounting commands 1 default start-stop group TACACS
+aaa accounting commands 1 default start-stop group TACACS group RADIUS
 aaa accounting commands 2 default none
+aaa accounting commands 3 default start-stop logging
 ```
 
 ## Address Locking
@@ -2853,6 +2855,44 @@ monitor server radius
    probe method access-request username arista password 7 <removed>
 ```
 
+### Monitor TWAMP
+
+#### TWAMP-light Summary
+
+- Reflector Default Listen Port is 12345
+
+- Sender Default Destination Port is 123
+
+- Sender Default Source Port is 45678
+
+#### TWAMP-light Sender Profiles
+
+| Profile Name | Measurement Interval(seconds) | Measurement Samples | Significance Value(microseconds) | Significance Offset(microseconds) |
+| ------------ | ----------------------------- | ------------------- | -------------------------------- | --------------------------------- |
+| test-profile | 5 | 10 | 50 | 5 |
+| test-profile2 | - | - | - | - |
+
+#### Monitor TWAMP configuration
+
+```eos
+!
+monitor twamp
+   twamp-light
+      reflector defaults
+         listen port 12345
+      !
+      sender defaults
+         destination port 123
+         source port 45678
+      !
+      sender profile test-profile
+         measurement interval 5 seconds
+         measurement samples 10
+         significance 50 microseconds offset 5 microseconds
+      !
+      sender profile test-profile2
+```
+
 ## Monitor Connectivity
 
 ### Global Configuration
@@ -3933,6 +3973,7 @@ interface Dps1
 | Interface | Enabled | Administrative Groups | Metric | Max Reservable Bandwidth | Min-delay | SRLG |
 | --------- | ------- | --------------------- | ------ | ------------------------ | --------- | ---- |
 | Ethernet81/3 | True | 3,15-29,testgrp | 4 | 10 percent | 5 microseconds | TEST-SRLG |
+| Ethernet81/4 | True | 4,7-100,testgrp | 2 | 100 mbps | twamp-light, fallback 2 milliseconds | 16 |
 
 #### Ethernet Interfaces Device Configuration
 
@@ -4939,11 +4980,12 @@ interface Ethernet81/4
    no shutdown
    no switchport
    ip address 100.64.127.0/31
+   traffic-engineering
    traffic-engineering bandwidth 100 mbps
    traffic-engineering administrative-group 4,7-100,testgrp
    traffic-engineering srlg 16
    traffic-engineering metric 2
-   traffic-engineering min-delay static 2 milliseconds
+   traffic-engineering min-delay dynamic twamp-light fallback 2 milliseconds
 !
 interface Ethernet81/10
    description isis_port_channel_member
@@ -5156,6 +5198,12 @@ interface Ethernet84
 | --------- | ----------- | --------- | -------- | ------- |
 | Port-Channel130 | ACL1 | POOL1 | 0 | - |
 
+##### IP NAT: Interfaces configured via profile
+
+| Interface | Profile |
+| --------- |-------- |
+| Port-Channel130 | TEST-NAT-PROFILE |
+
 ##### IPv6
 
 | Interface | Description | MLAG ID | IPv6 Address | VRF | MTU | Shutdown | ND RA Disabled | Managed Config Flag | IPv6 ACL In | IPv6 ACL Out |
@@ -5186,7 +5234,7 @@ interface Ethernet84
 
 | Interface | Enabled | Administrative Groups | Metric | Max Reservable Bandwidth | Min-delay | SRLG |
 | --------- | ------- | --------------------- | ------ | ------------------------ | --------- | ---- |
-| Port-Channel136 | True | 7 | - | - | - | - |
+| Port-Channel136 | True | 7 | - | - | twamp-light, fallback 123 microseconds | - |
 
 #### Port-Channel Interfaces Device Configuration
 
@@ -5688,6 +5736,7 @@ interface Port-Channel130
    ip nat source static 3.0.0.1 4.0.0.1
    ip nat destination dynamic access-list ACL1 pool POOL1
    ip nat source dynamic access-list ACL2 pool POOL2
+   ip nat service-profile TEST-NAT-PROFILE
 !
 interface Port-Channel131
    description dot1q-tunnel mode
@@ -5806,6 +5855,7 @@ interface Port-Channel136
    ip address 100.64.127.2/31
    traffic-engineering
    traffic-engineering administrative-group 7
+   traffic-engineering min-delay dynamic twamp-light fallback 123 microseconds
 !
 interface Port-Channel137
    description Traffic Engineering Interface
@@ -7057,6 +7107,8 @@ router service-insertion
 
 - Traffic Engineering is enabled.
 
+- TWAMP-light sender profile is test-profile
+
 #### Segment Routing Summary
 
 - SRTE is enabled.
@@ -7073,6 +7125,15 @@ router service-insertion
 | 5.6.7.8 | 20320 | 80 | - | - | 2600599809 | 900002 900004 900007 900006 | 400 | 220 | ipv4 |
 | 5.6.7.8 | 20320 | 120 | - | - | 2600599809 | 900002 900008 900009 900006 | - | - | ipv6 |
 | 5.6.7.8 | 20320 | 120 | - | - | 2600599809 | 900002 900010 900011 900012 | - | - | ipv6 |
+
+##### Flex-algo
+
+| Algo Number | Algo Name | Priority | Metric | Color | Admin-groups | SRLG Excludes |
+| ----------- | --------- | -------- | ------ | ----- | ------------ | ------------- |
+| 128 | test-algo | 127 | 1 | 450000 | include-all 99,100,102,105 include-any 101,103,110-115,117 exclude 45,60-70 | test,400-500,502 |
+| 129 | test-2 | 128 | min-delay | 100 | include-all 4 exclude 101 | 100,0xA |
+| 130 | test-3 | 123 | te-metric | 1234 | exclude 117 | 101 |
+| 131 | test-4 | - | - | - | - | - |
 
 #### Router Traffic Engineering Device Configuration
 
@@ -7115,6 +7176,30 @@ router traffic-engineering
             segment-list label-stack 900002 900010 900011 900012
    router-id ipv4 10.0.0.1
    router-id ipv6 2001:beef:cafe::1
+   !
+   flex-algo
+      flex-algo 128 test-algo
+         priority 127
+         administrative-group include all 99,100,102,105 include any 101,103,110-115,117 exclude 45,60-70
+         metric 1
+         srlg exclude test,400-500,502
+         color 450000
+      !
+      flex-algo 129 test-2
+         priority 128
+         administrative-group include all 4 exclude 101
+         metric min-delay
+         srlg exclude 100,0xA
+         color 100
+      !
+      flex-algo 130 test-3
+         priority 123
+         administrative-group exclude 117
+         metric te-metric
+         srlg exclude 101
+         color 1234
+      !
+      flex-algo 131 test-4
 ```
 
 ### Router OSPF
@@ -9280,6 +9365,8 @@ router bfd
 | LDP Interface Disabled Default | True |
 | LDP Transport-Address Interface | Loopback0 |
 | ICMP Fragmentation-Needed Tunneling Enabled | True |
+| Tunnel Termination Model | TTL: uniform, DSCP: uniform |
+| Tunnel Termination PHP Model | TTL: pipe, DSCP: pipe |
 
 ### MPLS Interfaces
 
@@ -9345,6 +9432,8 @@ router bfd
 ```eos
 !
 mpls ip
+mpls tunnel termination model ttl uniform dscp uniform
+mpls tunnel termination php model ttl pipe dscp pipe
 !
 mpls ldp
    router-id 192.168.1.1
@@ -10685,6 +10774,27 @@ ipv6 address virtual source-nat vrf TEST_04 address 2001:db8:85a3::8a2e:370:7335
 | Settings | Value |
 | -------- | ----- |
 | Maximum CPU Allocation | 42 |
+| Interface profile | TestProfile1 |
+
+#### Platform Software Forwarding Engine Interface Profiles
+
+##### TestProfile1
+
+| Interface | Rx-Queue Count | Rx-Queue Worker | Rx-Queue Mode |
+| --------- | -------------- | --------------- | ------------- |
+| Ethernet1/1 | 4 | 0-2,5 | - |
+| Ethernet1/2 | 2 | - | shared |
+| Ethernet1/4 | 1 | - | - |
+| Ethernet1/5 | 2 | 3,4 | exclusive |
+
+##### TestProfile2
+
+| Interface | Rx-Queue Count | Rx-Queue Worker | Rx-Queue Mode |
+| --------- | -------------- | --------------- | ------------- |
+| Ethernet1 | 3 | 2 | - |
+| Ethernet9 | - | - | - |
+
+##### TestProfile3
 
 ### Platform Device Configuration
 
@@ -10701,6 +10811,35 @@ platform sand qos map traffic-class 2 to network-qos 15
 platform sand multicast replication default ingress
 platform sand mdb profile l3-xxl
 platform sfe data-plane cpu allocation maximum 42
+!
+platform sfe interface
+   interface profile TestProfile1
+   !
+   profile TestProfile1
+      interface Ethernet1/1
+         rx-queue count 4
+         rx-queue worker 0-2,5
+      !
+      interface Ethernet1/2
+         rx-queue count 2
+         rx-queue mode shared
+      !
+      interface Ethernet1/4
+         rx-queue count 1
+      !
+      interface Ethernet1/5
+         rx-queue count 2
+         rx-queue worker 3,4
+         rx-queue mode exclusive
+   !
+   profile TestProfile2
+      interface Ethernet1
+         rx-queue count 3
+         rx-queue worker 2
+      !
+      interface Ethernet9
+   !
+   profile TestProfile3
 ```
 
 ## System L1
@@ -11593,35 +11732,28 @@ ip nat synchronization
 
 ### Errdisable Summary
 
-|  Detect Cause | Enabled |
-| ------------- | ------- |
-| acl | True |
-| arp-inspection | True |
-| dot1x | True |
-| link-change | True |
-| tapagg | True |
-| xcvr-misconfigured | True |
-| xcvr-overheat | True |
-| xcvr-power-unsupported | True |
+Errdisable recovery timer interval: 300 seconds
 
-|  Detect Cause | Enabled | Interval |
-| ------------- | ------- | -------- |
-| arp-inspection | True | 300 |
-| bpduguard | True | 300 |
-| dot1x | True | 300 |
-| hitless-reload-down | True | 300 |
-| lacp-rate-limit | True | 300 |
-| link-flap | True | 300 |
-| no-internal-vlan | True | 300 |
-| portchannelguard | True | 300 |
-| portsec | True | 300 |
-| speed-misconfigured | True | 300 |
-| tapagg | True | 300 |
-| uplink-failure-detection | True | 300 |
-| xcvr-misconfigured | True | 300 |
-| xcvr-overheat | True | 300 |
-| xcvr-power-unsupported | True | 300 |
-| xcvr-unsupported | True | 300 |
+|  Cause | Detection Enabled | Recovery Enabled |
+| ------ | ----------------- | ---------------- |
+| acl | True | - |
+| arp-inspection | True | True |
+| bpduguard | - | True |
+| dot1x | True | True |
+| hitless-reload-down | - | True |
+| lacp-rate-limit | - | True |
+| link-change | True | - |
+| link-flap | - | True |
+| no-internal-vlan | - | True |
+| portchannelguard | - | True |
+| portsec | - | True |
+| speed-misconfigured | - | True |
+| tapagg | True | True |
+| uplink-failure-detection | - | True |
+| xcvr-misconfigured | True | True |
+| xcvr-overheat | True | True |
+| xcvr-power-unsupported | True | True |
+| xcvr-unsupported | - | True |
 
 ```eos
 !
@@ -12031,6 +12163,11 @@ qos random-detect ecn allow non-ect chip-based
 | cmap_tc5_v4 | acl | acl_qos_tc5_v4 |
 | cmap_tc5_v6 | - | - |
 | COS_RANGE | vlan | 1-3 |
+| DSCP_TEST_1 | dscp<br>ecn | af11<br>ect-ce |
+| DSCP_TEST_2 | dscp<br>ecn | 2-4,6<br>non-ect |
+| DSCP_TEST_3 | dscp | cs0 |
+| DSCP_TEST_4 | dscp<br>ecn | ef<br>ce |
+| DSCP_TEST_5 | ecn | ce |
 | VLAN_RANGE | vlan | 200-400 |
 
 #### Class-maps Device Configuration
@@ -12063,6 +12200,21 @@ class-map type qos match-any cmap_tc5_v6
 !
 class-map type qos match-any COS_RANGE
    match vlan 1-3
+!
+class-map type qos match-any DSCP_TEST_1
+   match dscp af11 ecn ect-ce
+!
+class-map type qos match-any DSCP_TEST_2
+   match dscp 2-4,6 ecn non-ect
+!
+class-map type qos match-any DSCP_TEST_3
+   match dscp cs0
+!
+class-map type qos match-any DSCP_TEST_4
+   match dscp ef ecn ce
+!
+class-map type qos match-any DSCP_TEST_5
+   match ecn ce
 !
 class-map type qos match-any VLAN_RANGE
    match vlan 200-400

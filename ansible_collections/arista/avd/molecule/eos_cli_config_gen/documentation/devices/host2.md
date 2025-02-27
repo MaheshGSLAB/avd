@@ -111,6 +111,8 @@
   - [IP DHCP Snooping Device Configuration](#ip-dhcp-snooping-device-configuration)
 - [IP NAT](#ip-nat)
   - [IP NAT Device Configuration](#ip-nat-device-configuration)
+- [Errdisable](#errdisable)
+  - [Errdisable Summary](#errdisable-summary)
 - [MACsec](#macsec)
   - [MACsec Summary](#macsec-summary)
   - [MACsec Device Configuration](#macsec-device-configuration)
@@ -302,9 +304,9 @@ management cvx
 
 #### Management API HTTP Summary
 
-| HTTP | HTTPS | Default Services |
-| ---- | ----- | ---------------- |
-| True | False | False |
+| HTTP | HTTPS | UNIX-Socket | Default Services |
+| ---- | ----- | ----------- | ---------------- |
+| True | False | - | False |
 
 #### Management API HTTP Device Configuration
 
@@ -408,16 +410,28 @@ no aaa authorization config-commands
 
 #### AAA Accounting Summary
 
-| Type | Commands | Record type | Group | Logging |
-| ---- | -------- | ----------- | ----- | ------- |
-| Exec - Console | - | none | - | True |
+| Type | Commands | Record type | Groups | Logging |
+| ---- | -------- | ----------- | ------ | ------- |
+| Exec - Console | - | none | - | - |
+| Commands - Console | all | none | - | - |
+| Commands - Console | 0 | none | - | - |
 | Exec - Default | - | none | - | - |
+| System - Default | - | none | - | - |
+| Dot1x - Default | - | start-stop | - | True |
+| Commands - Default | all | none | - | - |
+| Commands - Default | 0 | none | - | - |
 
 #### AAA Accounting Device Configuration
 
 ```eos
 aaa accounting exec console none
+aaa accounting commands all console none
+aaa accounting commands 0 console none
 aaa accounting exec default none
+aaa accounting system default none
+aaa accounting dot1x default start-stop logging
+aaa accounting commands all default none
+aaa accounting commands 0 default none
 ```
 
 ## Management Security
@@ -866,11 +880,23 @@ interface Dps1
 | Qos ECN propagation | Disabled |
 | Qos map dscp to traffic-class decapsulation | Disabled |
 
+##### VLAN to VNI, Flood List and Multicast Group Mappings
+
+| VLAN | VNI | Flood List | Multicast Group |
+| ---- | --- | ---------- | --------------- |
+| 111,113,115-118 | 10111,10113,10115-10118 | - | - |
+| 110 | 10110 | - | 239.9.1.4 |
+| 111 | - | 10.1.1.10<br/>10.1.1.11 | - |
+
 #### VXLAN Interface Device Configuration
 
 ```eos
 !
 interface Vxlan1
+   vxlan vlan 110 vni 10110
+   vxlan vlan 111,113,115-118 vni 10111,10113,10115-10118
+   vxlan vlan 111 flood vtep 10.1.1.10 10.1.1.11
+   vxlan vlan 110 multicast group 239.9.1.4
    no vxlan qos ecn propagation
    no vxlan qos dscp propagation encapsulation
    no vxlan qos map dscp to traffic-class decapsulation
@@ -1496,6 +1522,37 @@ ip dhcp snooping
 !
 !
 ip nat synchronization
+```
+
+## Errdisable
+
+### Errdisable Summary
+
+|  Cause | Detection Enabled | Recovery Enabled |
+| ------ | ----------------- | ---------------- |
+| arp-inspection | - | True |
+| bpduguard | - | True |
+| hitless-reload-down | - | True |
+| lacp-rate-limit | - | True |
+| link-flap | - | True |
+| no-internal-vlan | - | True |
+| portchannelguard | - | True |
+| portsec | - | True |
+| tapagg | - | True |
+| uplink-failure-detection | - | True |
+
+```eos
+!
+errdisable recovery cause arp-inspection
+errdisable recovery cause bpduguard
+errdisable recovery cause hitless-reload-down
+errdisable recovery cause lacp-rate-limit
+errdisable recovery cause link-flap
+errdisable recovery cause no-internal-vlan
+errdisable recovery cause portchannelguard
+errdisable recovery cause portsec
+errdisable recovery cause tapagg
+errdisable recovery cause uplink-failure-detection
 ```
 
 ## MACsec

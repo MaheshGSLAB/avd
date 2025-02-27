@@ -1,22 +1,8 @@
-# Stage 1: Base Run Image
-ARG BASE_RUN_IMAGE
-FROM ${BASE_RUN_IMAGE} AS base_run
-
-# Stage 2: Build (For PyAVD)
-FROM debian:bookworm-slim AS build
-
-# Enable BuildKit cache to avoid redundant COPY steps
-RUN --mount=type=cache,target=/venvs \
-    mkdir -p /venvs && \
-    echo "Using BuildKit cache for /venvs"
-
-COPY --from=base_run /venvs /venvs
-
-# Copy the application code
+ARG BASE_IMAGE_TAG
+FROM ${BASE_IMAGE_TAG} AS build
 COPY . /avd
 WORKDIR /avd/python-avd
 
-# Install build dependencies and build the wheel
 RUN apt-get update && apt-get install -y --no-install-recommends make && \
     /venvs/UV3.11/bin/python -m pip install --break-system-packages build && \
     /venvs/UV3.11/bin/python -m build --wheel --outdir /tmp/wheels && \
@@ -24,17 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends make && \
       /venvs/UV$VERSION/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl; \
     done
 
-# Stage 3: Final Run Image (Minimal)
 FROM ubuntu:latest AS run
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && update-ca-certificates
-#     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# # Use --mount instead of COPY to avoid extra disk I/O and speed up builds
-# RUN --mount=type=cache,target=/venvs \
-#     mkdir -p /venvs && \
-#     echo "Using BuildKit cache for /venvs"
-
+# Copy virtual environments from the build stage
 COPY --from=build /venvs /venvs
-COPY --from=build /avd /avd

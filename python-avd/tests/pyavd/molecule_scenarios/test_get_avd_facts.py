@@ -1,6 +1,7 @@
 # Copyright (c) 2023-2025 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
+import json
 from copy import deepcopy
 
 import pytest
@@ -29,7 +30,7 @@ from tests.models import MoleculeScenario
 def test_get_avd_facts(molecule_scenario: MoleculeScenario) -> None:
     """Test get_avd_facts."""
     molecule_inputs = {host.name: deepcopy(host.hostvars) for host in molecule_scenario.hosts}
-    avd_facts = get_avd_facts(molecule_inputs)
+    avd_facts = get_avd_facts(molecule_inputs, pool_manager=molecule_scenario.pool_manager)
 
     assert isinstance(avd_facts, dict)
     assert "avd_switch_facts" in avd_facts
@@ -39,3 +40,5 @@ def test_get_avd_facts(molecule_scenario: MoleculeScenario) -> None:
     assert isinstance(avd_facts["avd_overlay_peers"], dict)
     assert "avd_topology_peers" in avd_facts
     assert isinstance(avd_facts["avd_topology_peers"], dict)
+    # Test that we can dump the returned data as json.
+    assert json.dumps(avd_facts)
