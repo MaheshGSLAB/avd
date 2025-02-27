@@ -205,7 +205,7 @@
               PYTHON_VERSION=${{ matrix.python_version }}
             cache-from: type=gha
             cache-to: type=gha,mode=max
-            tags: ghcr.io/${{ env.lowercase }}/pyavd:${{ matrix.python_version }}-${{ github.run_number }}-${SHORT_SHA}
+            tags: ${{ env.build_image_tag_${{ matrix.python_version | replace('.', '_') }} }}
 
     # ----------------------------------- #
     # Test Requirements
