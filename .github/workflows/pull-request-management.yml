@@ -160,10 +160,10 @@
         matrix:
           python_version: ["3.10", "3.11", "3.12", "3.13"]
       outputs:
-        build_image_tag_3_10: ${{ steps.set-build-tag.outputs.build_image_tag_3.10 }}
-        build_image_tag_3_11: ${{ steps.set-build-tag.outputs.build_image_tag_3.11 }}
-        build_image_tag_3_12: ${{ steps.set-build-tag.outputs.build_image_tag_3.12 }}
-        build_image_tag_3_13: ${{ steps.set-build-tag.outputs.build_image_tag_3.13 }}
+        build_image_tag_3_10: ${{ steps.set-build-tag.outputs.build_image_tag_3_10 }}
+        build_image_tag_3_11: ${{ steps.set-build-tag.outputs.build_image_tag_3_11 }}
+        build_image_tag_3_12: ${{ steps.set-build-tag.outputs.build_image_tag_3_12 }}
+        build_image_tag_3_13: ${{ steps.set-build-tag.outputs.build_image_tag_3_13 }}
       steps:
         - name: Check out repository code
           uses: actions/checkout@v4
@@ -176,8 +176,9 @@
           run: |
             SHORT_SHA=$(git rev-parse --short HEAD)
             BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/pyavd:${{ matrix.python_version }}-${{ github.run_number }}-${SHORT_SHA}"
-            echo "build_image_tag_${{ matrix.python_version }}=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
-            echo "build_image_tag_${{ matrix.python_version }}=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
+            IMAGE_OUTPUT_KEY="build_image_tag_${{ matrix.python_version | replace('.', '_') }}"
+            echo "$IMAGE_OUTPUT_KEY=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
+            echo "$IMAGE_OUTPUT_KEY=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
 
         - name: Log in to GitHub Container Registry
           uses: docker/login-action@v2
