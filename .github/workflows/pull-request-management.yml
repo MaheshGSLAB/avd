@@ -198,7 +198,7 @@
             target: run
             tags: ${{ env.build_image_tag }}
             build-args: 
-              BASE_RUN_IMAGE=${{ needs.avd-base-image.outputs.base_image_tag }}
+              BASE_IMAGE_TAG=${{ needs.avd-base-image.outputs.base_image_tag }}
             cache-from: type=gha
             cache-to: type=gha,mode=max
             outputs: type=image,push=true
