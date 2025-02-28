@@ -194,11 +194,11 @@
             install: true
             driver-opts: network=host
 
-        # - name: Set Correct Image Tag for Python ${{ matrix.python_version }}
-        #   run: |
-        #     PYTHON_VERSION_UNDERSCORE=$(echo "${{ matrix.python_version }}" | tr '.' '_')
-        #     VAR_NAME="build_image_tag_${PYTHON_VERSION_UNDERSCORE}"
-        #     echo "BUILD_IMAGE_TAG=${!VAR_NAME}" >> $GITHUB_ENV
+        - name: Set Correct Image Tag for Python ${{ matrix.python_version }}
+          run: |
+            PYTHON_VERSION_UNDERSCORE=$(echo "${{ matrix.python_version }}" | tr '.' '_')
+            VAR_NAME="build_image_tag_${PYTHON_VERSION_UNDERSCORE}"
+            echo "BUILD_IMAGE_TAG=${!VAR_NAME}" >> $GITHUB_ENV
           
         - name: Build and Push PyAVD Image for Python ${{ matrix.python_version }}
           uses: docker/build-push-action@v6
