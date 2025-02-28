@@ -206,9 +206,9 @@
             file: .github/DockerfileBuild
             push: true
             target: run
-            build-args: 
-              BASE_IMAGE_TAG=${{ needs.avd-base-image.outputs.base_image_tag }}
-              PYTHON_VERSION=${{ matrix.python_version }}
+            build-args: |
+              "BASE_IMAGE_TAG=${{ needs.avd-base-image.outputs.base_image_tag }}"
+              "PYTHON_VERSION=${{ matrix.python_version }}"
             cache-from: type=gha
             cache-to: type=gha,mode=max
             tags: ${{ env.BUILD_IMAGE_TAG }}
