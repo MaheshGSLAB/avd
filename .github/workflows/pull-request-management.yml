@@ -168,7 +168,7 @@
           id: set-build-tag
           run: |
             SHORT_SHA=$(git rev-parse --short HEAD)
-            BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/avd-base:${{ github.run_number }}-${SHORT_SHA}"
+            BUILD_IMAGE_TAG="ghcr.io/${{ env.lowercase }}/avd-pyavd:${{ github.run_number }}-${SHORT_SHA}"
             echo "build_image_tag=$BUILD_IMAGE_TAG" >> $GITHUB_ENV
             echo "build_image_tag=$BUILD_IMAGE_TAG" >> $GITHUB_OUTPUT
 
