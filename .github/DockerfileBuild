@@ -1,14 +1,12 @@
 ARG BASE_IMAGE_TAG
-ARG PYTHON_VERSION
-
 FROM ${BASE_IMAGE_TAG} AS build
 COPY . /avd
 WORKDIR /avd/python-avd
 
 RUN apt-get update && apt-get install -y --no-install-recommends make && \
-    /venvs/UV${PYTHON_VERSION}/bin/python -m pip install --break-system-packages build && \
-    /venvs/UV${PYTHON_VERSION}/bin/python -m build --wheel --outdir /tmp/wheels && \
-    /venvs/UV${PYTHON_VERSION}/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl
+    /venvs/UV3.11/bin/python -m pip install --break-system-packages build && \
+    /venvs/UV3.11/bin/python -m build --wheel --outdir /tmp/wheels && \
+    /venvs/UV3.11/bin/python -m pip install --no-cache-dir /tmp/wheels/*.whl
 
 FROM ubuntu:latest AS run
 # Copy virtual environments from the build stage
