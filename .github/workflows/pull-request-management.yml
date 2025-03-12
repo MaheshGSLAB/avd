@@ -153,12 +153,12 @@
             pip install --upgrade pip
             pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
             
-        - name: Save Virtual Environment (if updated)
-          if: steps.cache-venv.outputs.cache-hit != 'true'
+        - name: Upload Virtual Environment (Even if Cache Exists)
           uses: actions/upload-artifact@v4
           with:
             name: base-avd
             path: /tmp/python_env/
+            retention-days: 30
 
     build_pyavd:
       name: Build pyavd
