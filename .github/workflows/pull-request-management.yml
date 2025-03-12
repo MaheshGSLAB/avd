@@ -178,8 +178,8 @@
           run: |
             chmod -R +x /tmp/python_env/bin
             ls -la /tmp/python_env/bin  # Check permissions
-            mkdir -p /home/runner/.ansible/tmp
-            chmod 1777 /home/runner/.ansible/tmp
+            ls -al /home/runner/
+            ls -al /home/runner/.ansible/
         - name: Install Python & Ansible Requirements
           run: |
             echo "Python executable: $(command -v python)"
