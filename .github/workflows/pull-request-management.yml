@@ -185,6 +185,7 @@
             echo "Python executable: $(command -v python)"
             echo "Pip executable: $(command -v pip)"
             python -m pip install --upgrade "${{ matrix.ansible_version }}"
+            ls -al /tmp/
           shell: /usr/bin/bash -e {0}
           env:
             PATH: "/tmp/python_env/bin:${PATH}"
