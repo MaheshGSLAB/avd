@@ -1,553 +1,595 @@
 ---
-name: "Collection code testing"
-
-"on":
-  pull_request:
-  merge_group:
-  push:
-    branches:
-      - devel
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
-  cancel-in-progress: true
-
-env:
-  # Set -vvv is ACTIONS_STEP_DEBUG is set
-  # Apparently it is set in secrets when running with debug
-  ANSIBLE_VERBOSITY: ${{ secrets.ACTIONS_STEP_DEBUG && 3 || 0 }}
-  AVD_NEVER_RUN_FROM_SOURCE: 1
-  PY_COLORS: 1 # allows molecule colors to be passed to GitHub Actions
-  ANSIBLE_FORCE_COLOR: 1 # allows ansible colors to be passed to GitHub Actions
-
-jobs:
-  file-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      eos_design: ${{ steps.filter.outputs.eos_design }}
-      config_gen: ${{ steps.filter.outputs.config_gen }}
-      cloudvision: ${{ steps.filter.outputs.cloudvision }}
-      dhcp: ${{ steps.filter.outputs.dhcp }}
-      plugins: ${{ steps.filter.outputs.plugins }}
-      requirements: ${{ steps.filter.outputs.requirements }}
-      docs: ${{ steps.filter.outputs.docs }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            eos_design:
-              - 'ansible_collections/arista/avd/roles/eos_designs/*'
-              - 'ansible_collections/arista/avd/roles/eos_designs/**/*'
-              - '.github/workflows/pull-request-management.yml'
-              - 'ansible_collections/arista/avd/molecule/*'
-              - 'ansible_collections/arista/avd/molecule/**/*'
-              - 'python-avd/pyavd/_eos_designs/*'
-              - 'python-avd/pyavd/_eos_designs/**/*'
-              - '!ansible_collections/arista/avd/roles/eos_config_deploy_cvp/*'
-              - '!ansible_collections/arista/avd/roles/eos_config_deploy_cvp/**/*'
-              - '!ansible_collections/arista/avd/molecule/cvp_configlet_upload/*'
-              - '!ansible_collections/arista/avd/molecule/cvp_configlet_upload/**/*'
-            config_gen:
-              - 'ansible_collections/arista/avd/roles/eos_cli_config_gen/*'
-              - 'ansible_collections/arista/avd/roles/eos_cli_config_gen/**/*'
-              - '.github/workflows/pull-request-management.yml'
-              - 'ansible_collections/arista/avd/molecule/eos_cli_config_gen*/*'
-              - 'ansible_collections/arista/avd/molecule/eos_cli_config_gen*/**/*'
-              - 'python-avd/pyavd/_eos_cli_config_gen/*'
-              - 'python-avd/pyavd/_eos_cli_config_gen/**/*'
-            validate_state:
-              - 'ansible_collections/arista/avd/roles/eos_validate_state/*'
-              - 'ansible_collections/arista/avd/roles/eos_validate_state/**/*'
-            cloudvision:
-              - 'ansible_collections/arista/avd/roles/eos_config_deploy_cvp/*'
-              - 'ansible_collections/arista/avd/roles/eos_config_deploy_cvp/**/*'
-              - 'ansible_collections/arista/avd/molecule/cvp_configlet_upload/*'
-              - 'ansible_collections/arista/avd/molecule/cvp_configlet_upload/**/*'
-              - '.github/workflows/pull-request-management.yml'
-            dhcp:
-              - 'ansible_collections/arista/avd/roles/dhcp_provisioner/*'
-              - 'ansible_collections/arista/avd/roles/dhcp_provisioner/**/*'
-              - '.github/workflows/pull-request-management.yml'
-            plugins:
-              - 'ansible_collections/arista/avd/plugins/filter/**'
-              - 'ansible_collections/arista/avd/plugins/test/**'
-            requirements:
-              - 'ansible_collections/arista/avd/requirements.txt'
-              - 'ansible_collections/arista/avd/requirements-dev.txt'
-              - 'ansible_collections/arista/avd/meta/runtime.yml'
-              - '.github/requirements-ci-dev.txt'
-              - '.github/workflows/pull-request-management.yml'
-            docs:
-              - '.github/workflows/pull-request-management.yml'
-              - 'mkdocs.yml'
-              - 'ansible_collections/arista/avd/docs/**'
-              - 'ansible_collections/arista/avd/roles/**/*.md'
-              - 'ansible_collections/arista/avd/**/*.md'
-              - 'ansible_collections/arista/avd/README.md'
-              - 'ansible_collections/arista/avd/**/*.schema.yml'
-            pyavd:
-              - 'python_avd/*'
-              - 'python_avd/**/*'
-
-  # ----------------------------------- #
-  # Test Requirements
-  # ----------------------------------- #
-  python_requirements:
-    name: Test Python requirements installation
-    runs-on: ubuntu-latest
-    needs: [file-changes]
-    if: needs.file-changes.outputs.requirements == 'true'
-    strategy:
-      fail-fast: true
-      matrix:
-        python_version:
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python_version }}
-      - name: "Install Python requirements"
-        run: |
-          pip install -r .github/requirements-ci-dev.txt -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
-
-  # ----------------------------------- #
-  # EOS CLI CONFIG GEN MOLECULE
-  # ----------------------------------- #
-  molecule_eos_cli_config_gen:
-    name: Validate eos_cli_config_gen
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario:
-          - "eos_cli_config_gen"
-          - "eos_cli_config_gen_deprecated_vars"
-          - "eos_cli_config_gen_negative_unit_tests"
-        ansible_version:
-          - "ansible-core<2.19.0 --upgrade"
-        # Also test minimum ansible version for one scenario.
-        include:
-          - avd_scenario: "eos_cli_config_gen"
-            ansible_version: "ansible-core==2.16.0"
-    needs: [file-changes]
-    if: needs.file-changes.outputs.config_gen == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run molecule action
-        uses: arista-netdevops-community/action-molecule-avd@v1.8.1
-        with:
-          molecule_parentdir: "ansible_collections/arista/avd"
-          molecule_command: "test"
-          molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
-          pip_file: .github/requirements-ci-dev.txt
-          galaxy_file: "ansible_collections/arista/avd/collections.yml"
-          ansible: ${{ matrix.ansible_version }}
-          check_git: true
-          check_git_enforced: true
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: molecule-${{ matrix.avd_scenario }}-artifacts
-      #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
-
-  # ----------------------------------- #
-  # DHCP PROVISIONNER MOLECULE
-  # ----------------------------------- #
-  molecule_dhcp_provisionner:
-    name: Validate DHCP configuration
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario: ["dhcp_configuration", "dhcp_provisioning"]
-        ansible_version: ["ansible-core<2.19.0 --upgrade"]
-    needs: [file-changes]
-    if: needs.file-changes.outputs.dhcp == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run molecule action
-        uses: arista-netdevops-community/action-molecule-avd@v1.8.1
-        with:
-          molecule_parentdir: "ansible_collections/arista/avd"
-          molecule_command: "test"
-          molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
-          pip_file: .github/requirements-ci-dev.txt
-          galaxy_file: "ansible_collections/arista/avd/collections.yml"
-          ansible: ${{ matrix.ansible_version }}
-          check_git: true
-          check_git_enforced: true
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: molecule-${{ matrix.avd_scenario }}-artifacts
-      #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
-
-  # ----------------------------------- #
-  # EOS Design MOLECULE
-  # ----------------------------------- #
-  molecule_eos_designs:
-    name: Validate eos_designs
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario:
-          - "ansible_only"
-          - "eos_designs_deprecated_vars"
-          - "eos_designs-l2ls"
-          - "eos_designs-mpls-isis-sr-ldp"
-          - "eos_designs_negative_unit_tests"
-          - "eos_designs-twodc-5stage-clos"
-          - "eos_designs_unit_tests"
-          - "evpn_underlay_ebgp_overlay_ebgp"
-          - "evpn_underlay_isis_overlay_ibgp"
-          - "evpn_underlay_ospf_overlay_ebgp"
-          - "evpn_underlay_rfc5549_overlay_ebgp"
-          - "example-campus-fabric"
-          - "example-dual-dc-l3ls"
-          - "example-isis-ldp-ipvpn"
-          - "example-l2ls-fabric"
-          - "example-single-dc-l3ls"
-          - "example-cv-pathfinder"
-        ansible_version:
-          # Testing all scenario with 2.16.x, due to bug with in 2.17.0 with and the way we test eos_designs_negative_unit_tests https://github.com/ansible/ansible/issues/83292
-          - "ansible-core>=2.16.0,<2.17.0 --upgrade"
-        pip_requirements:
-          - ".github/requirements-ci-dev.txt"
-        # Also test minimum ansible version for one scenario.
-        include:
-          - avd_scenario: "eos_designs_unit_tests"
-            ansible_version: "ansible-core==2.16.0 --upgrade"
-            pip_requirements: ".github/requirements-ci-dev.txt"
-          - avd_scenario: "eos_designs_unit_tests"
-            ansible_version: "ansible-core<2.18.0 --upgrade"
-            pip_requirements: ".github/requirements-ci-dev.txt"
-          - avd_scenario: "eos_designs_unit_tests"
-            ansible_version: "ansible-core<2.19.0 --upgrade"
-            pip_requirements: ".github/requirements-ci-dev.txt"
-    needs: [file-changes]
-    if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build minimum requirements
-        run: |
-          pip install uv
-          uv pip compile .github/requirements-ci-dev.txt --resolution=lowest-direct > ${{ matrix.pip_requirements }}
-          cat ${{ matrix.pip_requirements }}
-        if: matrix.pip_requirements == 'tmp-requirements-minimum.txt'
-      - name: Run molecule action
-        uses: arista-netdevops-community/action-molecule-avd@v1.8.1
-        with:
-          molecule_parentdir: "ansible_collections/arista/avd"
-          molecule_command: "test"
-          molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
-          pip_file: ${{ matrix.pip_requirements }}
-          galaxy_file: "ansible_collections/arista/avd/collections.yml"
-          ansible: ${{ matrix.ansible_version }}
-          check_git: true
-          check_git_enforced: true
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: molecule-${{ matrix.avd_scenario }}-artifacts
-      #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
-  # ----------------------------------- #
-  # Cloudvision MOLECULE
-  # ----------------------------------- #
-  molecule_cloudvision:
-    name: Validate cvp_collection
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario:
-          - "eos_config_deploy_cvp"
-        ansible_version:
-          - "ansible-core<2.19.0 --upgrade"
-        include:
-          - avd_scenario: "eos_config_deploy_cvp"
-            ansible_version: "ansible-core==2.16.0"
-    needs: [file-changes]
-    if: needs.file-changes.outputs.cloudvision == 'true' || needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run molecule action
-        uses: arista-netdevops-community/action-molecule-avd@v1.8.1
-        with:
-          molecule_parentdir: "ansible_collections/arista/avd"
-          molecule_command: "test"
-          molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
-          pip_file: .github/requirements-ci-dev.txt
-          galaxy_file: "ansible_collections/arista/avd/collections.yml"
-          ansible: ${{ matrix.ansible_version }}
-          check_git: true
-          check_git_enforced: true
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: molecule-${{ matrix.avd_scenario }}-artifacts
-      #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
-      #
-  # ----------------------------------- #
-  # EOS Validate State MOLECULE
-  # ----------------------------------- #
-  molecule_eos_validate_state:
-    name: Validate eos_validate_state
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        avd_scenario:
-          - "eos_validate_state"
-        ansible_version:
-          - "ansible-core<2.19.0 --upgrade"
-        include:
-          - avd_scenario: "eos_validate_state"
-            ansible_version: "ansible-core==2.16.0"
-    needs: [file-changes]
-    if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.validate_state == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run molecule action
-        uses: arista-netdevops-community/action-molecule-avd@v1.8.1
-        with:
-          molecule_parentdir: "ansible_collections/arista/avd"
-          molecule_command: "test"
-          molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
-          pip_file: .github/requirements-ci-dev.txt
-          galaxy_file: "ansible_collections/arista/avd/collections.yml"
-          ansible: ${{ matrix.ansible_version }}
-          check_git: true
-          check_git_enforced: true
-
-  # ----------------------------------- #
-  # Ansible tests
-  # ----------------------------------- #
-  ansible_test_sanity:
-    name: Run ansible-test sanity validation
-    runs-on: ubuntu-latest
-    needs: [file-changes]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.10
-            3.11
-            3.12
-            3.13
-      - name: "Install Python requirements"
-        run: |
-          pip install "ansible-core<2.19.0" -r .github/requirements-ci-dev.txt --upgrade
-      - name: "Run ansible-test sanity"
-        run: |
-          cd ansible_collections/arista/avd/
-          ansible-test sanity --color yes -v
-
-  ansible_test_units:
-    name: Run ansible-test units test cases
-    runs-on: ubuntu-latest
-    needs: [file-changes]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.12
-      - name: "Install Python requirements"
-        run: |
-          pip install pyyaml "ansible-core<2.19.0" -r .github/requirements-ci-dev.txt --upgrade
-      - name: "Run ansible-test units test cases"
-        run: |
-          cd ansible_collections/arista/avd/
-          ansible-test units --coverage --requirements -vv
-          ansible-test coverage xml
-          mv tests/output/reports/coverage.xml ./units-coverage.xml
-      - name: Upload coverage from ansible-test units
-        uses: actions/upload-artifact@v4
-        with:
-          name: ansible-test-units-coverage
-          path: ansible_collections/arista/avd/units-coverage.xml
-
-  ansible_test_integration:
-    name: Run ansible-test integration test cases
-    runs-on: ubuntu-latest
-    needs: [file-changes]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.12
-            3.13
-      - name: "Install Python requirements"
-        run: |
-          pip install "ansible-core<2.19.0" -r .github/requirements-ci-dev.txt --upgrade
-      - name: "Run ansible-test integration test cases"
-        run: |
-          cd ansible_collections/arista/avd/
-          ansible-test integration --coverage --requirements -vv
-          ansible-test coverage xml
-          mv tests/output/reports/coverage.xml ./integration-coverage.xml
-      - name: Upload coverage from ansible-test integration
-        uses: actions/upload-artifact@v4
-        with:
-          name: ansible-test-integration-coverage
-          path: ansible_collections/arista/avd/integration-coverage.xml
-
-  # ----------------------------------- #
-  # Build Collection
-  # ----------------------------------- #
-  build_collection:
-    name: Build Ansible collection
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.12
-      - uses: actions/checkout@v4
-      - name: "Install Python & Ansible requirements"
-        run: |
-          # distlib is required when using manifest
-          pip install "ansible-core<2.19.0" distlib --upgrade
-      - name: "Build Ansible collection"
-        run: |
-          ansible-galaxy collection build -vvv --force ansible_collections/arista/avd
-      - name: Upload collection
-        uses: actions/upload-artifact@v4
-        with:
-          name: avd-collection
-          path: ./arista-avd-*.tar.gz
-
-  # ----------------------------------- #
-  # Galaxy Importer
-  # ----------------------------------- #
-  galaxy_importer:
-    name: Test galaxy-importer
-    runs-on: ubuntu-latest
-    needs: [build_collection]
-    steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.11
-      - uses: actions/checkout@v4
-      - name: "Install Python & Ansible requirements"
-        run: |
-          pip install "ansible-core==2.16.0"
-      - name: Download collection
-        uses: actions/download-artifact@v4
-        with:
-          name: avd-collection
-      - name: Install galaxy-importer
-        # Install the specific version of galaxy-importer used on galaxy.ansible.com
-        # The version conflicts with our requirements,
-        # so we let the galaxy-importer version resolve remaining requirements.
-        run: |
-          pip install "galaxy-importer==0.4.26"
-      - name: "Run galaxy-importer checks"
-        run: python -m galaxy_importer.main *.tar.gz
-      - uses: actions/upload-artifact@v4
-        with:
-          name: importer-logs
-          path: ./importer_result.json
-
-  # ----------------------------------- #
-  # Ansible Lint
-  # Run on the built collection from Galaxy importer
-  # ----------------------------------- #
-  ansible_lint:
-    name: Run ansible-lint test case
-    runs-on: ubuntu-latest
-    needs: [build_collection]
-    env:
-      ANSIBLE_COLLECTIONS_PATH: /home/runner/work/avd/avd
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.10
-            3.11
-            3.12
-            3.13
-      - name: "Install Python & Ansible requirements"
-        run: |
-          pip install -r .github/requirements-ci-dev.txt -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
-      - name: Download collection
-        uses: actions/download-artifact@v4
-        with:
-          name: avd-collection
-      - name: "Extract collection"
-        run: |
-          mkdir collections
-          tar xvzf arista-avd-*.tar.gz -C collections
-      - name: "🥷 Remove unskippable ansible-lint rule added for Galaxy"
-        working-directory: collections
-        run: |
-          sed -i 's/- syntax-check/# - syntax-check/g' .ansible-lint
-      - name: "Run ansible-lint"
-        working-directory: collections
-        run: |
-          ansible-lint --force-color --strict -v
-
-  # ----------------------------------- #
-  # Test of pyavd
-  # ----------------------------------- #
-  pyavd:
-    name: Test pyavd
-    runs-on: ubuntu-latest
-    needs: [file-changes]
-    if: |
-      needs.file-changes.outputs.eos_design == 'true' ||
-      needs.file-changes.outputs.config_gen == 'true' ||
-      needs.file-changes.outputs.pyavd == 'true'
-    strategy:
-      matrix:
-        python: ["3.10", "3.11", "3.12", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: "Install tox"
-        run: |
-          pip install tox tox-gh-actions --upgrade
-      - name: "Run pytest via tox for ${{ matrix.python }}"
-        working-directory: python-avd
-        run: |
-          tox
-      - name: Upload coverage from pytest
-        # Coverage only runs as part of 3.11.
-        if: |
-          matrix.python == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-coverage
-          path: python-avd/coverage.xml
-
-      - name: Upload eos_designs compiled templates from pytest
-        if: |
-          matrix.python == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-eos-designs-compiled-templates
-          path: python-avd/pyavd/_eos_designs/j2templates/compiled_templates/
-
-      - name: Upload eos_cli_config_gen compiled templates from pytest
-        if: |
-          matrix.python == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-eos-cli-config-gen-compiled-templates
-          path: python-avd/pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
+  name: "Collection code testing"
+  
+  "on":
+    pull_request:
+    merge_group:
+    push:
+      branches:
+        - devel
+  
+  concurrency:
+    group: ${{ github.workflow }}-${{ github.head_ref }}
+    cancel-in-progress: true
+  
+  env:
+    # Set -vvv is ACTIONS_STEP_DEBUG is set
+    # Apparently it is set in secrets when running with debug
+    ANSIBLE_VERBOSITY: ${{ secrets.ACTIONS_STEP_DEBUG && 3 || 0 }}
+    AVD_NEVER_RUN_FROM_SOURCE: 1
+    PY_COLORS: 1 # allows molecule colors to be passed to GitHub Actions
+    ANSIBLE_FORCE_COLOR: 1 # allows ansible colors to be passed to GitHub Actions
+  
+  jobs:
+    file-changes:
+      runs-on: ubuntu-latest
+      outputs:
+        eos_design: ${{ steps.filter.outputs.eos_design }}
+        config_gen: ${{ steps.filter.outputs.config_gen }}
+        cloudvision: ${{ steps.filter.outputs.cloudvision }}
+        dhcp: ${{ steps.filter.outputs.dhcp }}
+        plugins: ${{ steps.filter.outputs.plugins }}
+        requirements: ${{ steps.filter.outputs.requirements }}
+        docs: ${{ steps.filter.outputs.docs }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dorny/paths-filter@v3
+          id: filter
+          with:
+            filters: |
+              eos_design:
+                - 'ansible_collections/arista/avd/roles/eos_designs/*'
+                - 'ansible_collections/arista/avd/roles/eos_designs/**/*'
+                - '.github/workflows/pull-request-management.yml'
+                - 'ansible_collections/arista/avd/molecule/*'
+                - 'ansible_collections/arista/avd/molecule/**/*'
+                - 'python-avd/pyavd/_eos_designs/*'
+                - 'python-avd/pyavd/_eos_designs/**/*'
+                - '!ansible_collections/arista/avd/roles/eos_config_deploy_cvp/*'
+                - '!ansible_collections/arista/avd/roles/eos_config_deploy_cvp/**/*'
+                - '!ansible_collections/arista/avd/molecule/cvp_configlet_upload/*'
+                - '!ansible_collections/arista/avd/molecule/cvp_configlet_upload/**/*'
+              config_gen:
+                - 'ansible_collections/arista/avd/roles/eos_cli_config_gen/*'
+                - 'ansible_collections/arista/avd/roles/eos_cli_config_gen/**/*'
+                - '.github/workflows/pull-request-management.yml'
+                - 'ansible_collections/arista/avd/molecule/eos_cli_config_gen*/*'
+                - 'ansible_collections/arista/avd/molecule/eos_cli_config_gen*/**/*'
+                - 'python-avd/pyavd/_eos_cli_config_gen/*'
+                - 'python-avd/pyavd/_eos_cli_config_gen/**/*'
+              validate_state:
+                - 'ansible_collections/arista/avd/roles/eos_validate_state/*'
+                - 'ansible_collections/arista/avd/roles/eos_validate_state/**/*'
+              cloudvision:
+                - 'ansible_collections/arista/avd/roles/eos_config_deploy_cvp/*'
+                - 'ansible_collections/arista/avd/roles/eos_config_deploy_cvp/**/*'
+                - 'ansible_collections/arista/avd/molecule/cvp_configlet_upload/*'
+                - 'ansible_collections/arista/avd/molecule/cvp_configlet_upload/**/*'
+                - '.github/workflows/pull-request-management.yml'
+              dhcp:
+                - 'ansible_collections/arista/avd/roles/dhcp_provisioner/*'
+                - 'ansible_collections/arista/avd/roles/dhcp_provisioner/**/*'
+                - '.github/workflows/pull-request-management.yml'
+              plugins:
+                - 'ansible_collections/arista/avd/plugins/filter/**'
+                - 'ansible_collections/arista/avd/plugins/test/**'
+              requirements:
+                - 'ansible_collections/arista/avd/requirements.txt'
+                - 'ansible_collections/arista/avd/requirements-dev.txt'
+                - 'ansible_collections/arista/avd/meta/runtime.yml'
+                - '.github/requirements-ci-dev.txt'
+                - '.github/workflows/pull-request-management.yml'
+              docs:
+                - '.github/workflows/pull-request-management.yml'
+                - 'mkdocs.yml'
+                - 'ansible_collections/arista/avd/docs/**'
+                - 'ansible_collections/arista/avd/roles/**/*.md'
+                - 'ansible_collections/arista/avd/**/*.md'
+                - 'ansible_collections/arista/avd/README.md'
+                - 'ansible_collections/arista/avd/**/*.schema.yml'
+              pyavd:
+                - 'python_avd/*'
+                - 'python_avd/**/*'
+  
+    # ----------------------------------- #
+    # Test Requirements
+    # ----------------------------------- #
+    python_requirements:
+      name: Test Python requirements installation
+      runs-on: ubuntu-latest
+      needs: [file-changes]
+      if: needs.file-changes.outputs.requirements == 'true'
+      strategy:
+        fail-fast: true
+        matrix:
+          python_version:
+            - "3.10"
+            - "3.11"
+            - "3.12"
+            - "3.13"
+      steps:
+        - uses: actions/checkout@v4
+        - name: Set up Python 3
+          uses: actions/setup-python@v5
+          with:
+            python-version: ${{ matrix.python_version }}
+        - name: "Install Python requirements"
+          run: |
+            pip install -r .github/requirements-ci-dev.txt -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+  
+    # ----------------------------------- #
+    # Build Collection
+    # ----------------------------------- #
+    build_pyavd:
+      name: Build pyavd
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/setup-python@v5
+          with:
+            python-version: |
+              3.11
+        - uses: actions/checkout@v4
+        - name: "Create Virtual Environment & Install pyavd"
+          run: |
+            python -m venv /tmp/python_env
+            source /tmp/python_env/bin/activate
+            pip install --upgrade pip
+            pip install build
+            pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+            cd python-avd && python -m build --wheel --outdir /tmp/wheels
+            pip install --no-cache-dir /tmp/wheels/*.whl
+            pip list
+          shell: /usr/bin/bash -e {0}
+        - name: Upload Virtual Environment
+          uses: actions/upload-artifact@v4
+          with:
+            name: pyavd
+            path: /tmp/python_env/
+            retention-days: 1
+  
+    # ----------------------------------- #
+    # EOS CLI CONFIG GEN MOLECULE
+    # ----------------------------------- #
+    molecule_eos_cli_config_gen:
+      name: Validate eos_cli_config_gen
+      runs-on: ubuntu-latest
+      needs: [build_pyavd, file-changes]
+      strategy:
+        fail-fast: true
+        matrix:
+          avd_scenario:
+            - "eos_cli_config_gen"
+            - "eos_cli_config_gen_deprecated_vars"
+            - "eos_cli_config_gen_negative_unit_tests"
+          ansible_version:
+            - "ansible-core<2.19.0"
+          # Also test minimum ansible version for one scenario.
+          include:
+            - avd_scenario: "eos_cli_config_gen"
+              ansible_version: "ansible-core==2.16.0"
+      steps:
+        - uses: actions/checkout@v4
+        - name: Download AVD Collection Artifact
+          uses: actions/download-artifact@v4
+          with:
+            name: pyavd
+            path: /tmp/python_env
+        - name: Fix Virtual Environment Permissions
+          run: |
+            chmod -R +x /tmp/python_env/bin
+            ls -la /tmp/python_env/bin  # Check permissions
+            mkdir -p /home/runner/.ansible/tmp
+            chmod 1777 /home/runner/.ansible/tmp
+        - name: Install Python & Ansible Requirements
+          run: |
+            echo "Python executable: $(command -v python)"
+            echo "Pip executable: $(command -v pip)"
+            python -m pip install --upgrade "ansible-core<2.19.0"
+          shell: /usr/bin/bash -e {0}
+          env:
+            PATH: "/tmp/python_env/bin:${PATH}"
+        - name: Run molecule action
+          run: " . /tmp/python_env/bin/activate && command -v python && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          shell: /usr/bin/bash -e {0}
+          env:
+            PATH: "/tmp/python_env/bin:${PATH}"
+        # - uses: actions/upload-artifact@v4
+        #   with:
+        #     name: molecule-${{ matrix.avd_scenario }}-artifacts
+        #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
+  
+    # # ----------------------------------- #
+    # # DHCP PROVISIONNER MOLECULE
+    # # ----------------------------------- #
+    # molecule_dhcp_provisionner:
+    #   name: Validate DHCP configuration
+    #   runs-on: ubuntu-latest
+    #   strategy:
+    #     fail-fast: true
+    #     matrix:
+    #       avd_scenario: ["dhcp_configuration", "dhcp_provisioning"]
+    #       ansible_version: ["ansible-core<2.19.0 --upgrade"]
+    #   needs: [file-changes]
+    #   if: needs.file-changes.outputs.dhcp == 'true'
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Run molecule action
+    #       uses: arista-netdevops-community/action-molecule-avd@v1.8.1
+    #       with:
+    #         molecule_parentdir: "ansible_collections/arista/avd"
+    #         molecule_command: "test"
+    #         molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
+    #         pip_file: .github/requirements-ci-dev.txt
+    #         galaxy_file: "ansible_collections/arista/avd/collections.yml"
+    #         ansible: ${{ matrix.ansible_version }}
+    #         check_git: true
+    #         check_git_enforced: true
+    #     # - uses: actions/upload-artifact@v4
+    #     #   with:
+    #     #     name: molecule-${{ matrix.avd_scenario }}-artifacts
+    #     #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
+  
+    # # ----------------------------------- #
+    # # EOS Design MOLECULE
+    # # ----------------------------------- #
+    # molecule_eos_designs:
+    #   name: Validate eos_designs
+    #   runs-on: ubuntu-latest
+    #   strategy:
+    #     fail-fast: true
+    #     matrix:
+    #       avd_scenario:
+    #         - "ansible_only"
+    #         - "eos_designs_deprecated_vars"
+    #         - "eos_designs-l2ls"
+    #         - "eos_designs-mpls-isis-sr-ldp"
+    #         - "eos_designs_negative_unit_tests"
+    #         - "eos_designs-twodc-5stage-clos"
+    #         - "eos_designs_unit_tests"
+    #         - "evpn_underlay_ebgp_overlay_ebgp"
+    #         - "evpn_underlay_isis_overlay_ibgp"
+    #         - "evpn_underlay_ospf_overlay_ebgp"
+    #         - "evpn_underlay_rfc5549_overlay_ebgp"
+    #         - "example-campus-fabric"
+    #         - "example-dual-dc-l3ls"
+    #         - "example-isis-ldp-ipvpn"
+    #         - "example-l2ls-fabric"
+    #         - "example-single-dc-l3ls"
+    #         - "example-cv-pathfinder"
+    #       ansible_version:
+    #         # Testing all scenario with 2.16.x, due to bug with in 2.17.0 with and the way we test eos_designs_negative_unit_tests https://github.com/ansible/ansible/issues/83292
+    #         - "ansible-core>=2.16.0,<2.17.0 --upgrade"
+    #       pip_requirements:
+    #         - ".github/requirements-ci-dev.txt"
+    #       # Also test minimum ansible version for one scenario.
+    #       include:
+    #         - avd_scenario: "eos_designs_unit_tests"
+    #           ansible_version: "ansible-core==2.16.0 --upgrade"
+    #           pip_requirements: ".github/requirements-ci-dev.txt"
+    #         - avd_scenario: "eos_designs_unit_tests"
+    #           ansible_version: "ansible-core<2.18.0 --upgrade"
+    #           pip_requirements: ".github/requirements-ci-dev.txt"
+    #         - avd_scenario: "eos_designs_unit_tests"
+    #           ansible_version: "ansible-core<2.19.0 --upgrade"
+    #           pip_requirements: ".github/requirements-ci-dev.txt"
+    #   needs: [file-changes]
+    #   if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Build minimum requirements
+    #       run: |
+    #         pip install uv
+    #         uv pip compile .github/requirements-ci-dev.txt --resolution=lowest-direct > ${{ matrix.pip_requirements }}
+    #         cat ${{ matrix.pip_requirements }}
+    #       if: matrix.pip_requirements == 'tmp-requirements-minimum.txt'
+    #     - name: Run molecule action
+    #       uses: arista-netdevops-community/action-molecule-avd@v1.8.1
+    #       with:
+    #         molecule_parentdir: "ansible_collections/arista/avd"
+    #         molecule_command: "test"
+    #         molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
+    #         pip_file: ${{ matrix.pip_requirements }}
+    #         galaxy_file: "ansible_collections/arista/avd/collections.yml"
+    #         ansible: ${{ matrix.ansible_version }}
+    #         check_git: true
+    #         check_git_enforced: true
+    #     # - uses: actions/upload-artifact@v4
+    #     #   with:
+    #     #     name: molecule-${{ matrix.avd_scenario }}-artifacts
+    #     #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
+    # # ----------------------------------- #
+    # # Cloudvision MOLECULE
+    # # ----------------------------------- #
+    # molecule_cloudvision:
+    #   name: Validate cvp_collection
+    #   runs-on: ubuntu-latest
+    #   strategy:
+    #     fail-fast: true
+    #     matrix:
+    #       avd_scenario:
+    #         - "eos_config_deploy_cvp"
+    #       ansible_version:
+    #         - "ansible-core<2.19.0 --upgrade"
+    #       include:
+    #         - avd_scenario: "eos_config_deploy_cvp"
+    #           ansible_version: "ansible-core==2.16.0"
+    #   needs: [file-changes]
+    #   if: needs.file-changes.outputs.cloudvision == 'true' || needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
+  
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Run molecule action
+    #       uses: arista-netdevops-community/action-molecule-avd@v1.8.1
+    #       with:
+    #         molecule_parentdir: "ansible_collections/arista/avd"
+    #         molecule_command: "test"
+    #         molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
+    #         pip_file: .github/requirements-ci-dev.txt
+    #         galaxy_file: "ansible_collections/arista/avd/collections.yml"
+    #         ansible: ${{ matrix.ansible_version }}
+    #         check_git: true
+    #         check_git_enforced: true
+    #     # - uses: actions/upload-artifact@v4
+    #     #   with:
+    #     #     name: molecule-${{ matrix.avd_scenario }}-artifacts
+    #     #     path: ${PWD}/ansible_collections/arista/avd/molecule/${{ matrix.avd_scenario }}
+    #     #
+    # # ----------------------------------- #
+    # # EOS Validate State MOLECULE
+    # # ----------------------------------- #
+    # molecule_eos_validate_state:
+    #   name: Validate eos_validate_state
+    #   runs-on: ubuntu-latest
+    #   strategy:
+    #     fail-fast: true
+    #     matrix:
+    #       avd_scenario:
+    #         - "eos_validate_state"
+    #       ansible_version:
+    #         - "ansible-core<2.19.0 --upgrade"
+    #       include:
+    #         - avd_scenario: "eos_validate_state"
+    #           ansible_version: "ansible-core==2.16.0"
+    #   needs: [file-changes]
+    #   if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.validate_state == 'true'
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Run molecule action
+    #       uses: arista-netdevops-community/action-molecule-avd@v1.8.1
+    #       with:
+    #         molecule_parentdir: "ansible_collections/arista/avd"
+    #         molecule_command: "test"
+    #         molecule_args: "--scenario-name ${{ matrix.avd_scenario }}"
+    #         pip_file: .github/requirements-ci-dev.txt
+    #         galaxy_file: "ansible_collections/arista/avd/collections.yml"
+    #         ansible: ${{ matrix.ansible_version }}
+    #         check_git: true
+    #         check_git_enforced: true
+  
+    # # ----------------------------------- #
+    # # Ansible tests
+    # # ----------------------------------- #
+    # ansible_test_sanity:
+    #   name: Run ansible-test sanity validation
+    #   runs-on: ubuntu-latest
+    #   needs: [file-changes]
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Set up Python 3
+    #       uses: actions/setup-python@v5
+    #       with:
+    #         python-version: |
+    #           3.10
+    #           3.11
+    #           3.12
+    #           3.13
+    #     - name: "Install Python requirements"
+    #       run: |
+    #         pip install "ansible-core<2.19.0" -r .github/requirements-ci-dev.txt --upgrade
+    #     - name: "Run ansible-test sanity"
+    #       run: |
+    #         cd ansible_collections/arista/avd/
+    #         ansible-test sanity --color yes -v
+  
+    # ansible_test_units:
+    #   name: Run ansible-test units test cases
+    #   runs-on: ubuntu-latest
+    #   needs: [file-changes]
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Set up Python 3
+    #       uses: actions/setup-python@v5
+    #       with:
+    #         python-version: |
+    #           3.12
+    #     - name: "Install Python requirements"
+    #       run: |
+    #         pip install pyyaml "ansible-core<2.19.0" -r .github/requirements-ci-dev.txt --upgrade
+    #     - name: "Run ansible-test units test cases"
+    #       run: |
+    #         cd ansible_collections/arista/avd/
+    #         ansible-test units --coverage --requirements -vv
+    #         ansible-test coverage xml
+    #         mv tests/output/reports/coverage.xml ./units-coverage.xml
+    #     - name: Upload coverage from ansible-test units
+    #       uses: actions/upload-artifact@v4
+    #       with:
+    #         name: ansible-test-units-coverage
+    #         path: ansible_collections/arista/avd/units-coverage.xml
+  
+    # ansible_test_integration:
+    #   name: Run ansible-test integration test cases
+    #   runs-on: ubuntu-latest
+    #   needs: [file-changes]
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Set up Python 3
+    #       uses: actions/setup-python@v5
+    #       with:
+    #         python-version: |
+    #           3.12
+    #           3.13
+    #     - name: "Install Python requirements"
+    #       run: |
+    #         pip install "ansible-core<2.19.0" -r .github/requirements-ci-dev.txt --upgrade
+    #     - name: "Run ansible-test integration test cases"
+    #       run: |
+    #         cd ansible_collections/arista/avd/
+    #         ansible-test integration --coverage --requirements -vv
+    #         ansible-test coverage xml
+    #         mv tests/output/reports/coverage.xml ./integration-coverage.xml
+    #     - name: Upload coverage from ansible-test integration
+    #       uses: actions/upload-artifact@v4
+    #       with:
+    #         name: ansible-test-integration-coverage
+    #         path: ansible_collections/arista/avd/integration-coverage.xml
+  
+    # # ----------------------------------- #
+    # # Build Collection
+    # # ----------------------------------- #
+    # build_collection:
+    #   name: Build Ansible collection
+    #   runs-on: ubuntu-latest
+    #   steps:
+    #     - uses: actions/setup-python@v5
+    #       with:
+    #         python-version: |
+    #           3.12
+    #     - uses: actions/checkout@v4
+    #     - name: "Install Python & Ansible requirements"
+    #       run: |
+    #         # distlib is required when using manifest
+    #         pip install "ansible-core<2.19.0" distlib --upgrade
+    #     - name: "Build Ansible collection"
+    #       run: |
+    #         ansible-galaxy collection build -vvv --force ansible_collections/arista/avd
+    #     - name: Upload collection
+    #       uses: actions/upload-artifact@v4
+    #       with:
+    #         name: avd-collection
+    #         path: ./arista-avd-*.tar.gz
+  
+    # # ----------------------------------- #
+    # # Galaxy Importer
+    # # ----------------------------------- #
+    # galaxy_importer:
+    #   name: Test galaxy-importer
+    #   runs-on: ubuntu-latest
+    #   needs: [build_collection]
+    #   steps:
+    #     - uses: actions/setup-python@v5
+    #       with:
+    #         python-version: |
+    #           3.11
+    #     - uses: actions/checkout@v4
+    #     - name: "Install Python & Ansible requirements"
+    #       run: |
+    #         pip install "ansible-core==2.16.0"
+    #     - name: Download collection
+    #       uses: actions/download-artifact@v4
+    #       with:
+    #         name: avd-collection
+    #     - name: Install galaxy-importer
+    #       # Install the specific version of galaxy-importer used on galaxy.ansible.com
+    #       # The version conflicts with our requirements,
+    #       # so we let the galaxy-importer version resolve remaining requirements.
+    #       run: |
+    #         pip install "galaxy-importer==0.4.26"
+    #     - name: "Run galaxy-importer checks"
+    #       run: python -m galaxy_importer.main *.tar.gz
+    #     - uses: actions/upload-artifact@v4
+    #       with:
+    #         name: importer-logs
+    #         path: ./importer_result.json
+  
+    # # ----------------------------------- #
+    # # Ansible Lint
+    # # Run on the built collection from Galaxy importer
+    # # ----------------------------------- #
+    # ansible_lint:
+    #   name: Run ansible-lint test case
+    #   runs-on: ubuntu-latest
+    #   needs: [build_collection]
+    #   env:
+    #     ANSIBLE_COLLECTIONS_PATH: /home/runner/work/avd/avd
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Set up Python 3
+    #       uses: actions/setup-python@v5
+    #       with:
+    #         python-version: |
+    #           3.10
+    #           3.11
+    #           3.12
+    #           3.13
+    #     - name: "Install Python & Ansible requirements"
+    #       run: |
+    #         pip install -r .github/requirements-ci-dev.txt -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+    #     - name: Download collection
+    #       uses: actions/download-artifact@v4
+    #       with:
+    #         name: avd-collection
+    #     - name: "Extract collection"
+    #       run: |
+    #         mkdir collections
+    #         tar xvzf arista-avd-*.tar.gz -C collections
+    #     - name: "🥷 Remove unskippable ansible-lint rule added for Galaxy"
+    #       working-directory: collections
+    #       run: |
+    #         sed -i 's/- syntax-check/# - syntax-check/g' .ansible-lint
+    #     - name: "Run ansible-lint"
+    #       working-directory: collections
+    #       run: |
+    #         ansible-lint --force-color --strict -v
+  
+    # # ----------------------------------- #
+    # # Test of pyavd
+    # # ----------------------------------- #
+    # pyavd:
+    #   name: Test pyavd
+    #   runs-on: ubuntu-latest
+    #   needs: [file-changes]
+    #   if: |
+    #     needs.file-changes.outputs.eos_design == 'true' ||
+    #     needs.file-changes.outputs.config_gen == 'true' ||
+    #     needs.file-changes.outputs.pyavd == 'true'
+    #   strategy:
+    #     matrix:
+    #       python: ["3.10", "3.11", "3.12", "3.13"]
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - name: Set up Python 3
+    #       uses: actions/setup-python@v5
+    #       with:
+    #         python-version: ${{ matrix.python }}
+    #     - name: "Install tox"
+    #       run: |
+    #         pip install tox tox-gh-actions --upgrade
+    #     - name: "Run pytest via tox for ${{ matrix.python }}"
+    #       working-directory: python-avd
+    #       run: |
+    #         tox
+    #     - name: Upload coverage from pytest
+    #       # Coverage only runs as part of 3.11.
+    #       if: |
+    #         matrix.python == '3.11'
+    #       uses: actions/upload-artifact@v4
+    #       with:
+    #         name: pytest-coverage
+    #         path: python-avd/coverage.xml
+  
+    #     - name: Upload eos_designs compiled templates from pytest
+    #       if: |
+    #         matrix.python == '3.11'
+    #       uses: actions/upload-artifact@v4
+    #       with:
+    #         name: pytest-eos-designs-compiled-templates
+    #         path: python-avd/pyavd/_eos_designs/j2templates/compiled_templates/
+  
+    #     - name: Upload eos_cli_config_gen compiled templates from pytest
+    #       if: |
+    #         matrix.python == '3.11'
+    #       uses: actions/upload-artifact@v4
+    #       with:
+    #         name: pytest-eos-cli-config-gen-compiled-templates
+    #         path: python-avd/pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
