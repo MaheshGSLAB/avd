@@ -189,7 +189,7 @@
           env:
             PATH: "/tmp/python_env/bin:${PATH}"
         - name: Run molecule action
-          run: "cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          run: "cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }} -- -l host1 -vvvv"
           shell: /usr/bin/bash -e {0}
           env:
             PATH: "/tmp/python_env/bin:${PATH}"
