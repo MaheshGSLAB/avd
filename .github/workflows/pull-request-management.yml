@@ -135,11 +135,8 @@
         - name: install pyavd
           run: |
             pip install --upgrade pip
-            pip install build
-            pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
-            cd python-avd && python -m build --wheel --outdir /tmp/wheels
-            pip install --no-cache-dir /tmp/wheels/*.whl
-            pip list
+            pip install -r .github/requirements-ci-dev.txt -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+            
           shell: /usr/bin/bash -e {0}
           env:
             PATH: "/tmp/python_env/bin:${PATH}"
