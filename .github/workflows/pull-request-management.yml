@@ -137,7 +137,7 @@
             pip install build
             echo "Python executable: $(command -v python)"
             echo "Pip executable: $(command -v pip)"
-            pip install -r .github/requirements-ci.txt -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+            pip install -r ansible_collections/arista/avd/requirements-dev.txt -r .github/requirements-ci.txt --upgrade
           shell: /usr/bin/bash -e {0}
         - name: Upload Virtual Environment
           uses: actions/upload-artifact@v4
