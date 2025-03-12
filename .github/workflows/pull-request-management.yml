@@ -131,43 +131,23 @@
         - uses: actions/checkout@v4
         - name: "Create Virtual Environment & Install pyavd"
           run: |
-            # Install dependencies and capture logs
-            pip install -r .github/requirements-ci-dev.txt -r ansible_collections/arista/avd/requirements-dev.txt --upgrade | tee pip_install.log
-
-            # Extract the "Stored in directory" path from logs
-            FULL_WHEEL_PATH=$(grep -m 1 "Stored in directory:" pip_install.log | awk '{print $NF}')
-
-            # Verify the path and print it
-            if [ -z "$FULL_WHEEL_PATH" ]; then
-              echo "Wheel path not found in logs."
-              exit 1
-            fi
-            echo "Full wheel path: $FULL_WHEEL_PATH"
-
-            # Use the previously extracted FULL_WHEEL_PATH
-            echo "Searching for pyavd-5.2.0.dev2-py3-none-any.whl in $FULL_WHEEL_PATH"
-
-            # List the contents of the directory
-            echo "Contents of the wheel directory:"
-            ls -al "$FULL_WHEEL_PATH"
-
-            # Find the specific file in the directory
-            WHEEL_FILE=$(find "$FULL_WHEEL_PATH" -type f -name "pyavd-5.2.0.dev2-py3-none-any.whl")
-
-            # Check if the file exists
-            if [ -z "$WHEEL_FILE" ]; then
-              echo "Wheel file not found: pyavd-5.2.0.dev2-py3-none-any.whl"
-              exit 1
-            fi
-
-            echo "Found wheel file: $WHEEL_FILE"
-
-            echo "WHEEL_FILE=$WHEEL_FILE" >> $GITHUB_ENV
+            python -m venv /tmp/python_env
+            source /tmp/python_env/bin/activate
+            pip install --upgrade pip
+            pip install build
+            echo "Python executable: $(command -v python)"
+            echo "Pip executable: $(command -v pip)"
+            pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+            cd python-avd && python -m build --wheel --outdir /tmp/wheels
+            pip install --no-cache-dir /tmp/wheels/*.whl
+            pip list
+          shell: /usr/bin/bash -e {0}
         - name: Upload Virtual Environment
           uses: actions/upload-artifact@v4
           with:
             name: pyavd
             path: /tmp/python_env/
+            retention-days: 1
   
     # ----------------------------------- #
     # EOS CLI CONFIG GEN MOLECULE
@@ -196,24 +176,23 @@
           with:
             name: pyavd
             path: /tmp/python_env
-        # - name: Fix Virtual Environment Permissions
-        #   run: |
-        #     chmod -R +x /tmp/python_env/bin
-        #     ls -la /tmp/python_env/bin  # Check permissions
-        #     ansible --version
+        - name: Fix Virtual Environment Permissions
+          run: |
+            chmod -R +x /tmp/python_env/bin
+            ls -la /tmp/python_env/bin  # Check permissions
         - name: Install Python & Ansible Requirements
           run: |
             echo "Python executable: $(command -v python)"
             echo "Pip executable: $(command -v pip)"
-            python -m pip install --upgrade '${{ matrix.ansible_version }}'
-          # shell: /usr/bin/bash -e {0}
-          # env:
-          #   PATH: "/tmp/python_env/bin:${PATH}"
+            python -m pip install --upgrade "ansible-core<2.19.0"
+          shell: /usr/bin/bash -e {0}
+          env:
+            PATH: "/tmp/python_env/bin:${PATH}"
         - name: Run molecule action
-          run: "cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
-          # shell: /usr/bin/bash -e {0}
-          # env:
-          #   PATH: "/tmp/python_env/bin:${PATH}"
+          run: " . /tmp/python_env/bin/activate && command -v python && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
+          shell: /usr/bin/bash -e {0}
+          env:
+            PATH: "/tmp/python_env/bin:${PATH}"
         # - uses: actions/upload-artifact@v4
         #   with:
         #     name: molecule-${{ matrix.avd_scenario }}-artifacts
