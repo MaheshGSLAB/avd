@@ -133,15 +133,11 @@
           run: |
             python -m venv /tmp/python_env
             source /tmp/python_env/bin/activate
-            echo "Python executable: $(command -v python)"
-            echo "Pip executable: $(command -v pip)"
             pip install --upgrade pip
             pip install build
             pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
             cd python-avd && python -m build --wheel --outdir /tmp/wheels
             pip install --no-cache-dir /tmp/wheels/*.whl
-            echo "Python executable: $(command -v python)"
-            echo "Pip executable: $(command -v pip)"
           shell: /usr/bin/bash -e {0}
         - name: Upload Virtual Environment
           uses: actions/upload-artifact@v4
@@ -184,12 +180,12 @@
           run: |
             echo "Python executable: $(command -v python)"
             echo "Pip executable: $(command -v pip)"
-            source /tmp/python_env/activate && python -m pip install --upgrade "${{ matrix.ansible_version }}"
+            source /tmp/python_env/bin/activate && python -m pip install --upgrade "${{ matrix.ansible_version }}"
           shell: /usr/bin/bash -e {0}
           # env:
           #   PATH: "/tmp/python_env/bin:${PATH}"
         - name: Run molecule action
-          run: "source /tmp/python_env/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }} -- -l host1 -vvvv"
+          run: "source /tmp/python_env/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }} -- -l host1 -vvvv"
           shell: /usr/bin/bash -e {0}
           # env:
           #   PATH: "/tmp/python_env/bin:${PATH}"
