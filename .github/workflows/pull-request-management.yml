@@ -132,7 +132,8 @@
         - name: "Create Virtual Environment & Install pyavd"
           run: |
             python -m venv /tmp/python_env
-            source /tmp/python_env/bin/activate
+        - name: install pyavd
+          run: |
             pip install --upgrade pip
             pip install build
             pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
@@ -140,6 +141,8 @@
             pip install --no-cache-dir /tmp/wheels/*.whl
             pip list
           shell: /usr/bin/bash -e {0}
+          env:
+            PATH: "/tmp/python_env/bin:${PATH}"
         - name: Upload Virtual Environment
           uses: actions/upload-artifact@v4
           with:
