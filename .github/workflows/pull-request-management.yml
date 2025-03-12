@@ -178,17 +178,11 @@
             ls -la /tmp/python_env/bin  # Check permissions
         - name: Install Python & Ansible Requirements
           run: |
-            echo "Python executable: $(command -v python)"
-            echo "Pip executable: $(command -v pip)"
             source /tmp/python_env/bin/activate && python -m pip install --upgrade "${{ matrix.ansible_version }}"
           shell: /usr/bin/bash -e {0}
-          # env:
-          #   PATH: "/tmp/python_env/bin:${PATH}"
         - name: Run molecule action
-          run: "source /tmp/python_env/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }} -- -l host1 -vvvv"
+          run: "source /tmp/python_env/bin/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }}"
           shell: /usr/bin/bash -e {0}
-          # env:
-          #   PATH: "/tmp/python_env/bin:${PATH}"
         # - uses: actions/upload-artifact@v4
         #   with:
         #     name: molecule-${{ matrix.avd_scenario }}-artifacts
