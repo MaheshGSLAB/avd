@@ -129,13 +129,26 @@
           with:
             python-version: "3.11"
 
+        - name: Compute Cache Key (Only for AVD Requirements)
+          id: compute-key
+          run: echo "hash=$(sha256sum ansible_collections/arista/avd/requirements-dev.txt | awk '{print $1}')" >> $GITHUB_ENV
+
+        - name: Restore Cached Virtual Environment
+          id: cache-venv
+          uses: actions/cache@v4
+          with:
+            path: /tmp/python_env
+            key: avd-venv-${{ env.hash }}
+
         - name: Create Virtual Environment & Install Dependencies
           run: |
             python -m venv /tmp/python_env
             source /tmp/python_env/bin/activate
             pip install --upgrade pip build
             pip install -r .github/requirements-ci-dev.txt
-            pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+            if [[ "${{ steps.cache-venv.outputs.cache-hit }}" != "true" ]]; then
+              pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
+            fi
 
         - name: Upload Virtual Environment
           uses: actions/upload-artifact@v4
