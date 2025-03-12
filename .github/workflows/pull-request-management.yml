@@ -184,16 +184,15 @@
           run: |
             echo "Python executable: $(command -v python)"
             echo "Pip executable: $(command -v pip)"
-            python -m pip install --upgrade "${{ matrix.ansible_version }}"
-            ls -al /tmp/
+            source /tmp/python_env/activate && python -m pip install --upgrade "${{ matrix.ansible_version }}"
           shell: /usr/bin/bash -e {0}
-          env:
-            PATH: "/tmp/python_env/bin:${PATH}"
+          # env:
+          #   PATH: "/tmp/python_env/bin:${PATH}"
         - name: Run molecule action
-          run: "cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }} -- -l host1 -vvvv"
+          run: "source /tmp/python_env/activate && cd ansible_collections/arista/avd && molecule test --scenario-name ${{ matrix.avd_scenario }} -- -l host1 -vvvv"
           shell: /usr/bin/bash -e {0}
-          env:
-            PATH: "/tmp/python_env/bin:${PATH}"
+          # env:
+          #   PATH: "/tmp/python_env/bin:${PATH}"
         # - uses: actions/upload-artifact@v4
         #   with:
         #     name: molecule-${{ matrix.avd_scenario }}-artifacts
