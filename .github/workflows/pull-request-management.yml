@@ -149,12 +149,13 @@
             if [[ "${{ steps.cache-venv.outputs.cache-hit }}" != "true" ]]; then
               pip install -r ansible_collections/arista/avd/requirements-dev.txt --upgrade
             fi
-
+        - name: Compress Virtual Environment
+          run: tar -czf /tmp/pyavd.tar.gz -C /tmp python_env
         - name: Upload Virtual Environment
           uses: actions/upload-artifact@v4
           with:
             name: pyavd
-            path: /tmp/python_env/
+            path: /tmp/pyavd.tar.gz
   
     # ----------------------------------- #
     # EOS CLI CONFIG GEN MOLECULE
@@ -183,7 +184,9 @@
           uses: actions/download-artifact@v4
           with:
             name: pyavd
-            path: /tmp/python_env
+            path: /tmp/
+        - name: Extract Virtual Environment
+          run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
         - name: Fix Virtual Environment Permissions (if needed)
           run: chmod -R +x /tmp/python_env/bin || true
         - name: Install Ansible Version & Run Tests
@@ -216,7 +219,9 @@
           uses: actions/download-artifact@v4
           with:
             name: pyavd
-            path: /tmp/python_env
+            path: /tmp/
+        - name: Extract Virtual Environment
+          run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
         - name: Fix Virtual Environment Permissions (if needed)
           run: chmod -R +x /tmp/python_env/bin || true
         - name: Install Ansible Version & Run Tests
@@ -281,7 +286,9 @@
           uses: actions/download-artifact@v4
           with:
             name: pyavd
-            path: /tmp/python_env
+            path: /tmp/
+        - name: Extract Virtual Environment
+          run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
         - name: Fix Virtual Environment Permissions (if needed)
           run: chmod -R +x /tmp/python_env/bin || true
         - name: Install Ansible Version & Run Tests
@@ -319,7 +326,9 @@
           uses: actions/download-artifact@v4
           with:
             name: pyavd
-            path: /tmp/python_env
+            path: /tmp/
+        - name: Extract Virtual Environment
+          run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
         - name: Fix Virtual Environment Permissions (if needed)
           run: chmod -R +x /tmp/python_env/bin || true
         - name: Install Ansible Version & Run Tests
@@ -357,7 +366,9 @@
           uses: actions/download-artifact@v4
           with:
             name: pyavd
-            path: /tmp/python_env
+            path: /tmp/
+        - name: Extract Virtual Environment
+          run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
         - name: Fix Virtual Environment Permissions (if needed)
           run: chmod -R +x /tmp/python_env/bin || true
         - name: Install Ansible Version & Run Tests
