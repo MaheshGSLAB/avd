@@ -186,12 +186,18 @@ jobs:
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
       - name: Fix Virtual Environment Permissions (if needed)
         run: chmod -R +x /tmp/python_env/bin || true
-      - name: Install Ansible Version & Run Tests
+      - name: Install Ansible Version & Run Molecule
         run: |
           source /tmp/python_env/bin/activate
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
+      - name: Check GIT status
+        run: |
+          ./molecule-runner.sh
+        env:
+          INPUT_CHECK_GIT: true
+          INPUT_CHECK_GIT_ENFORCED: true
       # - uses: actions/upload-artifact@v4
       #   with:
       #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -227,6 +233,12 @@ jobs:
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
+      - name: Check GIT status
+        run: |
+          ./molecule-runner.sh
+        env:
+          INPUT_CHECK_GIT: true
+          INPUT_CHECK_GIT_ENFORCED: true
       # - uses: actions/upload-artifact@v4
       #   with:
       #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -294,6 +306,12 @@ jobs:
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
+      - name: Check GIT status
+        run: |
+          ./molecule-runner.sh
+        env:
+          INPUT_CHECK_GIT: true
+          INPUT_CHECK_GIT_ENFORCED: true
       # - uses: actions/upload-artifact@v4
       #   with:
       #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -334,6 +352,12 @@ jobs:
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
+      - name: Check GIT status
+        run: |
+          ./molecule-runner.sh
+        env:
+          INPUT_CHECK_GIT: true
+          INPUT_CHECK_GIT_ENFORCED: true
       # - uses: actions/upload-artifact@v4
       #   with:
       #     name: molecule-${{ matrix.avd_scenario }}-artifacts
@@ -374,6 +398,12 @@ jobs:
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
+      - name: Check GIT status
+        run: |
+          ./molecule-runner.sh
+        env:
+          INPUT_CHECK_GIT: true
+          INPUT_CHECK_GIT_ENFORCED: true
 
   # ----------------------------------- #
   # Ansible tests
