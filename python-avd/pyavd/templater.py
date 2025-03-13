@@ -123,60 +123,30 @@ class Templar:
         ----------
             searchpaths: The list of path to search templates in.
         """
-        self.environment.loader = ExtensionFileSystemLoader(searchpaths)
-
         # Ensure the compiled templates directory exists
         precompiled_templates_path = Path(precompiled_templates_path)
         precompiled_templates_path.mkdir(parents=True, exist_ok=True)
+        searchpaths = [Path(path).resolve() for path in searchpaths]
+        self.environment.loader = ExtensionFileSystemLoader(searchpaths)
 
         for searchpath in searchpaths:
-            searchpath = Path(searchpath).resolve()  # Ensure absolute paths
+            for template_path in searchpath.rglob("*.j2"):  # Recursively search for templates
+                # Get relative path to preserve subdirectory structure
+                relative_path = template_path.relative_to(searchpath)
+                compiled_filename = relative_path.with_suffix(".py")
 
-            # ✅ Process templates listed by Jinja2 (subdirectories)
-            for template_name in self.environment.loader.list_templates():
-                template_path = searchpath / template_name
-                if not template_path.exists():
-                    continue  # Skip if template doesn't exist in this searchpath
+                # Ensure output directory exists
+                output_path = Path(precompiled_templates_path) / compiled_filename
+                output_path.parent.mkdir(parents=True, exist_ok=True)
 
-                parent_folder = template_path.parent.name if template_path.parent != searchpath else "root"
-
-                # Read the template source
-                with open(template_path, "r", encoding="utf-8") as f:
-                    template_source = f.read()
-
-                # Compile the Jinja2 template source
+                # Read and compile the template
+                template_source = template_path.read_text(encoding="utf-8")
                 compiled_code = self.environment.compile(template_source, raw=True)
 
-                # Extract base filename and apply prefix
-                base_filename = Path(template_name).stem  # Remove `.j2` extension
-                compiled_filename = f"{parent_folder}_{base_filename}.py"
-                output_path = precompiled_templates_path / compiled_filename
+                # Write compiled template
+                output_path.write_bytes(compiled_code.encode("utf-8"))
 
-                # Write compiled template (Fix: ensure it's bytes)
-                with open(output_path, "wb") as f:
-                    f.write(compiled_code.encode("utf-8"))  # Encode to bytes
-
-            # ✅ Manually find `.j2` files at the root of `searchpath`
-            for template_path in searchpath.glob("*.j2"):
-                parent_folder = "root"  # Since these are directly inside `j2templates/`
-
-                # Read the template source
-                with open(template_path, "r", encoding="utf-8") as f:
-                    template_source = f.read()
-
-                # Compile the Jinja2 template source
-                compiled_code = self.environment.compile(template_source, raw=True)
-
-                # Extract base filename and apply prefix
-                base_filename = template_path.stem  # Remove `.j2` extension
-                compiled_filename = f"{parent_folder}_{base_filename}.py"
-                output_path = precompiled_templates_path / compiled_filename
-
-                # Write compiled template (Fix: ensure it's bytes)
-                with open(output_path, "wb") as f:
-                    f.write(compiled_code.encode("utf-8"))  # Encode to bytes
-
-        # Reset loader after compilation
+        # Reset loader if necessary
         self.environment.loader = self.loader
 
 
