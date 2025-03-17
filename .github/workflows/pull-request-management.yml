@@ -381,7 +381,7 @@ jobs:
         include:
           - avd_scenario: 'anta_runner'
             ansible_version: 'ansible-core==2.16.0'
-    needs: [ file-changes ]
+    needs: [build_pyavd, file-changes]
     if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.anta_runner == 'true'
     steps:
       - uses: actions/checkout@v4
