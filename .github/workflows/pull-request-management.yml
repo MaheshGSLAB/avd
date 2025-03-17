@@ -133,7 +133,9 @@ jobs:
           python -m venv /tmp/python_env
           source /tmp/python_env/bin/activate
           pip install --upgrade pip build molecule
-          pip install -r .github/requirements-ci-dev.txt
+          cd python-avd
+          python -m build --wheel --outdir /tmp/python_env
+          pip wheel -r requirements.txt --wheel-dir /tmp/python_env
       - name: Compress Virtual Environment
         run: tar -czf /tmp/pyavd.tar.gz -C /tmp python_env
       - name: Upload Virtual Environment
@@ -177,6 +179,7 @@ jobs:
       - name: Install Ansible Version & Run Molecule
         run: |
           source /tmp/python_env/bin/activate
+          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -218,6 +221,7 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
+          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -291,6 +295,7 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
+          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -337,6 +342,7 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
+          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -383,6 +389,7 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
+          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
