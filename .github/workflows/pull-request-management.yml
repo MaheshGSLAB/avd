@@ -377,7 +377,7 @@ jobs:
         avd_scenario:
           - 'anta_runner'
         ansible_version:
-          - 'ansible-core<2.19.0 --upgrade'
+          - 'ansible-core<2.19.0'
         include:
           - avd_scenario: 'anta_runner'
             ansible_version: 'ansible-core==2.16.0'
