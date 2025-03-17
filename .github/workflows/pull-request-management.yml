@@ -135,7 +135,6 @@ jobs:
           pip install --upgrade pip build molecule
           cd python-avd
           python -m build --wheel --outdir /tmp/python_env
-          pip wheel -r requirements.txt --wheel-dir /tmp/python_env
       - name: Compress Virtual Environment
         run: tar -czf /tmp/pyavd.tar.gz -C /tmp python_env
       - name: Upload Virtual Environment
