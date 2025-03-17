@@ -385,17 +385,28 @@ jobs:
     if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.anta_runner == 'true'
     steps:
       - uses: actions/checkout@v4
-      - name: Run molecule action
-        uses: arista-netdevops-community/action-molecule-avd@v1.8.1
+      - name: Download AVD Collection Artifact
+        uses: actions/download-artifact@v4
         with:
-          molecule_parentdir: 'ansible_collections/arista/avd'
-          molecule_command: 'test'
-          molecule_args: '--scenario-name ${{ matrix.avd_scenario }}'
-          pip_file: .github/requirements-ci-dev.txt
-          galaxy_file: "ansible_collections/arista/avd/collections.yml"
-          ansible: ${{ matrix.ansible_version }}
-          check_git: true
-          check_git_enforced: true
+          name: pyavd
+          path: /tmp/
+      - name: Extract Virtual Environment
+        run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
+      - name: Fix Virtual Environment Permissions (if needed)
+        run: chmod -R +x /tmp/python_env/bin || true
+      - name: Install Ansible Version & Run Tests
+        run: |
+          source /tmp/python_env/bin/activate
+          python -m pip install --no-cache-dir /tmp/python_env/*.whl
+          python -m pip install --upgrade "${{ matrix.ansible_version }}"
+          cd ansible_collections/arista/avd
+          molecule test --scenario-name ${{ matrix.avd_scenario }}
+      - name: Check GIT status
+        run: |
+          .github/molecule-runner.sh
+        env:
+          INPUT_CHECK_GIT: true
+          INPUT_CHECK_GIT_ENFORCED: true
 
   # ----------------------------------- #
   # EOS Validate State MOLECULE
