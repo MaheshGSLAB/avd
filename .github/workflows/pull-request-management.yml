@@ -132,10 +132,8 @@ jobs:
         run: |
           python -m venv /tmp/python_env
           source /tmp/python_env/bin/activate
-          python -m pip install molecule distlib
           pip install --upgrade pip build
-          cd python-avd
-          python -m build --wheel --outdir /tmp/python_env
+          pip install -r .github/requirements-ci-dev.txt
       - name: Compress Virtual Environment
         run: tar -czf /tmp/pyavd.tar.gz -C /tmp python_env
       - name: Upload Virtual Environment
@@ -150,6 +148,7 @@ jobs:
   molecule_eos_cli_config_gen:
     name: Validate eos_cli_config_gen
     runs-on: ubuntu-latest
+    needs: [build_pyavd, file-changes]
     strategy:
       fail-fast: true
       matrix:
@@ -163,7 +162,6 @@ jobs:
         include:
           - avd_scenario: "eos_cli_config_gen"
             ansible_version: "ansible-core==2.16.0"
-    needs: [file-changes, build_pyavd]
     if: needs.file-changes.outputs.config_gen == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -179,7 +177,6 @@ jobs:
       - name: Install Ansible Version & Run Molecule
         run: |
           source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -205,7 +202,7 @@ jobs:
       matrix:
         avd_scenario: ["dhcp_configuration", "dhcp_provisioning"]
         ansible_version: ["ansible-core<2.19.0"]
-    needs: [file-changes, build_pyavd]
+    needs: [build_pyavd, file-changes]
     if: needs.file-changes.outputs.dhcp == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -221,7 +218,6 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -279,7 +275,7 @@ jobs:
           - avd_scenario: "eos_designs_unit_tests"
             ansible_version: "ansible-core<2.19.0"
             pip_requirements: ".github/requirements-ci-dev.txt"
-    needs: [file-changes, build_pyavd]
+    needs: [build_pyavd, file-changes]
     if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -295,7 +291,6 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -325,7 +320,7 @@ jobs:
         include:
           - avd_scenario: "eos_config_deploy_cvp"
             ansible_version: "ansible-core==2.16.0"
-    needs: [file-changes, build_pyavd]
+    needs: [build_pyavd, file-changes]
     if: needs.file-changes.outputs.cloudvision == 'true' || needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.config_gen == 'true'
 
     steps:
@@ -342,7 +337,6 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -373,7 +367,7 @@ jobs:
         include:
           - avd_scenario: "eos_validate_state"
             ansible_version: "ansible-core==2.16.0"
-    needs: [file-changes, build_pyavd]
+    needs: [build_pyavd, file-changes]
     if: needs.file-changes.outputs.eos_design == 'true' || needs.file-changes.outputs.validate_state == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -389,7 +383,6 @@ jobs:
       - name: Install Ansible Version & Run Tests
         run: |
           source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
