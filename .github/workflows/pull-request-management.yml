@@ -141,16 +141,13 @@ jobs:
             3.11
             3.12
             3.13
-      - name: Create Virtual Environment & Install Dependencies
+      - name: Install pyavd dependencies
         run: |
-          python -m venv /tmp/python_env
-          source /tmp/python_env/bin/activate
-          pip install --upgrade pip build molecule
           cd python-avd
-          python -m build --wheel --outdir /tmp/python_env
-      - name: Compress Virtual Environment
-        run: tar -czf /tmp/pyavd.tar.gz -C /tmp python_env
-      - name: Upload Virtual Environment
+          python -m build --wheel --outdir /tmp/pyavd
+      - name: Compress pyavd dependencies
+        run: tar -czf /tmp/pyavd.tar.gz -C /tmp pyavd
+      - name: Upload pyavd wheel package
         uses: actions/upload-artifact@v4
         with:
           name: pyavd
@@ -186,12 +183,10 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
-      - name: Install Ansible Version & Run Molecule
+      - name: Install pyavd, Ansible Version & Run Molecule
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
+          pip install --upgrade pip build molecule "molecule-plugins[docker]"
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -228,12 +223,9 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
-      - name: Install Ansible Version & Run Tests
+      - name: Install pyavd, Ansible Version & Run Tests
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -297,12 +289,9 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
       - name: Install Ansible Version & Run Tests
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -344,12 +333,9 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
       - name: Install Ansible Version & Run Tests
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -391,12 +377,9 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
       - name: Install Ansible Version & Run Tests
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -434,12 +417,9 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
       - name: Install Ansible Version & Run Tests
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
           python -m pip install --upgrade "${{ matrix.ansible_version }}"
           cd ansible_collections/arista/avd
           molecule test --scenario-name ${{ matrix.avd_scenario }}
@@ -456,7 +436,7 @@ jobs:
   ansible_test_sanity:
     name: Run ansible-test sanity validation
     runs-on: ubuntu-latest
-    needs: [file-changes]
+    needs: [build_pyavd, file-changes]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3
@@ -474,23 +454,19 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
-      - name: Install Ansible Version & Run Tests
+      - name: "Install Ansible requirements"
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
-          python -m pip install "ansible-core<2.19.0"
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
+          pip install "ansible-core<2.19.0"
       - name: "Run ansible-test sanity"
         run: |
-          source /tmp/python_env/bin/activate
           cd ansible_collections/arista/avd/
           ansible-test sanity --color yes -v
 
   ansible_test_units:
     name: Run ansible-test units test cases
     runs-on: ubuntu-latest
-    needs: [file-changes]
+    needs: [build_pyavd, file-changes]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3
@@ -505,16 +481,10 @@ jobs:
           path: /tmp/
       - name: Extract Virtual Environment
         run: tar -xzf /tmp/pyavd.tar.gz -C /tmp
-      - name: Fix Virtual Environment Permissions (if needed)
-        run: chmod -R +x /tmp/python_env/bin || true
-      - name: Install Ansible Version & Run Tests
+      - name: "Install Ansible requirements"
         run: |
-          source /tmp/python_env/bin/activate
-          python -m pip install --no-cache-dir /tmp/python_env/*.whl
-          python -m pip install "ansible-core<2.19.0"
-      - name: "Run ansible-test units test cases"
-        run: |
-          source /tmp/python_env/bin/activate
+          python -m pip install --no-cache-dir /tmp/pyavd/*.whl
+          pip install "ansible-core<2.19.0"
           cd ansible_collections/arista/avd/
           ansible-test units --coverage --requirements -vv
           ansible-test coverage xml
