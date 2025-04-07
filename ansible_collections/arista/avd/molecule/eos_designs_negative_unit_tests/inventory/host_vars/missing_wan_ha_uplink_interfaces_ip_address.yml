@@ -1,0 +1,81 @@
+---
+#Testing missing defined application-profile
+fabric_name: FABRIC_WAN_ROUTER3
+wan_mode: cv-pathfinder
+type: wan_router
+# Disabling underlay for tests
+underlay_routing_protocol: none
+
+bgp_as: 65000
+
+cv_pathfinder_regions:
+  - name: AVD_Land_West
+    id: 42
+    description: AVD Region
+    sites:
+      - name: Site422
+        id: 422
+        location: Somewhere
+
+bgp_peer_groups:
+  wan_overlay_peers:
+    password: "htm4AZe9mIQOO1uiMuGgYQ=="
+    listen_range_prefixes:
+      - 192.168.255.0/24
+
+wan_route_servers:
+  - hostname: cv-pathfinder-pathfinder
+    vtep_ip: 10.10.10.10
+    path_groups:
+      - name: INET
+        interfaces:
+          - name: Ethernet1
+            public_ip: 192.168.55.55
+
+wan_ipsec_profiles:
+  control_plane:
+    shared_key: ABCDEF1234567890
+  data_plane:
+    shared_key: ABCDEF1234567890666
+
+default_node_types:
+  - node_type: wan_router
+    match_hostnames:
+      - "missing-application-classification.*"
+
+wan_router:
+  defaults:
+    loopback_ipv4_pool: 192.168.42.0/24
+    vtep_loopback_ipv4_pool: 192.168.255.0/24
+  nodes:
+    - name: missing_wan_ha_uplink_interfaces_ip_address
+      id: 1
+      cv_pathfinder_site: Site422
+      cv_pathfinder_region: AVD_Land_West
+      uplink_switches: [missing_wan_ha_ipv4_pool]
+      uplink_switch_interfaces: [Ethernet10]
+      uplink_interfaces: [Ethernet2]
+      wan_ha:
+        enabled: true
+        ipsec: false
+        ha_ipv4_pool: 10.10.10.0/24
+        ha_interfaces: [Ethernet42, Ethernet43]
+      l3_interfaces:
+        - name: Ethernet1
+          wan_carrier: ATT
+          wan_circuit_id: 666
+          dhcp_accept_default_route: true
+          ip_address: dhcp
+
+wan_carriers:
+  - name: ATT
+    path_group: INET
+    trusted: true
+
+wan_path_groups:
+  - name: INET
+    id: 101
+
+
+expected_error_message: >-
+  Missing `wan_ha.ha_ipv4_pool` node settings to allocate an IP address to defined HA interface.
