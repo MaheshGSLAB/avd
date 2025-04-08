@@ -1,0 +1,699 @@
+---
+fabric_name: FABRIC_MISSING_WAN_HA_UPLINK_INTERFACES_IP
+# Testing cv-pathfinder
+wan_mode: cv-pathfinder
+# Have all the router in the examples use eBGP as underlay routing protocol -
+# the default is "none" for WAN routers"
+underlay_routing_protocol: ebgp
+
+ipv4_prefix_list_catalog:
+  - name: ALLOW-DEFAULT
+    sequence_numbers:
+      - sequence: 10
+        action: permit 0.0.0.0/0
+  - name: PL2
+    sequence_numbers:
+      - sequence: 10
+        action: permit 5.0.0.0/0
+      - sequence: 20
+        action: deny 10.0.0.0/24
+
+cv_pathfinder_regions:
+  - name: AVD_Land_West
+    id: 42
+    description: AVD Region
+    sites:
+      - name: Site404
+        id: 404
+        location: Atlantis
+      - name: Site405
+        id: 405
+        location: El Dorado
+      - name: Site422
+        id: 422
+        location: Somewhere
+      - name: Site423
+        id: 423
+        location: Somewhere-warm
+      - name: Site12
+        id: 12
+        location: 12 Downing Street, London
+  - name: AVD_Land_East
+    id: 43
+    description: AVD Region
+    sites:
+      - name: Site511
+        id: 511
+        location: Miami
+
+ipv4_acls:
+  - name: TEST-IPV4-ACL-WITH-IP-FIELDS-IN
+    entries:
+      - sequence: 15
+        action: deny
+        protocol: ip
+        source: any
+        destination: interface_ip
+      - action: permit
+        protocol: ip
+        source: peer_ip
+        destination: interface_ip
+
+bgp_peer_groups:
+  wan_overlay_peers:
+    password: "htm4AZe9mIQOO1uiMuGgYQ=="
+    listen_range_prefixes:
+      - 192.168.142.0/24
+      - 192.168.143.0/24
+
+fabric_ip_addressing:
+  wan_ha:
+    ipv4_prefix_length: 24
+
+wan_stun_dtls_profile_name: profileA
+
+wan_route_servers:
+  # Not testing the overloading
+  - hostname: cv-pathfinder-pathfinder
+
+wan_ipsec_profiles:
+  control_plane:
+    shared_key: ABCDEF1234567890
+  data_plane:
+    shared_key: ABCDEF1234567890666
+
+default_node_types:
+  - node_type: wan_rr
+    match_hostnames:
+      - "cv-pathfinder-pathfinder.*"
+  - node_type: wan_router
+    match_hostnames:
+      - "cv-pathfinder-edge.*"
+      - "cv-pathfinder-transit.*"
+  - node_type: l3leaf
+    match_hostnames:
+      - ".*leaf.*"
+
+wan_router:
+  defaults:
+    loopback_ipv4_pool: 192.168.42.0/24
+    vtep_loopback_ipv4_pool: 192.168.142.0/24
+    filter:
+      always_include_vrfs_in_tenants: [TenantA]
+    uplink_ipv4_pool: 172.17.0.0/16
+    bgp_as: 65000
+  # Testing HA and disabling HA
+  node_groups:
+    # SITE_HA_ENABLED
+    # Because HA is enabled, this allow to test that MPLS-ONLY, present on
+    # cv-pathfinder-edge2B (because of Colt) is being configured on cv-pathfinder-edge2A
+    # with only LAN_HA path-group.
+    - group: Site423
+      cv_pathfinder_region: AVD_Land_West
+      cv_pathfinder_site: Site423
+      uplink_type: p2p-vrfs
+      uplink_switches: [site-ha-enabled-leaf2A, site-ha-enabled-leaf2B]
+      uplink_interfaces: [Ethernet52, Ethernet53]
+      wan_ha:
+        enabled: true
+      nodes:
+        - name: cv-pathfinder-edge2A
+          id: 2
+          l3_interfaces:
+            - name: Ethernet1
+              wan_carrier: ATT
+              wan_circuit_id: 423-01
+              # dhcp_accept_default_route: true
+              # ip_address: dhcp
+          uplink_switch_interfaces: [Ethernet1, Ethernet1]
+        - name: cv-pathfinder-edge2B
+          id: 3
+          l3_interfaces:
+            - name: Ethernet2
+              wan_carrier: Colt
+              wan_circuit_id: 10423
+              ip_address: 172.15.6.6/31
+          uplink_switch_interfaces: [Ethernet2, Ethernet2]
+
+    # TRANSIT_SITE_HA_ENABLED
+    - group: TRANSIT_SITE_HA_ENABLED
+      loopback_ipv4_pool: 192.168.43.0/24
+      vtep_loopback_ipv4_pool: 192.168.143.0/24
+      filter:
+        always_include_vrfs_in_tenants: [TenantA, TenantB]
+      uplink_ipv4_pool: 172.17.0.0/16
+      uplink_type: p2p-vrfs
+      uplink_switches: [site-ha-enabled-leaf1]
+      uplink_interfaces: [Ethernet52]
+      cv_pathfinder_transit_mode: region
+      # Disable HA IPsec
+      wan_ha:
+        enabled: true # TODO AVD4.8.0: Remove once WAN HA is GA.
+        ipsec: false
+      nodes:
+        - name: cv-pathfinder-transit1A
+          cv_pathfinder_region: AVD_Land_West
+          cv_pathfinder_site: Site422
+          id: 1
+          uplink_switch_interfaces: [Ethernet1]
+          l3_interfaces:
+            - name: Ethernet1.42
+              wan_carrier: Comcast
+              dhcp_accept_default_route: true
+              ip_address: dhcp
+            - name: Ethernet2.42
+              peer_ip: 123.12.3.4
+              encapsulation_dot1q_vlan: 666
+              wan_carrier: Colt
+              wan_circuit_id: 10666
+              ip_address: 172.16.6.6/31
+              cv_pathfinder_internet_exit:
+                policies:
+                  - name: DIRECT-EXIT-POLICY-2
+        - name: cv-pathfinder-transit1B
+          cv_pathfinder_region: AVD_Land_West
+          cv_pathfinder_site: Site422
+          id: 2
+          uplink_switch_interfaces: [Ethernet2]
+          l3_interfaces:
+            - name: Ethernet1.42
+              wan_carrier: Comcast
+              dhcp_accept_default_route: true
+              ip_address: dhcp
+            - name: Ethernet2.42
+              encapsulation_dot1q_vlan: 666
+              wan_carrier: Colt
+              wan_circuit_id: 10666
+              ip_address: 172.16.6.6/31
+
+    # SITE_HA_ENABLED_DIRECT_HA
+    # One interface disable usage of port-channel
+    # test flow-tracking on ethernet interface for direct HA
+    - group: Site404
+      cv_pathfinder_region: AVD_Land_West
+      cv_pathfinder_site: Site404
+      uplink_switches: [site-ha-enabled-leaf2A, site-ha-enabled-leaf2B]
+      uplink_interfaces: [Ethernet52, Ethernet53]
+      wan_ha:
+        enabled: true # TODO AVD4.8.0: Remove once WAN HA is GA.
+        ha_interfaces: [Ethernet52]
+        # Test wan_ha mtu
+        mtu: 9100
+        ha_ipv4_pool: 10.10.10.0/24
+        # Check flow tracking on ethernet interface
+        flow_tracking:
+          enabled: true
+        use_port_channel_for_direct_ha: false
+      nodes:
+        - name: cv-pathfinder-edge3A
+          id: 6
+          l3_interfaces:
+            - name: Ethernet1
+              wan_carrier: ATT
+              wan_circuit_id: 404-01
+              dhcp_accept_default_route: true
+              ip_address: dhcp
+        - name: cv-pathfinder-edge3B
+          id: 7
+          l3_interfaces:
+            - name: Ethernet2
+              wan_carrier: Colt
+              wan_circuit_id: 10423
+              ip_address: 172.15.6.6/31
+
+    # SITE_HA_ENABLED_DIRECT_HA
+    # Multiple interfaces in port-channel for direct HA
+    # test changing port-channel ID
+    - group: SITE_DIRECT_HA_PORT_CHANNEL
+      cv_pathfinder_transit_mode: region
+      cv_pathfinder_region: AVD_Land_West
+      cv_pathfinder_site: Site405
+      # Disable HA IPsec
+      wan_ha:
+        enabled: true # TODO AVD4.8.0: Remove once WAN HA is GA.
+        ipsec: false
+        ha_interfaces: [Ethernet42, Ethernet43]
+        ha_ipv4_pool: 10.10.10.0/24
+        # Check flow tracking on port-channel
+        flow_tracking:
+          enabled: true
+        # Testing overwriting port-channel ID
+        port_channel_id: 666
+      nodes:
+        - name: cv-pathfinder-edge4A
+          id: 8
+          l3_interfaces:
+            - name: Ethernet1.42
+              wan_carrier: Comcast
+              dhcp_accept_default_route: true
+              ip_address: dhcp
+        - name: cv-pathfinder-edge4B
+          cv_pathfinder_region: AVD_Land_West
+          id: 9
+          l3_interfaces:
+            - name: Ethernet1.42
+              wan_carrier: Comcast
+              dhcp_accept_default_route: true
+              ip_address: dhcp
+
+# Fake DC1
+l3leaf:
+  defaults:
+    bgp_as: 65199
+    loopback_ipv4_pool: 192.168.45.0/24
+    vtep_loopback_ipv4_pool: 192.168.255.0/24
+    virtual_router_mac_address: 00:1c:73:00:00:01
+    filter:
+      always_include_vrfs_in_tenants: [TenantA]
+  nodes:
+    - name: site-ha-enabled-leaf1
+      id: 1
+    - name: site-ha-enabled-leaf2A
+      id: 2
+    - name: site-ha-enabled-leaf2B
+      id: 3
+    - name: site-ha-disabled-leaf
+      id: 4
+
+wan_rr:
+  defaults:
+    loopback_ipv4_pool: 192.168.44.0/24
+    vtep_loopback_ipv4_pool: 192.168.144.0/24
+    data_plane_cpu_allocation_max: 1
+    bgp_as: 65000
+  nodes:
+    - name: cv-pathfinder-pathfinder
+      id: 1
+      cv_pathfinder_site: Global-pathfinder-site
+      l3_interfaces:
+        - name: Ethernet1
+          wan_carrier: Bouygues_Telecom
+          wan_circuit_id: 777
+          static_routes:
+            - prefix: 0.0.0.0/0
+          ip_address: 10.7.7.7/31
+          public_ip: 172.17.7.7
+          peer_ip: 10.7.7.6
+        - name: Ethernet2/2
+          wan_carrier: Colt
+          wan_circuit_id: 10000
+          ip_address: 172.16.0.1/31
+        - name: Ethernet3
+          wan_carrier: Another-ISP
+          wan_circuit_id: 999
+          ip_address: 10.9.9.9/31
+    - name: cv-pathfinder-pathfinder1
+      id: 2
+      cv_pathfinder_region: AVD_Land_West
+      cv_pathfinder_site: Site423
+      data_plane_cpu_allocation_max: 3
+      l3_interfaces:
+        - name: Ethernet1
+          wan_carrier: Orange
+          wan_circuit_id: 888
+          ip_address: 10.8.8.8/31
+    - name: cv-pathfinder-pathfinder2
+      id: 3
+      cv_pathfinder_region: AVD_Land_East
+      data_plane_cpu_allocation_max: 3
+      l3_interfaces:
+        - name: Ethernet1
+          wan_carrier: SFR
+          wan_circuit_id: 999
+          ip_address: 10.9.9.9/31
+        - name: Ethernet2
+          wan_carrier: ATT-MPLS
+          wan_circuit_id: 10999
+          ip_address: 172.19.9.9/31
+          # public IP here will be overridden by
+          # wan_route_servers.path_groups.interfaces.ip_address
+          # in CV_PATHFINDER_MULTI_RR_TESTS groups vars.
+          public_ip: 10.37.37.7
+
+wan_path_groups:
+  - name: MPLS
+    ipsec:
+      static_peers: false
+      dynamic_peers: false
+    # TODO remove one once auto-id is implemented - for now required in schema
+    id: 100
+    dps_keepalive:
+      interval: 300
+  - name: INET
+    id: 101
+  - name: LTE
+    id: 102
+    # The expectation here is that LTE shouldn't be present in the default lb policy.
+    excluded_from_default_policy: true
+    dps_keepalive:
+      interval: 100
+      failure_threshold: 12
+  - name: Equinix
+    id: 103
+    default_preference: alternate
+  - name: Satellite
+    id: 104
+    default_preference: alternate
+    dps_keepalive:
+      interval: auto
+  - name: AWS
+    id: 105
+
+wan_carriers:
+  - name: Comcast
+    path_group: INET
+    trusted: true
+  - name: ATT
+    path_group: INET
+    trusted: true
+  - name: Bouygues_Telecom
+    path_group: INET
+    trusted: true
+  - name: SFR
+    path_group: INET
+    trusted: true
+  - name: Orange
+    path_group: INET
+    trusted: true
+  - name: Another-ISP
+    path_group: INET
+    trusted: true
+  - name: Colt
+    path_group: MPLS
+    trusted: true
+  - name: ATT-MPLS
+    path_group: MPLS
+    trusted: true
+  - name: Comcast-5G
+    path_group: LTE
+    trusted: true
+  # Testing a not trusted carrier
+  - name: Inmrasat
+    path_group: Satellite
+  - name: AWS-1
+    path_group: AWS
+    trusted: true
+
+tenants:
+  - name: TenantA
+    mac_vrf_vni_base: 1000
+    vrfs:
+      - name: default
+        vrf_id: 1
+        # Checking static route on VRF default is redistributed in a route-map
+        static_routes:
+          - destination_address_prefix: 66.66.66.0/24
+            gateway: 172.17.0.0
+            nodes: [cv-pathfinder-edge]
+      - name: PROD
+        # Showing that wan_vni and vrf_id can be different. `vrf_id` influences the subinterface id.
+        vrf_id: 142
+        svis:
+          - id: 100
+            name: VLAN100
+            ip_address_virtual: 10.0.100.1/24
+      - name: IT
+        vrf_id: 1000
+    l2vlans:
+      - id: 101
+        name: VLAN101
+  - name: TenantB
+    vrfs:
+      - name: default
+        vrf_id: 1
+      - name: TRANSIT
+        vrf_id: 66
+      # Test that a VRF with address_families: [] on a WAN router is not configured on Vxlan1 interface. Only configured for BGP because we force enabled: true
+      - name: NOT-WAN-VRF
+        vrf_id: 13
+        address_families: []
+        bgp:
+          # Test that we can forcefully configure BGP for this VRF even if not needed by anything.
+          enabled: true
+  - name: TenantC
+    mac_vrf_vni_base: 1000
+    vrfs:
+      # Test adding a VRF on an uplink switch and seeing it configured on the WAN routers
+      - name: ATTRACTED-VRF-FROM-UPLINK
+        vrf_id: 666
+        svis:
+          - id: 666
+            name: VLAN666
+            ip_address_virtual: 10.66.66.66/24
+            nodes:
+              - node: site-ha-disabled-leaf
+                ip_address: 10.66.66.1
+  - name: TenantD
+    # Tenant used to test VRFs
+    # knob wan_use_evpn_node_settings_for_lan: true
+    mac_vrf_vni_base: 1000
+    vrfs:
+      - name: WAN-VRF-NO-AF
+        vrf_id: 200
+        # Setting address families under tenant to empty list
+        # and checking the VRF is still added on the WAN when the knob is true
+        # and the VRF is defined under wan_virtual_topologies.vrfs
+        address_families: []
+      - name: VRF-NO-WAN
+        vrf_id: 300
+        # keeping default address family "evpn" and verifying we do not raise
+        # when the knob is true. The VRF should be configured.
+      - name: VRF-NO-WAN-NO-AF
+        vrf_id: 400
+        # when the knob is true. The VRF should not be configured under VXLAN and BGP.
+        address_families: []
+
+wan_virtual_topologies:
+  vrfs:
+    - name: default
+      policy: DEFAULT-AVT-POLICY
+      wan_vni: 1
+    - name: PROD
+      policy: PROD-AVT-POLICY
+      wan_vni: 42
+    # Testing reusing the same policy as default VRF
+    - name: IT
+      policy: DEFAULT-AVT-POLICY
+      wan_vni: 100
+    # Testing a VRF only on transit and not edge
+    - name: TRANSIT
+      policy: TRANSIT-AVT-POLICY
+      wan_vni: 66
+    - name: ATTRACTED-VRF-FROM-UPLINK
+      wan_vni: 166
+    - name: WAN-VRF-NO-AF
+      # Using PROD policy to avoid extra noise
+      policy: PROD-AVT-POLICY
+      wan_vni: 200
+  policies:
+    - name: PROD-AVT-POLICY
+      default_virtual_topology:
+        path_groups:
+          - names: [INET]
+            preference: preferred
+          - names: [MPLS]
+            preference: alternate
+      application_virtual_topologies:
+        - application_profile: VOICE
+          lowest_hop_count: true
+          path_groups:
+            - names: [MPLS]
+              preference: preferred
+            - names: [INET]
+              preference: alternate
+          constraints:
+            jitter: 42
+          internet_exit:
+            policy: ZSCALER-EXIT-POLICY-1
+          id: 2
+        - application_profile: VIDEO
+          path_groups:
+            - names: [MPLS, LTE]
+              preference: preferred
+            - names: [INET]
+              preference: alternate
+          constraints:
+            loss_rate: 42.0
+          internet_exit:
+            policy: ZSCALER-EXIT-POLICY-2
+          id: 4
+        # This will not be rendered on devices without MPLS except if their HA
+        # peer have MPLS.
+        - application_profile: MPLS-ONLY
+          path_groups:
+            - names: [MPLS]
+              preference: preferred
+          id: 5
+    - name: DEFAULT-AVT-POLICY
+      default_virtual_topology:
+        path_groups:
+          # No preference to check the default.
+          - names: [INET, Equinix]
+          - names: [MPLS]
+            preference: 4223
+      application_virtual_topologies:
+        - application_profile: VIDEO
+          path_groups:
+            # The expectation here is that Equinix will be configured with priority 1/preferred,
+            # since we are overriding the default_preference value (2/alternate).
+            - names: [MPLS, INET, Equinix]
+              preference: preferred
+          internet_exit:
+            policy: DIRECT-EXIT-POLICY-1
+          id: 3
+    - name: TRANSIT-AVT-POLICY
+      default_virtual_topology:
+        path_groups:
+          - names: [INET]
+            preference: preferred
+          - names: [MPLS]
+            preference: alternate
+      application_virtual_topologies:
+        - application_profile: VOICE
+          name: CUSTOM-VOICE-PROFILE-NAME
+          path_groups:
+            - names: [MPLS]
+              preference: preferred
+            - names: [INET]
+              preference: alternate
+          internet_exit:
+            policy: DIRECT-EXIT-POLICY-2
+          id: 42
+
+application_classification:
+  application_profiles:
+    - name: VIDEO
+      # Testing categories filtering
+      categories:
+        - name: VIDEO1
+      applications:
+        # Testing applications in application-profiles filtering
+        - name: CUSTOM-APPLICATION-1
+        # Builtin application that should not raise
+        - name: skype
+      # application transport to also be covered by the profile
+      application_transports:
+        - rtp
+    - name: IT
+    - name: MPLS-ONLY
+    - name: VOICE
+      applications:
+        # Testing applications in application-profiles filtering
+        - name: CUSTOM-VOICE-APPLICATION
+    # This should not be rendered in any device
+    - name: NOT-IN-ANY-POLICY
+  categories:
+    # This should not be rendered in any device
+    - name: NOT-IN-ANY-PROFILE
+    - name: VIDEO1
+      applications:
+        # Testing applications in categories filtering
+        - name: CUSTOM-APPLICATION-2
+        - name: CUSTOM-DSCP-APPLICATION
+        # Builtin application that should not raise
+        - name: microsoft-teams
+  applications:
+    ipv4_applications:
+      # This should not be rendered in any device
+      - name: NOT-IN-ANY-PROFILE-NOR-CATEGORY
+      - name: CUSTOM-APPLICATION-1
+        protocols: [tcp]
+        # Testing filtering of prefixes
+        src_prefix_set_name: CUSTOM-SRC-PREFIX-1
+        dest_prefix_set_name: CUSTOM-DEST-PREFIX-1
+      - name: CUSTOM-APPLICATION-2
+        protocols: [tcp]
+        tcp_src_port_set_name: TCP-SRC-2
+        tcp_dest_port_set_name: TCP-DEST-2
+      - name: CUSTOM-voice-APPLICATION
+        protocols: [udp]
+        udp_src_port_set_name: UDP-SRC-VOICE
+        udp_dest_port_set_name: UDP-DEST-VOICE
+      - name: CUSTOM-DSCP-APPLICATION
+        dscp_ranges:
+          - ef
+          - 12-14
+          - cs6
+          - 42
+  field_sets:
+    ipv4_prefixes:
+      # This should not be rendered in any device
+      - name: NOT-IN-ANY-APPLICATION
+      - name: CUSTOM-SRC-PREFIX-1
+        prefix_values:
+          - 42.42.42.0/24
+      - name: CUSTOM-DEST-PREFIX-1
+        prefix_values:
+          - 6.6.6.0/24
+    l4_ports:
+      # This should not be rendered in any device
+      - name: NOT-IN-ANY-APPLICATION
+      - name: TCP-SRC-2
+        port_values:
+          - 42
+      - name: TCP-DEST-2
+        port_values:
+          - 666
+          - 777
+      - name: UDP-SRC-VOICE
+        port_values:
+          - 42000-42999
+      - name: UDP-DEST-VOICE
+        port_values:
+          - 30000-30100
+          - 31000-31100
+
+cv_pathfinder_internet_exit_policies:
+  - name: ZSCALER-EXIT-POLICY-1
+    type: zscaler
+    zscaler:
+      domain_name: test.local
+      ipsec_key_salt: THIS_SHOULD_BE_VAULTED
+  - name: ZSCALER-EXIT-POLICY-2
+    fallback_to_system_default: false
+    type: zscaler
+    zscaler:
+      domain_name: test.local
+      ipsec_key_salt: THIS_SHOULD_BE_VAULTED
+  - name: DIRECT-EXIT-POLICY-1
+    fallback_to_system_default: false
+    type: direct
+  - name: DIRECT-EXIT-POLICY-2
+    type: direct
+
+zscaler_endpoints:
+  cloud_name: zscalerbeta
+  device_location:
+    city: Santa Clara, CA
+    country: United States
+  primary:
+    city: Fremont, CA
+    datacenter: FMT1
+    country: United States
+    region: us-west1
+    latitude: 37
+    longitude: -121
+    ip_address: 10.37.121.1 # Not the correct address
+  secondary:
+    city: Washington, DC
+    datacenter: WAS1
+    country: United States
+    region: us-east1
+    latitude: 39
+    longitude: -77
+    ip_address: 10.39.77.1 # Not the correct address
+  tertiary:
+    city: Frankfurt
+    datacenter: FRA4
+    country: Germany
+    region: eu-west1
+    latitude: 50
+    longitude: 9
+    ip_address: 10.50.9.1 # Not the correct address
+
+cv_pathfinder_global_sites:
+  - name: Global-pathfinder-site
+    location: Somewhere under the rainbow
+
+expected_error_message: >-
+  MLAG same_subnet addressing requires the pool to be a /31 for host 'mlag_same_subnet_1'.
