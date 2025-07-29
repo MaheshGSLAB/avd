@@ -666,11 +666,10 @@ jobs:
     needs: [file-changes]
     if: |
       needs.file-changes.outputs.eos_design == 'true' ||
-      needs.file-changes.outputs.pyavd == 'true'
+      needs.file-changes.outputs.config_gen == 'true'
     strategy:
       fail-fast: false
       matrix:
-        # Run standard tests on all versions EXCEPT 3.11, which has its own coverage job
         python: ["3.10", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -682,26 +681,26 @@ jobs:
         run: pip install tox tox-gh-actions --upgrade
       - name: Run Pytest via Tox
         working-directory: python-avd
-        # Assumes your tox.ini has a default [testenv] that runs pytest without coverage
         run: tox
 
-  # Job 2: Parallel coverage test suites (only for Python 3.11)
   test-coverage:
     name: Test pyavd (Python ${{ matrix.python }}, Suite ${{ matrix.suite.name }})
     runs-on: ubuntu-latest
     needs: [file-changes]
     if: |
       needs.file-changes.outputs.eos_design == 'true' ||
-      needs.file-changes.outputs.pyavd == 'true'
+      needs.file-changes.outputs.config_gen == 'true'
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.11"] # This job is hardcoded to Python 3.11
+        python: ["3.11"]
         suite:
           - name: "Main-Tests"
-            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py --ignore=tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
-          - name: "Excluded-Tests"
-            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
+            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py --ignore=tests/pyavd/molecule_scenarios/test_negative_eos_designs.py --ignore=tests/schema_tools/metaschema/test_meta_schema_model.py"
+          - name: "Excluded-Tests(test_get_device_config and test_get_device_doc and test_meta_schema_model)"
+            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py tests/pyavd/molecule_scenarios/test_negative_eos_designs.py tests/schema_tools/metaschema/test_meta_schema_model.py"
+          - name: "Excluded-Tests(test_negative_eos_designs)"
+            pytest_args: "tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -744,16 +743,10 @@ jobs:
           name: eos-cli-config-gen-compiled-templates
           path: python-avd/pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
 
-  # Job 3: Combine and report coverage (depends on the Python 3.11 job)
   report-coverage:
     name: Report Coverage (Python 3.11)
     runs-on: ubuntu-latest
-    needs: [test-coverage] # This job only needs the coverage job
-    if: |
-      always() && (
-        needs.file-changes.outputs.eos_design == 'true' ||
-        needs.file-changes.outputs.pyavd == 'true'
-      )
+    needs: [test-coverage]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
