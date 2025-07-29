@@ -660,7 +660,32 @@ jobs:
   # ----------------------------------- #
   # Test of pyavd
   # ----------------------------------- #
-  # This job runs your two test suites in parallel
+  test-pytest:
+    name: Test pyavd (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    needs: [file-changes]
+    if: |
+      needs.file-changes.outputs.eos_design == 'true' ||
+      needs.file-changes.outputs.pyavd == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        # Run standard tests on all versions EXCEPT 3.11, which has its own coverage job
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install tox
+        run: pip install tox tox-gh-actions --upgrade
+      - name: Run Pytest via Tox
+        working-directory: python-avd
+        # Assumes your tox.ini has a default [testenv] that runs pytest without coverage
+        run: tox
+
+  # Job 2: Parallel coverage test suites (only for Python 3.11)
   test-coverage:
     name: Test pyavd (Python ${{ matrix.python }}, Suite ${{ matrix.suite.name }})
     runs-on: ubuntu-latest
@@ -671,13 +696,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.11"]
+        python: ["3.11"] # This job is hardcoded to Python 3.11
         suite:
           - name: "Main-Tests"
             pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py --ignore=tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
           - name: "Excluded-Tests"
             pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
-
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -690,17 +714,14 @@ jobs:
         working-directory: python-avd
         run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
 
-      # --- START: THE FIX ---
       - name: Find and Move coverage file
         run: |
-          echo "Searching for coverage file in python-avd/"
           coverage_file=$(find ./python-avd -maxdepth 1 -name ".coverage.*")
           if [ -z "$coverage_file" ]; then
             echo "::error::Coverage file not found in python-avd/!"
             exit 1
           fi
           new_name="coverage-${{ matrix.suite.name }}.dat"
-          echo "Found file: '$coverage_file'. Moving to root as '$new_name'"
           mv "$coverage_file" "$new_name"
           
       - name: Upload coverage data
@@ -709,8 +730,6 @@ jobs:
           name: coverage-data-${{ matrix.suite.name }}
           path: coverage-${{ matrix.suite.name }}.dat
 
-      # --- START: UPLOAD COMPILED TEMPLATES ---
-      # These steps run only for one of the test suites to avoid uploading the same files twice.
       - name: Upload eos_designs compiled templates
         if: matrix.suite.name == 'Main-Tests'
         uses: actions/upload-artifact@v4
@@ -724,13 +743,12 @@ jobs:
         with:
           name: eos-cli-config-gen-compiled-templates
           path: python-avd/pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
-      # --- END: THE FIX ---
 
-  # This job runs AFTER the parallel tests to combine the reports
+  # Job 3: Combine and report coverage (depends on the Python 3.11 job)
   report-coverage:
     name: Report Coverage (Python 3.11)
     runs-on: ubuntu-latest
-    needs: [test-coverage]
+    needs: [test-coverage] # This job only needs the coverage job
     if: |
       always() && (
         needs.file-changes.outputs.eos_design == 'true' ||
@@ -744,32 +762,21 @@ jobs:
           python-version: '3.11'
       - name: Install Coverage
         run: pip install "coverage[toml]"
-      # --- START: DOWNLOAD ALL ARTIFACTS ---
+        
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          # Download all artifacts into a single parent directory
           path: ./artifacts
-      # --- END: DOWNLOAD ALL ARTIFACTS ---
 
       - name: Combine and Report Coverage
         working-directory: python-avd
         run: |
           set -ex
-
-          echo "--- Moving coverage data files ---"
           find ../artifacts/coverage-data-*/ -type f -name "*.dat" -exec mv {} . \;
-
-          echo "--- Placing compiled template files ---"
-          # FIX: Create the *full* destination path, including the final 'compiled_templates' directory.
           mkdir -p ./pyavd/_eos_designs/j2templates/compiled_templates/
           mkdir -p ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
-
-          # This 'mv' command will now succeed because the destination exists.
           mv ../artifacts/eos-designs-compiled-templates/* ./pyavd/_eos_designs/j2templates/compiled_templates/
           mv ../artifacts/eos-cli-config-gen-compiled-templates/* ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
-
-          echo "--- Combining coverage and generating XML report ---"
           coverage combine --rcfile=pyproject.toml coverage-*.dat
           coverage xml --rcfile=pyproject.toml
           
