@@ -740,8 +740,9 @@ jobs:
         working-directory: python-avd
         run: |
           # --- THE FIX ---
-          # Move the downloaded .dat files to the correct location for combining.
-          mv coverage-data/*/*.dat .
+          # Use the 'find' command to robustly locate all .dat files
+          # in the downloaded subdirectories and move them to the current directory.
+          find coverage-data -type f -name "*.dat" -exec mv {} . \;
           
           # The rest of the commands will now work.
           coverage combine --rcfile=pyproject.toml
