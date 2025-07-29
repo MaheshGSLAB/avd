@@ -668,6 +668,9 @@ jobs:
     if: |
       needs.file-changes.outputs.eos_design == 'true' ||
       needs.file-changes.outputs.pyavd == 'true'
+    defaults:
+      run:
+        working-directory: ./python-avd
     strategy:
       fail-fast: false # Allows all jobs to finish even if one fails
       matrix:
