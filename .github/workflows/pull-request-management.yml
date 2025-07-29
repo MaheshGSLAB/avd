@@ -691,10 +691,8 @@ jobs:
         run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
 
       # --- START: THE FIX ---
-      - name: Find and Move coverage file to root
+      - name: Find and Move coverage file
         run: |
-          # This robust script finds the generated coverage file inside python-avd
-          # and moves it to the repository root with a simple, non-hidden name.
           echo "Searching for coverage file in python-avd/"
           coverage_file=$(find ./python-avd -maxdepth 1 -name ".coverage.*")
           if [ -z "$coverage_file" ]; then
@@ -704,12 +702,28 @@ jobs:
           new_name="coverage-${{ matrix.suite.name }}.dat"
           echo "Found file: '$coverage_file'. Moving to root as '$new_name'"
           mv "$coverage_file" "$new_name"
+          
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-${{ matrix.suite.name }}
-          # The path is now the simple filename at the repository root.
           path: coverage-${{ matrix.suite.name }}.dat
+
+      # --- START: UPLOAD COMPILED TEMPLATES ---
+      # These steps run only for one of the test suites to avoid uploading the same files twice.
+      - name: Upload eos_designs compiled templates
+        if: matrix.suite.name == 'Main-Tests'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eos-designs-compiled-templates
+          path: python-avd/pyavd/_eos_designs/j2templates/compiled_templates/
+
+      - name: Upload eos_cli_config_gen compiled templates
+        if: matrix.suite.name == 'Main-Tests'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eos-cli-config-gen-compiled-templates
+          path: python-avd/pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
       # --- END: THE FIX ---
 
   # This job runs AFTER the parallel tests to combine the reports
@@ -730,28 +744,39 @@ jobs:
           python-version: '3.11'
       - name: Install Coverage
         run: pip install "coverage[toml]"
-      - name: Download all coverage data
+      # --- START: DOWNLOAD ALL ARTIFACTS ---
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: python-avd/coverage-data
+          # Download all artifacts into a single parent directory
+          path: ./artifacts
+      # --- END: DOWNLOAD ALL ARTIFACTS ---
+
       - name: Combine and Report Coverage
         working-directory: python-avd
         run: |
-          set -x
-          echo "--- Moving coverage files ---"
-          # Find and move any .dat files from the downloaded artifact subdirectories
-          find coverage-data -type f -name "*.dat" -exec mv {} . \;
-          
+          set -ex
+
+          echo "--- Moving coverage data files ---"
+          find ../artifacts/coverage-data-*/ -type f -name "*.dat" -exec mv {} . \;
+
+          echo "--- Placing compiled template files ---"
+          # Create the target parent directories first to be safe
+          mkdir -p pyavd/_eos_designs/j2templates/
+          mkdir -p pyavd/_eos_cli_config_gen/j2templates/
+          # Move the downloaded template files into the checked-out source tree
+          # The '|| true' handles cases where a test run might not generate templates
+          mv ../artifacts/eos-designs-compiled-templates/* ./pyavd/_eos_designs/j2templates/compiled_templates/ || true
+          mv ../artifacts/eos-cli-config-gen-compiled-templates/* ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/ || true
+
           echo "--- Verifying files after move ---"
           ls -la .
 
-          echo "--- Combining coverage data ---"
-          # FIX: Explicitly tell 'combine' which data files to use
+          echo "--- Combining coverage and generating XML report ---"
           coverage combine --rcfile=pyproject.toml coverage-*.dat
-          
-          echo "--- Generating reports ---"
           coverage report --rcfile=pyproject.toml
           coverage xml --rcfile=pyproject.toml
+          
       - name: Upload final coverage report
         uses: actions/upload-artifact@v4
         with:
