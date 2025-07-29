@@ -739,12 +739,24 @@ jobs:
       - name: Combine and Report Coverage
         working-directory: python-avd
         run: |
-          # --- THE FIX ---
-          # Use the 'find' command to robustly locate all .dat files
-          # in the downloaded subdirectories and move them to the current directory.
+          # --- START: DETAILED DEBUGGING ---
+          set -x # This will print every command before it is run
+
+          echo "--- Verifying downloaded artifact structure ---"
+          # List the full contents of the download directory
+          ls -R coverage-data
+
+          echo "--- Moving coverage files ---"
+          # Find and move any .dat files to the current directory
           find coverage-data -type f -name "*.dat" -exec mv {} . \;
+
+          echo "--- Verifying files after move ---"
+          # List the contents of the current directory to see if the move was successful
+          ls -la .
           
-          # The rest of the commands will now work.
+          echo "--- Combining coverage data ---"
+          # --- END: DETAILED DEBUGGING ---
+
           coverage combine --rcfile=pyproject.toml
           coverage report --rcfile=pyproject.toml
           coverage xml --rcfile=pyproject.toml
