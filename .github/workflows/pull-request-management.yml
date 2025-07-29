@@ -694,14 +694,26 @@ jobs:
       - name: Rename coverage file for upload
         working-directory: python-avd
         run: |
-          # Find the uniquely named coverage file and give it a predictable name
-          find . -name ".coverage.*" -exec mv {} .coverage.${{ matrix.suite.name }} \;
+          # This robust script finds the generated coverage file, checks if it exists,
+          # and renames it to a predictable name for the upload step.
+          echo "Searching for '.coverage.*' file..."
+          # Use a loop to be safe, though there should only be one file.
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              new_name=".coverage.${{ matrix.suite.name }}"
+              echo "Found file: '$f'. Renaming to '$new_name'"
+              mv "$f" "$new_name"
+              exit 0 # Exit successfully after finding and renaming
+            fi
+          done
+          echo "::error::Coverage data file not found after test run!"
+          exit 1
       
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-${{ matrix.suite.name }}
-          # Upload the predictably named file
+          # Upload the now-predictably named file
           path: python-avd/.coverage.${{ matrix.suite.name }}
       # --- END: THE FIX ---
 
