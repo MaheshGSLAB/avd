@@ -696,9 +696,9 @@ jobs:
         python: ["3.11"]
         suite:
           - name: "Main-Tests"
-            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py --ignore=tests/pyavd/molecule_scenarios/test_negative_eos_designs.py --ignore=tests/schema_tools/metaschema/test_meta_schema_model.py"
-          - name: "Excluded-Tests(test_get_device_config and test_get_device_doc and test_meta_schema_model)"
-            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py tests/pyavd/molecule_scenarios/test_negative_eos_designs.py tests/schema_tools/metaschema/test_meta_schema_model.py"
+            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_negative_eos_designs.py --ignore=tests/schema_tools/metaschema/test_meta_schema_model.py"
+          - name: "Excluded-Tests(test_get_device_config and test_meta_schema_model)"
+            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/schema_tools/metaschema/test_meta_schema_model.py"
           - name: "Excluded-Tests(test_negative_eos_designs)"
             pytest_args: "tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
     steps:
