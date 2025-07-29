@@ -761,20 +761,16 @@ jobs:
           find ../artifacts/coverage-data-*/ -type f -name "*.dat" -exec mv {} . \;
 
           echo "--- Placing compiled template files ---"
-          # Create the target parent directories first to be safe
-          mkdir -p pyavd/_eos_designs/j2templates/
-          mkdir -p pyavd/_eos_cli_config_gen/j2templates/
-          # Move the downloaded template files into the checked-out source tree
-          # The '|| true' handles cases where a test run might not generate templates
-          mv ../artifacts/eos-designs-compiled-templates/* ./pyavd/_eos_designs/j2templates/compiled_templates/ || true
-          mv ../artifacts/eos-cli-config-gen-compiled-templates/* ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/ || true
+          # FIX: Create the *full* destination path, including the final 'compiled_templates' directory.
+          mkdir -p ./pyavd/_eos_designs/j2templates/compiled_templates/
+          mkdir -p ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
 
-          echo "--- Verifying files after move ---"
-          ls -la .
+          # This 'mv' command will now succeed because the destination exists.
+          mv ../artifacts/eos-designs-compiled-templates/* ./pyavd/_eos_designs/j2templates/compiled_templates/
+          mv ../artifacts/eos-cli-config-gen-compiled-templates/* ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
 
           echo "--- Combining coverage and generating XML report ---"
           coverage combine --rcfile=pyproject.toml coverage-*.dat
-          coverage report --rcfile=pyproject.toml
           coverage xml --rcfile=pyproject.toml
           
       - name: Upload final coverage report
