@@ -690,27 +690,27 @@ jobs:
         working-directory: python-avd
         run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
 
-      - name: Find and Rename coverage file
-        working-directory: python-avd
+      # --- START: THE FIX ---
+      - name: Find and Move coverage file to root
         run: |
-          # Find the uniquely named coverage file
-          coverage_file=$(find . -maxdepth 1 -name ".coverage.*")
+          # This robust script finds the generated coverage file inside python-avd
+          # and moves it to the repository root with a simple, non-hidden name.
+          echo "Searching for coverage file in python-avd/"
+          coverage_file=$(find ./python-avd -maxdepth 1 -name ".coverage.*")
           if [ -z "$coverage_file" ]; then
-            echo "::error::Coverage data file not found after test run!"
+            echo "::error::Coverage file not found in python-avd/!"
             exit 1
           fi
-          # --- THE FIX ---
-          # Rename it to a name that 'coverage combine' will recognize
-          new_name=".coverage.${{ matrix.suite.name }}"
-          echo "Found file: '$coverage_file'. Renaming to '$new_name'"
+          new_name="coverage-${{ matrix.suite.name }}.dat"
+          echo "Found file: '$coverage_file'. Moving to root as '$new_name'"
           mv "$coverage_file" "$new_name"
-
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-${{ matrix.suite.name }}
-          # Upload the file, which is still in the python-avd directory
-          path: python-avd/.coverage.${{ matrix.suite.name }}
+          # The path is now the simple filename at the repository root.
+          path: coverage-${{ matrix.suite.name }}.dat
+      # --- END: THE FIX ---
 
   # This job runs AFTER the parallel tests to combine the reports
   report-coverage:
@@ -722,7 +722,6 @@ jobs:
         needs.file-changes.outputs.eos_design == 'true' ||
         needs.file-changes.outputs.pyavd == 'true'
       )
-
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -738,13 +737,19 @@ jobs:
       - name: Combine and Report Coverage
         working-directory: python-avd
         run: |
-          # --- THE FIX ---
-          # Move all the downloaded .coverage.* files from their subdirectories
-          # to the current directory
-          mv coverage-data/*/* .
+          set -x
+          echo "--- Moving coverage files ---"
+          # Find and move any .dat files from the downloaded artifact subdirectories
+          find coverage-data -type f -name "*.dat" -exec mv {} . \;
           
-          # This command will now find the .coverage.Main-Tests and .coverage.Excluded-Tests files
-          coverage combine --rcfile=pyproject.toml
+          echo "--- Verifying files after move ---"
+          ls -la .
+
+          echo "--- Combining coverage data ---"
+          # FIX: Explicitly tell 'combine' which data files to use
+          coverage combine --rcfile=pyproject.toml coverage-*.dat
+          
+          echo "--- Generating reports ---"
           coverage report --rcfile=pyproject.toml
           coverage xml --rcfile=pyproject.toml
       - name: Upload final coverage report
