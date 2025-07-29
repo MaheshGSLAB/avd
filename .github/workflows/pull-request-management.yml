@@ -660,8 +660,86 @@ jobs:
   # ----------------------------------- #
   # Test of pyavd
   # ----------------------------------- #
-  pyavd:
-    name: Test pyavd
+  # This new job runs the two test suites in parallel for Python 3.11
+  test-coverage:
+    name: Test pyavd (Python 3.11, Suite ${{ matrix.suite.name }})
+    runs-on: ubuntu-latest
+    needs: [file-changes]
+    if: |
+      needs.file-changes.outputs.eos_design == 'true' ||
+      needs.file-changes.outputs.config_gen == 'true' ||
+      needs.file-changes.outputs.pyavd == 'true'
+    strategy:
+      fail-fast: false # Allows all jobs to finish even if one fails
+      matrix:
+        python: ["3.11"] # We are only splitting the 3.11 run
+        suite:
+          - name: "Main Tests"
+            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py"
+          - name: "Excluded Tests"
+            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install tox
+        run: pip install tox tox-gh-actions --upgrade
+      - name: Run Pytest via Tox
+        working-directory: python-avd
+        run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          # Create a uniquely named artifact for each parallel job
+          name: coverage-data-${{ matrix.suite.name }}
+          path: python-avd/.coverage.* # Upload the parallel data file(s)
+
+  # This new job runs AFTER the parallel tests are finished to combine the reports
+  report-coverage:
+    name: Report Coverage (Python 3.11)
+    runs-on: ubuntu-latest
+    # This job waits for all parallel test jobs to finish
+    needs: [test-coverage]
+    if: |
+      always() && (
+        needs.file-changes.outputs.eos_design == 'true' ||
+        needs.file-changes.outputs.config_gen == 'true' ||
+        needs.file-changes.outputs.pyavd == 'true'
+      )
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tox
+        run: pip install tox --upgrade
+      - name: Download all coverage data
+        uses: actions/download-artifact@v4
+        with:
+          # Download all artifacts into a subdirectory
+          path: python-avd/coverage-data
+      - name: Combine and Report Coverage
+        working-directory: python-avd
+        run: |
+          # Move all downloaded data files to the correct location for combining
+          mv coverage-data/*/.coverage.* .
+          tox -e report
+      - name: Upload final coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-coverage-report
+          path: python-avd/coverage.xml
+      
+      # You can also add your 'Upload compiled templates' steps here if needed
+
+  # This job can run your other, non-coverage python versions
+  test-other-versions:
+    name: Test pyavd (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     needs: [file-changes]
     if: |
@@ -670,44 +748,19 @@ jobs:
       needs.file-changes.outputs.pyavd == 'true'
     strategy:
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        python: ["3.10", "3.12", "3.13"]
+
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python 3
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - name: Install tox
-        run: |
-          pip install tox tox-gh-actions --upgrade
-      - name: Run pytest via tox for ${{ matrix.python }}
+        run: pip install tox tox-gh-actions --upgrade
+      - name: Run Pytest via Tox
         working-directory: python-avd
-        run: |
-          tox -p auto
-      - name: Upload coverage from pytest
-        # Coverage only runs as part of 3.11.
-        if: |
-          matrix.python == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-coverage
-          path: python-avd/coverage.xml
-
-      - name: Upload eos_designs compiled templates from pytest
-        if: |
-          matrix.python == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-eos-designs-compiled-templates
-          path: python-avd/pyavd/_eos_designs/j2templates/compiled_templates/
-
-      - name: Upload eos_cli_config_gen compiled templates from pytest
-        if: |
-          matrix.python == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-eos-cli-config-gen-compiled-templates
-          path: python-avd/pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
+        run: tox
 
   # ----------------------------------- #
   # Cargo build, test and linting
