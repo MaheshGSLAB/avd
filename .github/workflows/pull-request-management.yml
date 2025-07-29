@@ -674,9 +674,9 @@ jobs:
         python: ["3.11"]
         suite:
           - name: "Main-Tests"
-            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py"
+            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py --ignore=tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
           - name: "Excluded-Tests"
-            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py"
+            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
 
     steps:
       - uses: actions/checkout@v4
@@ -739,8 +739,11 @@ jobs:
       - name: Combine and Report Coverage
         working-directory: python-avd
         run: |
-          # Move the predictably named files to the correct location for combining
-          mv coverage-data/*/.coverage.* .
+          # --- THE FIX ---
+          # Move the downloaded .dat files to the correct location for combining.
+          mv coverage-data/*/*.dat .
+          
+          # The rest of the commands will now work.
           coverage combine --rcfile=pyproject.toml
           coverage report --rcfile=pyproject.toml
           coverage xml --rcfile=pyproject.toml
