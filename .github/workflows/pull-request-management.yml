@@ -683,7 +683,7 @@ jobs:
       - name: Run pytest via tox for ${{ matrix.python }}
         working-directory: python-avd
         run: |
-          tox
+          tox -p auto
       - name: Upload coverage from pytest
         # Coverage only runs as part of 3.11.
         if: |
