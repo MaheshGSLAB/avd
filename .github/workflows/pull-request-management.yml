@@ -690,6 +690,11 @@ jobs:
       - name: Run Pytest via Tox
         working-directory: python-avd
         run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
+      - name: Check for files after test run
+        run: |
+          echo "Checking contents of python-avd/ directory..."
+          ls -la python-avd/
+          echo "---"
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
