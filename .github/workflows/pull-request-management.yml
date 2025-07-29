@@ -660,17 +660,61 @@ jobs:
   # ----------------------------------- #
   # Test of pyavd
   # ----------------------------------- #
-  # This new job runs your two test suites in parallel using a matrix
+  # This job runs your two test suites in parallel
   test-coverage:
-    name: DEBUG - Isolate Test Suite on Python 3.11
+    name: Test pyavd (Python ${{ matrix.python }}, Suite ${{ matrix.suite.name }})
     runs-on: ubuntu-latest
     needs: [file-changes]
     if: |
       needs.file-changes.outputs.eos_design == 'true' ||
       needs.file-changes.outputs.pyavd == 'true'
-    defaults:
-      run:
-        working-directory: ./python-avd
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11"]
+        suite:
+          - name: "Main-Tests"
+            pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_get_device_doc.py"
+          - name: "Excluded-Tests"
+            pytest_args: "tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install tox
+        run: pip install tox tox-gh-actions --upgrade
+      - name: Run Pytest via Tox
+        working-directory: python-avd
+        run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
+
+      # --- START: THE FIX ---
+      - name: Rename coverage file for upload
+        working-directory: python-avd
+        run: |
+          # Find the uniquely named coverage file and give it a predictable name
+          find . -name ".coverage.*" -exec mv {} .coverage.${{ matrix.suite.name }} \;
+      
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-${{ matrix.suite.name }}
+          # Upload the predictably named file
+          path: python-avd/.coverage.${{ matrix.suite.name }}
+      # --- END: THE FIX ---
+
+  # This job runs AFTER the parallel tests to combine the reports
+  report-coverage:
+    name: Report Coverage (Python 3.11)
+    runs-on: ubuntu-latest
+    needs: [test-coverage]
+    if: |
+      always() && (
+        needs.file-changes.outputs.eos_design == 'true' ||
+        needs.file-changes.outputs.pyavd == 'true'
+      )
 
     steps:
       - uses: actions/checkout@v4
@@ -678,18 +722,25 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install tox
-        run: pip install tox tox-gh-actions --upgrade
-      - name: Run The Failing Tests and Force Output
+      - name: Install Coverage
+        run: pip install "coverage[toml]"
+      - name: Download all coverage data
+        uses: actions/download-artifact@v4
+        with:
+          path: python-avd/coverage-data
+      - name: Combine and Report Coverage
+        working-directory: python-avd
         run: |
-          # We run only the smaller test suite to get a clean error log.
-          # The '|| true' at the end ensures this step will not stop the workflow,
-          # so we can see the full output even if pytest fails.
-          tox -e coverage -- tests/pyavd/molecule_scenarios/test_get_device_config.py tests/pyavd/molecule_scenarios/test_get_device_doc.py || true
-      - name: List Files After Test Run
-        run: |
-          echo "--- Final Directory Listing ---"
-          ls -la
+          # Move the predictably named files to the correct location for combining
+          mv coverage-data/*/.coverage.* .
+          coverage combine --rcfile=pyproject.toml
+          coverage report --rcfile=pyproject.toml
+          coverage xml --rcfile=pyproject.toml
+      - name: Upload final coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-coverage-report
+          path: python-avd/coverage.xml
 
   # ----------------------------------- #
   # Cargo build, test and linting
