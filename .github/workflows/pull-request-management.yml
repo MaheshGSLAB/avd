@@ -690,28 +690,27 @@ jobs:
         working-directory: python-avd
         run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
 
-      # --- START: THE FIX ---
-      - name: Find and Move coverage file to root
+      - name: Find and Rename coverage file
+        working-directory: python-avd
         run: |
-          # This robust script finds the generated coverage file inside python-avd
-          # and moves it to the repository root with a simple, non-hidden name.
-          echo "Searching for coverage file in python-avd/"
-          coverage_file=$(find ./python-avd -maxdepth 1 -name ".coverage.*")
+          # Find the uniquely named coverage file
+          coverage_file=$(find . -maxdepth 1 -name ".coverage.*")
           if [ -z "$coverage_file" ]; then
-            echo "::error::Coverage file not found in python-avd/!"
+            echo "::error::Coverage data file not found after test run!"
             exit 1
           fi
-          new_name="coverage-${{ matrix.suite.name }}.dat"
-          echo "Found file: '$coverage_file'. Moving to root as '$new_name'"
+          # --- THE FIX ---
+          # Rename it to a name that 'coverage combine' will recognize
+          new_name=".coverage.${{ matrix.suite.name }}"
+          echo "Found file: '$coverage_file'. Renaming to '$new_name'"
           mv "$coverage_file" "$new_name"
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-${{ matrix.suite.name }}
-          # The path is now the simple filename at the repository root.
-          path: coverage-${{ matrix.suite.name }}.dat
-      # --- END: THE FIX ---
+          # Upload the file, which is still in the python-avd directory
+          path: python-avd/.coverage.${{ matrix.suite.name }}
 
   # This job runs AFTER the parallel tests to combine the reports
   report-coverage:
@@ -739,24 +738,12 @@ jobs:
       - name: Combine and Report Coverage
         working-directory: python-avd
         run: |
-          # --- START: DETAILED DEBUGGING ---
-          set -x # This will print every command before it is run
-
-          echo "--- Verifying downloaded artifact structure ---"
-          # List the full contents of the download directory
-          ls -R coverage-data
-
-          echo "--- Moving coverage files ---"
-          # Find and move any .dat files to the current directory
-          find coverage-data -type f -name "*.dat" -exec mv {} . \;
-
-          echo "--- Verifying files after move ---"
-          # List the contents of the current directory to see if the move was successful
-          ls -la .
+          # --- THE FIX ---
+          # Move all the downloaded .coverage.* files from their subdirectories
+          # to the current directory
+          mv coverage-data/*/* .
           
-          echo "--- Combining coverage data ---"
-          # --- END: DETAILED DEBUGGING ---
-
+          # This command will now find the .coverage.Main-Tests and .coverage.Excluded-Tests files
           coverage combine --rcfile=pyproject.toml
           coverage report --rcfile=pyproject.toml
           coverage xml --rcfile=pyproject.toml
