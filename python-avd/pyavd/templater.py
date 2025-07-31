@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import logging
+import re
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -46,6 +48,10 @@ class Undefined(StrictUndefined):
 
 class Templar:
     def __init__(self, precompiled_templates_path: str | Path, searchpaths: list[str | Path] | None = None) -> None:
+        absolute_precompiled_path = str(Path(precompiled_templates_path).resolve())
+        if absolute_precompiled_path not in sys.path:
+            sys.path.insert(0, absolute_precompiled_path)
+
         if not RUNNING_FROM_SRC:
             self.loader = ModuleLoader(precompiled_templates_path)
         else:
@@ -57,13 +63,7 @@ class Templar:
                 ],
             )
 
-        # Accepting SonarLint issue: No autoescaping is ok, since we are not using this for a website, so XSS is not applicable.
-        self.environment = Environment(  # NOSONAR # noqa: S701
-            extensions=JINJA2_EXTENSIONS,
-            loader=self.loader,
-            undefined=Undefined,
-            trim_blocks=True,
-        )
+        self.environment = Environment(extensions=JINJA2_EXTENSIONS, loader=self.loader, undefined=Undefined, trim_blocks=True, autoescape=True)
         # Backward-compatible compilation for Jinja 3.0.0 to 3.1.x
         if not hasattr(self.environment, "concat"):
             self.environment.concat = "".join
@@ -116,37 +116,30 @@ class Templar:
         return self.environment.get_template(template_file).render(template_vars)
 
     def compile_templates_in_paths(self, precompiled_templates_path: str | Path, searchpaths: list[str | Path]) -> None:
-        """
-        Compile the Jinja2 templates in the given path and preserve template names.
-
-        Parameters
-        ----------
-            searchpaths: The list of path to search templates in.
-        """
-        # Ensure the compiled templates directory exists
-        precompiled_templates_path = Path(precompiled_templates_path)
-        precompiled_templates_path.mkdir(parents=True, exist_ok=True)
-        searchpaths = [Path(path).resolve() for path in searchpaths]
         self.environment.loader = ExtensionFileSystemLoader(searchpaths)
+        target_path = Path(precompiled_templates_path)
+        target_path.mkdir(parents=True, exist_ok=True)
+        template_map = {}
 
-        for searchpath in searchpaths:
-            for template_path in searchpath.rglob("*.j2"):  # Recursively search for templates
-                # Get relative path to preserve subdirectory structure
-                relative_path = template_path.relative_to(searchpath)
-                compiled_filename = relative_path.with_suffix(".py")
+        for template_name in self.environment.list_templates():
+            source, _, _ = self.environment.loader.get_source(self.environment, template_name)
+            compiled_code = self.environment.compile(source, raw=True)
+            sanitized_name = re.sub(r"[./\\]+", "_", template_name.removesuffix(".j2"))
+            output_filename = f"tmpl_{sanitized_name}.py"
+            output_path = target_path / output_filename
+            output_path.write_text(compiled_code, encoding="utf-8")
+            module_name = output_filename.removesuffix(".py")
+            template_map[template_name] = module_name
 
-                # Ensure output directory exists
-                output_path = Path(precompiled_templates_path) / compiled_filename
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # Read and compile the template
-                template_source = template_path.read_text(encoding="utf-8")
-                compiled_code = self.environment.compile(template_source, raw=True)
-
-                # Write compiled template
-                output_path.write_bytes(compiled_code.encode("utf-8"))
-
-        # Reset loader if necessary
+        init_py_path = target_path / "__init__.py"
+        init_py_content = (
+            "try:\n"
+            "    from jinja2.loaders import ModuleLoaderMapping\n"
+            "except ImportError:\n"
+            "    ModuleLoaderMapping = dict\n\n"
+            f"_JINJA_LOADER = ModuleLoaderMapping({template_map!r})\n"
+        )
+        init_py_path.write_text(init_py_content, encoding="utf-8")
         self.environment.loader = self.loader
 
 
