@@ -660,8 +660,8 @@ jobs:
   # ----------------------------------- #
   # Test of pyavd
   # ----------------------------------- #
-  test-coverage:
-    name: Test (Python ${{ matrix.python }}, Suite ${{ matrix.suite.name }})
+  test-pytest:
+    name: Test pyavd (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     needs: [file-changes]
     if: |
@@ -670,7 +670,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install tox
+        run: pip install tox tox-gh-actions --upgrade
+      - name: Run Pytest via Tox
+        working-directory: python-avd
+        run: tox
+
+  test-coverage:
+    name: Test pyavd (Python ${{ matrix.python }}, Suite ${{ matrix.suite.name }})
+    runs-on: ubuntu-latest
+    needs: [file-changes]
+    if: |
+      needs.file-changes.outputs.eos_design == 'true' ||
+      needs.file-changes.outputs.config_gen == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11"]
         suite:
           - name: "Main-Tests"
             pytest_args: "--ignore=tests/pyavd/molecule_scenarios/test_get_device_config.py --ignore=tests/pyavd/molecule_scenarios/test_negative_eos_designs.py --ignore=tests/schema_tools/metaschema/test_meta_schema_model.py"
@@ -680,29 +703,17 @@ jobs:
             pytest_args: "tests/pyavd/molecule_scenarios/test_negative_eos_designs.py"
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-
       - name: Install tox
         run: pip install tox tox-gh-actions --upgrade
-
       - name: Run Pytest via Tox
         working-directory: python-avd
-        # Run with coverage only for Python 3.11, otherwise run standard tests.
-        run: |
-          if [ "${{ matrix.python }}" == "3.11" ]; then
-            tox -e coverage -- ${{ matrix.suite.pytest_args }}
-          else
-            tox -- ${{ matrix.suite.pytest_args }}
-          fi
-
-      # --- The following steps only run for Python 3.11 ---
+        run: tox -e coverage -- ${{ matrix.suite.pytest_args }}
 
       - name: Find and Move coverage file
-        if: matrix.python == '3.11'
         run: |
           coverage_file=$(find ./python-avd -maxdepth 1 -name ".coverage.*")
           if [ -z "$coverage_file" ]; then
@@ -713,21 +724,20 @@ jobs:
           mv "$coverage_file" "$new_name"
           
       - name: Upload coverage data
-        if: matrix.python == '3.11'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-${{ matrix.suite.name }}
           path: coverage-${{ matrix.suite.name }}.dat
 
       - name: Upload eos_designs compiled templates
-        if: matrix.python == '3.11' && matrix.suite.name == 'Main-Tests'
+        if: matrix.suite.name == 'Main-Tests'
         uses: actions/upload-artifact@v4
         with:
           name: eos-designs-compiled-templates
           path: python-avd/pyavd/_eos_designs/j2templates/compiled_templates/
 
       - name: Upload eos_cli_config_gen compiled templates
-        if: matrix.python == '3.11' && matrix.suite.name == 'Main-Tests'
+        if: matrix.suite.name == 'Main-Tests'
         uses: actions/upload-artifact@v4
         with:
           name: eos-cli-config-gen-compiled-templates
