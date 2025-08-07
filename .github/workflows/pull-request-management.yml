@@ -714,20 +714,11 @@ jobs:
         working-directory: python-avd
         run: |
           tox -e coverage -- ${{ matrix.suite.pytest_args }}
-      - name: Find and Move coverage file
-        run: |
-          coverage_file=$(find ./python-avd -maxdepth 1 -name ".coverage.*")
-          if [ -z "$coverage_file" ]; then
-            echo "::error::Coverage file not found in python-avd/!"
-            exit 1
-          fi
-          new_name="coverage-${{ matrix.suite.name }}.dat"
-          mv "$coverage_file" "$new_name"
-      - name: Upload coverage data
+      - name: Upload partial coverage data
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-${{ matrix.suite.name }}
-          path: coverage-${{ matrix.suite.name }}.dat
+          path: python-avd/.coverage.*
       - name: Upload eos_designs compiled templates from pytest
         if: matrix.suite.name == 'Main-Tests'
         uses: actions/upload-artifact@v4
@@ -753,20 +744,17 @@ jobs:
           python-version: '3.11'
       - name: Install Coverage
         run: pip install "coverage[toml]"
-      - name: Download all artifacts
+      - name: Download all partial coverage data
         uses: actions/download-artifact@v4
         with:
-          path: ./artifacts
+          path: python-avd/coverage-data
+          pattern: coverage-data-*
       - name: Combine and Report Coverage
         working-directory: python-avd
         run: |
           set -ex
-          find ../artifacts/coverage-data-*/ -type f -name "*.dat" -exec mv {} . \;
-          mkdir -p ./pyavd/_eos_designs/j2templates/compiled_templates/
-          mkdir -p ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
-          mv ../artifacts/pytest-eos-designs-compiled-templates/* ./pyavd/_eos_designs/j2templates/compiled_templates/
-          mv ../artifacts/pytest-eos-cli-config-gen-compiled-templates/* ./pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
-          coverage combine --rcfile=pyproject.toml coverage-*.dat
+          mv coverage-data/*/* .
+          coverage combine --rcfile=pyproject.toml
           coverage report --rcfile=pyproject.toml
           coverage xml --rcfile=pyproject.toml
       - name: Upload final coverage report
