@@ -714,6 +714,11 @@ jobs:
         working-directory: python-avd
         run: |
           tox -e coverage -- ${{ matrix.suite.pytest_args }}
+      - name: Check for coverage file after test run
+        working-directory: python-avd
+        run: |
+          echo "Listing contents of the working directory to find the coverage file:"
+          ls -la
       - name: Upload partial coverage data
         uses: actions/upload-artifact@v4
         with:
