@@ -99,6 +99,16 @@ $defs:
               name:
                 type: str
                 description: BGP peer group name.
+              password:
+                type: str
+                description: |-
+                  Type 7 encrypted password.
+                  Takes precedence over `cleartext_password`.
+              cleartext_password:
+                type: str
+                description: |-
+                  BGP peer group cleartext password.
+                  To protect the password at rest it is strongly recommended to make use of a vault or similar.
               nodes:
                 type: list
                 items:
@@ -186,6 +196,7 @@ $defs:
               type: str
               description: Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
               format: ipv4_pool
+            # TODO: make the default value of the offset 1
             underlay_l2_multicast_group_ipv4_pool_offset:
               type: int
               default: 0
@@ -202,6 +213,29 @@ $defs:
                 Configuring `redistribute igmp` when both L2 and L3 EVPN Multicast is enabled will take up additional control-plane and data-plane resources,
                 but it is required to support forwarding of TTL=1 multicast traffic within the VLAN.
                 This can be overridden per SVI.
+        vxlan_flood_multicast:
+          documentation_options:
+            table: network-services-multicast-settings
+          type: dict
+          keys:
+            enabled:
+              type: bool
+              required: true
+              description: |-
+                Enable Flood group Multicast for all SVIs and l2vlans within Tenant.
+            underlay_l2_multicast_group_ipv4_pool:
+              type: str
+              description: |-
+                IPv4 Pool to allocate vxlan flood groups from.
+                The VLAN ID - 1 + `underlay_l2_multicast_group_ipv4_pool_offset` is the offset for each group.
+                Comma separated list of prefixes (IPv4_address/Mask) or ranges (IPv4_address-IPv4_address).
+              format: ipv4_pool
+            # TODO: make the default value of the offset 1
+            underlay_l2_multicast_group_ipv4_pool_offset:
+              type: int
+              default: 0
+              convert_types:
+                - str
         evpn_l3_multicast:
           documentation_options:
             table: network-services-multicast-settings
@@ -267,8 +301,8 @@ $defs:
                   description: RP address.
               nodes:
                 description: |
-                 Restrict configuration to specific nodes.
-                 Configuration Will be applied to all nodes if not set.
+                  Restrict configuration to specific nodes.
+                  Configuration Will be applied to all nodes if not set.
                 type: list
                 items:
                   type: str
@@ -279,7 +313,7 @@ $defs:
                   description: Group_prefix/mask.
               access_list_name:
                 type: str
-                convert_types: [ int ]
+                convert_types: [int]
                 description: |
                   List of groups to associate with the RP address set in 'rp'.
                   If access_list_name is set, a standard access-list will be configured matching these groups.
@@ -318,7 +352,7 @@ $defs:
           type: list
           primary_key: name
           description: |
-            VRFs will only be configured on a node if any of the underlying objects like `svis` or `l3_interfaces` apply to the node.
+            VRFs will only be configured on a node if any of the underlying objects like `svis`, `l3_interfaces` or `l3_port_channels` apply to the node.
 
             It is recommended to only define a VRF in one Tenant. If the same VRF name is used across multiple tenants and those tenants
             are accepted by `filter.tenants` on the node, any object set under the duplicate VRFs must either be unique or be an exact match.
@@ -395,6 +429,13 @@ $defs:
                   The subnet used for the iBGP peering in the VRF is derived from this pool based on the ID of the first MLAG switch.
                   If not set, "mlag_peer_l3_ipv4_pool" or "mlag_peer_ipv4_pool" will be used.
                 format: ipv4_pool
+              mlag_ibgp_peering_ipv6_pool:
+                type: str
+                description: |-
+                  Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                  The subnet used for the iBGP peering in the VRF is derived from this pool based on the ID of the first MLAG switch.
+                  If not set, "mlag_peer_l3_ipv6_pool" or "mlag_peer_ipv6_pool" will be used.
+                format: ipv6_pool
               ip_helpers:
                 type: list
                 primary_key: ip_helper
@@ -452,7 +493,7 @@ $defs:
                     type: str
                     description: |-
                       Provide a custom description or description template to be used on the VRF diagnostic loopback interface.
-                      This can be a template using the AVD string formatter syntax: https://avd.arista.com/devel/roles/eos_designs/docs/how-to/custom-descriptions-names.html#avd-string-formatter-syntax.
+                      This can be a template using the AVD string formatter syntax: https://avd.arista.com/stable/ansible_collections/arista/avd/roles/eos_designs/docs/how-to/custom-descriptions-names.html#avd-string-formatter-syntax.
                       The available template fields are:
                         - `interface`: The Loopback interface name.
                         - `vrf`: The VRF name.
@@ -493,6 +534,10 @@ $defs:
                           type: str
                           description: Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
                           format: ipv6_pool
+                  hardware_forwarding:
+                    type: bool
+                    description: |
+                      Enable hardware forwarding for diagnostic loopbacks. This is required for correct forwarding in VRFs without physical interfaces.
               ospf:
                 documentation_options:
                   table: network-services-vrfs-ospf-settings
@@ -544,11 +589,66 @@ $defs:
                       route_map:
                         type: str
                         description: Route-map name.
+                  authentication:
+                    type: str
+                    valid_values:
+                      - simple
+                      - message-digest
+                    description: |-
+                      Configure OSPF authentication for all interfaces under the VRF.
+                      Can be overridden at the interface level under `l3_interfaces`, `l3_port_channels` or `svis`.
+                  cleartext_simple_auth_key:
+                    type: str
+                    description: |-
+                      Cleartext password used with simple authentication.
+                      To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                      Configuration at the interface level under `l3_interfaces`, `l3_port_channels` or `svis` takes precedence.
+                    min_length: 1
+                    max_length: 8
+                  message_digest_keys:
+                    type: list
+                    primary_key: id
+                    min_length: 1
+                    max_length: 2
+                    items:
+                      type: dict
+                      keys:
+                        id:
+                          type: int
+                          convert_types:
+                            - str
+                        hash_algorithm:
+                          type: str
+                          valid_values:
+                            - md5
+                            - sha1
+                            - sha256
+                            - sha384
+                            - sha512
+                          default: sha512
+                        cleartext_key:
+                          type: str
+                          required: true
+                          convert_types:
+                            - int
+                          description: |-
+                            Cleartext key for OSPF message-digest authentication
+                            To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                            Configuration at the interface level under `l3_interfaces`, `l3_port_channels` or `svis` takes precedence.
+                          min_length: 1
+                          max_length: 16
                   nodes:
                     type: list
                     items:
                       type: str
                       description: Hostname.
+                  structured_config:
+                    type: dict
+                    relaxed_validation: true
+                    description: Custom structured config added under router_ospf.process_ids.[process_id=<process_id>] for eos_cli_config_gen.
+                    documentation_options:
+                      hide_keys: true
+                    $ref: "eos_cli_config_gen#/keys/router_ospf/keys/process_ids/items"
               redistribute_ospf:
                 documentation_options:
                   table: network-services-vrfs-ospf-settings
@@ -617,7 +717,7 @@ $defs:
                         description: Group_prefix/mask.
                     access_list_name:
                       type: str
-                      convert_types: [ int ]
+                      convert_types: [int]
                       description: |
                         List of groups to associate with the RP addresses set in 'rps'.
                         If access_list_name is set, a standard access-list will be configured matching these groups.
@@ -724,6 +824,15 @@ $defs:
                       items:
                         type: str
                         description: IPv4_address/Mask.
+                    static_routes:
+                      type: list
+                      $ref: "eos_designs#/$defs/static_routes"
+                      description: Static routes to be configured on every device where this interface is configured.
+                    ipv6_static_routes:
+                      type: list
+                      # Reusing the schema from `static_routes` since IPv4 and IPv6 static routes share the same keys.
+                      $ref: "eos_designs#/$defs/static_routes"
+                      description: IPv6 static routes to be configured on every device where this interface is configured.
                     nodes:
                       type: list
                       items:
@@ -779,9 +888,21 @@ $defs:
                             - message-digest
                         simple_auth_key:
                           type: str
-                          description: Password used with simple authentication.
+                          description: |-
+                            Type 7 encrypted key for OSPF simple authentication.
+                            Takes precedence over `cleartext_simple_auth_key`.
+                            NOTE: The l3_interfaces.interfaces list must not be more than 1 interface or they must all be the same
+                            (e.g. [Ethernet7, Ethernet7]) as the type7 password depends on the interface.
+                        cleartext_simple_auth_key:
+                          type: str
+                          description: |-
+                            Cleartext key for OSPF simple authentication.
+                            To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                          min_length: 1
+                          max_length: 8
                         message_digest_keys:
                           type: list
+                          # TODO: AVD 6.0.0: Make id primary_key and key required.
                           items:
                             type: dict
                             keys:
@@ -800,7 +921,18 @@ $defs:
                                 default: sha512
                               key:
                                 type: str
-                                description: Key password.
+                                description: |-
+                                  Type 7 encrypted key for OSPF message-digest authentication.
+                                  Takes precedence over `cleartext_key`
+                                  NOTE: The l3_interfaces.interfaces list must not be more than 1 interface or they must all be the same
+                                  (e.g. [Ethernet7, Ethernet7]) as the type7 password depends on the interface.
+                              cleartext_key:
+                                type: str
+                                description: |-
+                                  Cleartext key for OSPF message-digest authentication
+                                  To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                                min_length: 1
+                                max_length: 16
                     pim:
                       type: dict
                       description: |
@@ -815,6 +947,9 @@ $defs:
                       $ref: "eos_designs#/$defs/flow_tracking_link"
                       description: |-
                         Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
+                    campus_link_type:
+                      type: list
+                      $ref: "eos_designs#/$defs/campus_link_type"
                     structured_config:
                       type: dict
                       relaxed_validation: true
@@ -826,6 +961,220 @@ $defs:
                       type: str
                       description: |
                         EOS CLI rendered directly on the Ethernet interface in the final EOS configuration.
+              l3_port_channels:
+                documentation_options:
+                  table: network-services-vrfs-l3-port-channel-settings
+                type: list
+                description: |
+                  List of L3 Port-Channels.
+                  This will create IP routed Port-Channels inside the VRF.
+                items:
+                  type: dict
+                  keys:
+                    name:
+                      type: str
+                      required: true
+                      description: |-
+                        Port-Channel interface name like 'Port-Channel2' or subinterface name like 'Port-Channel2.42'.
+                        For a Port-Channel subinterface, the parent Port-Channel interface must be defined as well.
+                      pattern: "Port-Channel[\\d/]+(\\.[\\d]+)?"
+                    node:
+                      type: str
+                      required: true
+                      description: Node.
+                    description:
+                      type: str
+                      description: |-
+                        Interface description.
+                        If not set, a default description will be configured with '[<peer>[ <peer_port_channel>]]'.
+                    mode:
+                      type: str
+                      description: |-
+                        Port-Channel mode.
+                        Should not be set on Port-Channel subinterfaces.
+                      valid_values:
+                        - "active"
+                        - "passive"
+                        - "on"
+                      default: "active"
+                    member_interfaces:
+                      description: |-
+                        Port-Channel member interfaces.
+                        Should not be set on Port-Channel subinterfaces.
+                      type: list
+                      primary_key: name
+                      items:
+                        type: dict
+                        keys:
+                          name:
+                            type: str
+                            required: true
+                            description: |-
+                              Ethernet interface name like 'Ethernet2'.
+                              Member interface cannot be subinterface.
+                            pattern: "Ethernet[\\d/]+"
+                          description:
+                            type: str
+                            description: |-
+                              Interface description for this member.
+                              If not set, a default description will be configured with '[<peer>[ <peer_interface>]]'.
+                          peer:
+                            type: str
+                            description: |-
+                              The peer device name. Used for description and documentation.
+                              If not set, this inherits the peer setting on the port-channel interface.
+                          peer_interface:
+                            type: str
+                            description: |-
+                              The peer device interface. Used for description and documentation.
+                          speed:
+                            type: str
+                            description: |-
+                              Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`.
+                          structured_config:
+                            type: dict
+                            relaxed_validation: true
+                            documentation_options:
+                              hide_keys: true
+                            description: |-
+                              Custom structured config for the member ethernet interface.
+                            $ref: "eos_cli_config_gen#/keys/ethernet_interfaces/items"
+                    ip_address:
+                      type: str
+                      description: IPv4 address/Mask.
+                    encapsulation_dot1q_vlan:
+                      description: For subinterfaces the dot1q vlan is derived from the interface name by default, but can also be specified.
+                      type: int
+                      convert_types:
+                        - str
+                      min: 1
+                      max: 4094
+                    enabled:
+                      type: bool
+                      default: true
+                      description: Enable or Shutdown the interface.
+                    peer:
+                      type: str
+                      description: |-
+                        The peer device name. Used for description and documentation.
+                    peer_port_channel:
+                      type: str
+                      description: |-
+                        The peer device port-channel interface. Used for description and documentation.
+                    mtu:
+                      type: int
+                      convert_types:
+                        - str
+                      description: MTU can only be set on the parent Port-Channel.
+                    ipv4_acl_in:
+                      description: |-
+                        Name of the IPv4 access-list to be assigned in the ingress direction.
+                      type: str
+                      convert_types:
+                        - int
+                    ipv4_acl_out:
+                      description: |-
+                        Name of the IPv4 Access-list to be assigned in the egress direction.
+                      type: str
+                      convert_types:
+                        - int
+                    static_routes:
+                      type: list
+                      description: Static routes to be configured on the device where this Port-channel interface is configured.
+                      $ref: "eos_designs#/$defs/static_routes"
+                    ipv6_static_routes:
+                      type: list
+                      # Reusing the schema from `static_routes` since IPv4 and IPv6 static routes share the same keys.
+                      $ref: "eos_designs#/$defs/static_routes"
+                      description: IPv6 static routes to be configured on the device where this Port-channel interface is configured.
+                    ospf:
+                      type: dict
+                      description: OSPF interface configuration.
+                      keys:
+                        enabled:
+                          type: bool
+                        point_to_point:
+                          type: bool
+                          default: false
+                        area:
+                          type: str
+                          convert_types:
+                            - int
+                          description: OSPF area ID.
+                          default: "0.0.0.0"
+                        cost:
+                          type: int
+                          convert_types:
+                            - str
+                          description: OSPF link cost.
+                        authentication:
+                          type: str
+                          valid_values:
+                            - simple
+                            - message-digest
+                        simple_auth_key:
+                          type: str
+                          description: |-
+                            Type 7 encrypted key for OSPF simple authentication.
+                            Takes precedence over `cleartext_simple_auth_key`
+                            NOTE: The l3_interfaces.interfaces list must not be more than 1 interface or they must all be the same
+                            (e.g. [Ethernet7, Ethernet7]) as the type7 password depends on the interface.
+                        cleartext_simple_auth_key:
+                          type: str
+                          description: |-
+                            Cleartext key for OSPF simple authentication.
+                            To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                          min_length: 1
+                          max_length: 8
+                        message_digest_keys:
+                          type: list
+                          # TODO: AVD 6.0.0: Make id primary_key and key required.
+                          items:
+                            type: dict
+                            keys:
+                              id:
+                                type: int
+                                convert_types:
+                                  - str
+                              hash_algorithm:
+                                type: str
+                                valid_values:
+                                  - md5
+                                  - sha1
+                                  - sha256
+                                  - sha384
+                                  - sha512
+                                default: sha512
+                              key:
+                                type: str
+                                description: |-
+                                  Type 7 encrypted key for OSPF message-digest authentication.
+                                  Takes precedence over `cleartext_key`
+                                  NOTE: The l3_interfaces.interfaces list must not be more than 1 interface or they must all be the same
+                                  (e.g. [Ethernet7, Ethernet7]) as the type7 password depends on the interface.
+                              cleartext_key:
+                                type: str
+                                description: |-
+                                  Cleartext key for OSPF message-digest authentication
+                                  To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                                min_length: 1
+                                max_length: 16
+                    flow_tracking:
+                      type: dict
+                      $ref: "eos_designs#/$defs/flow_tracking_link"
+                      description: |-
+                        Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_port_channels` setting.
+                    structured_config:
+                      type: dict
+                      relaxed_validation: true
+                      description: Custom structured config added under port_channel_interfaces.[name=<interface>] for eos_cli_config_gen.
+                      documentation_options:
+                        hide_keys: true
+                      $ref: "eos_cli_config_gen#/keys/port_channel_interfaces/items"
+                    raw_eos_cli:
+                      type: str
+                      description: |
+                        EOS CLI rendered directly on the Port-Channel interface in the final EOS configuration.
               loopbacks:
                 documentation_options:
                   table: network-services-vrfs-loopbacks-settings
@@ -865,12 +1214,17 @@ $defs:
                             - int
                           description: OSPF area ID.
                           default: "0.0.0.0"
+                    hardware_forwarding:
+                      type: bool
+                      description: |
+                        Enable hardware forwarding for this loopback. This is required for correct forwarding in VRFs without physical interfaces.
                     raw_eos_cli:
                       type: str
                       description: |
                         EOS CLI rendered directly on the Loopback interface in the final EOS configuration.
               static_routes:
                 type: list
+                $ref: "eos_designs#/$defs/static_routes"
                 description: |
                   List of static routes for v4 and/or v6.
                   This will create static routes inside the tenant VRF.
@@ -883,75 +1237,40 @@ $defs:
                     destination_address_prefix:
                       type: str
                       description: IPv4_address.
+                      deprecation:
+                        warning: true
+                        remove_in_version: 6.0.0
+                        new_key: prefix
                     gateway:
                       type: str
                       description: IPv4_address.
-                    track_bfd:
-                      type: bool
-                      description: Track next-hop using BFD.
-                    distance:
-                      type: int
-                      convert_types:
-                        - str
-                      min: 1
-                      max: 255
-                    tag:
-                      type: int
-                      convert_types:
-                        - str
-                      min: 0
-                      max: 4294967295
-                    name:
-                      type: str
-                      description: description.
-                    metric:
-                      type: int
-                      convert_types:
-                        - str
-                      min: 0
-                      max: 4294967295
-                    interface:
-                      type: str
+                      deprecation:
+                        warning: true
+                        remove_in_version: 6.0.0
+                        new_key: next_hop
                     nodes:
                       type: list
                       items:
                         type: str
               ipv6_static_routes:
                 type: list
+                $ref: "eos_designs#/$defs/static_routes"
                 items:
                   type: dict
                   keys:
                     destination_address_prefix:
                       type: str
                       description: IPv6_address.
+                      deprecation:
+                        warning: true
+                        remove_in_version: 6.0.0
+                        new_key: prefix
                     gateway:
                       type: str
-                    track_bfd:
-                      type: bool
-                      description: Track next-hop using BFD.
-                    distance:
-                      type: int
-                      convert_types:
-                        - str
-                      min: 1
-                      max: 255
-                    tag:
-                      type: int
-                      convert_types:
-                        - str
-                      min: 0
-                      max: 4294967295
-                    name:
-                      type: str
-                      description: description.
-                    metric:
-                      type: int
-                      convert_types:
-                        - str
-                      min: 0
-                      max: 4294967295
-                    interface:
-                      type: str
+                      deprecation:
+                        warning: true
+                        remove_in_version: 6.0.0
+                        new_key: next_hop
                     nodes:
                       type: list
                       items:
@@ -995,7 +1314,14 @@ $defs:
                       type: str
                     password:
                       type: str
-                      description: Encrypted password.
+                      description: |-
+                        Type 7 encrypted password.
+                        Takes precedence over `cleartext_password`.
+                    cleartext_password:
+                      type: str
+                      description: |-
+                        BGP peer group cleartext password.
+                        To protect the password at rest it is strongly recommended to make use of a vault or similar.
                     send_community:
                       type: str
                       description: |
@@ -1076,6 +1402,9 @@ $defs:
                       max: 65535
                     bfd:
                       type: bool
+                    bfd_timers:
+                      type: dict
+                      $ref: "eos_cli_config_gen#/keys/router_bgp/keys/vrfs/items/keys/neighbors/items/keys/bfd_timers"
                     shutdown:
                       type: bool
               bgp:
@@ -1133,6 +1462,16 @@ $defs:
                       description: |
                         Nodes is required to restrict configuration of BGP neighbors to certain nodes in the network.
                         If not set the peer-group is created on devices which have a bgp_peer mapped to the corresponding peer_group.
+                    password:
+                      type: str
+                      description: |-
+                        Type 7 encrypted password.
+                        Takes precedence over `cleartext_password`.
+                    cleartext_password:
+                      type: str
+                      description: |-
+                        BGP peer group cleartext password.
+                        To protect the password at rest it is strongly recommended to make use of a vault or similar.
                     address_family_ipv4:
                       type: dict
                       keys:
@@ -1285,7 +1624,7 @@ $defs:
                   Tags leveraged for networks services filtering.
                   Tags are matched against filter.tags defined under node type settings.
                   Tags are also matched against the node_group name under node type settings.
-                default: ['all']
+                default: ["all"]
                 items:
                   type: str
                   default: all
@@ -1329,6 +1668,18 @@ $defs:
                 keys:
                   enabled:
                     type: bool
+              vxlan_flood_multicast:
+                documentation_options:
+                  table: network-services-multicast-settings
+                type: dict
+                keys:
+                  enabled:
+                    type: bool
+                    description: |-
+                      Explicitly enable or disable vxlan_flood_multicast to override setting of `<network_services_key>.[].vxlan_flood_multicast.enabled`.
+                  underlay_multicast_group:
+                    description: Specific multicast group to use for this VLAN.
+                    type: str
               igmp_snooping_enabled:
                 documentation_options:
                   table: network-services-multicast-settings
@@ -1379,6 +1730,16 @@ $defs:
                     description: |
                       EOS cli commands rendered on router_bgp.vlans.
                       This configuration will not be applied to vlan aware bundles.
+              private_vlan:
+                type: dict
+                $ref: eos_cli_config_gen#/keys/vlans/items/keys/private_vlan
+                keys:
+                  type:
+                    type: str
+                    required: true
+                  primary_vlan:
+                    type: int
+                    required: true
         point_to_point_services:
           documentation_options:
             table: network-services-point-to-point-services-settings
@@ -1411,6 +1772,34 @@ $defs:
                       description: Subinterface number.
                       convert_types:
                         - str
+                    port_channel:
+                      type: dict
+                      description: Settings to be applied to the Port-Channel subinterface.
+                      keys:
+                        structured_config:
+                          type: dict
+                          relaxed_validation: true
+                          description: |
+                            Custom structured config added on the Port-Channel subinterface for eos_cli_config_gen.
+                          documentation_options:
+                            hide_keys: true
+                          $ref: "eos_cli_config_gen#/keys/port_channel_interfaces/items"
+                        raw_eos_cli:
+                          type: str
+                          description: |
+                            EOS cli commands rendered on the Port-Channel subinterface.
+                    structured_config:
+                      type: dict
+                      relaxed_validation: true
+                      description: |
+                        Custom structured config added on the Ethernet subinterface for eos_cli_config_gen.
+                      documentation_options:
+                        hide_keys: true
+                      $ref: "eos_cli_config_gen#/keys/ethernet_interfaces/items"
+                    raw_eos_cli:
+                      type: str
+                      description: |
+                        EOS cli commands rendered on the Ethernet subinterface.
               endpoints:
                 type: list
                 description: Pseudowire terminating endpoints. Must have exactly two items.

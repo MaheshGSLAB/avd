@@ -487,6 +487,13 @@ interface {{ port_channel_interface.name }}
    ip nat service-profile {{ port_channel_interface.ip_nat.service_profile }}
 {%         endif %}
 {%     endif %}
+{%     if port_channel_interface.ntp_serve is arista.avd.defined %}
+{%         if port_channel_interface.ntp_serve %}
+   ntp serve
+{%         else %}
+   no ntp serve
+{%         endif %}
+{%     endif %}
 {%     if port_channel_interface.ospf_cost is arista.avd.defined %}
    ip ospf cost {{ port_channel_interface.ospf_cost }}
 {%     endif %}
@@ -529,6 +536,9 @@ interface {{ port_channel_interface.name }}
 {%     endif %}
 {%     if port_channel_interface.pim.ipv4.dr_priority is arista.avd.defined %}
    pim ipv4 dr-priority {{ port_channel_interface.pim.ipv4.dr_priority }}
+{%     endif %}
+{%     if port_channel_interface.pim.ipv4.neighbor_filter is arista.avd.defined %}
+   pim ipv4 neighbor filter {{ port_channel_interface.pim.ipv4.neighbor_filter }}
 {%     endif %}
 {%     if port_channel_interface.pim.ipv4.bfd is arista.avd.defined(true) %}
    pim ipv4 bfd
@@ -946,6 +956,9 @@ interface {{ port_channel_interface.name }}
 {%     if port_channel_interface.traffic_engineering.administrative_groups is arista.avd.defined %}
    traffic-engineering administrative-group {{ port_channel_interface.traffic_engineering.administrative_groups | join(",") }}
 {%     endif %}
+{%     for srlg in port_channel_interface.traffic_engineering.srlgs | arista.avd.natural_sort %}
+   traffic-engineering srlg {{ srlg }}
+{%     endfor %}
 {%     if port_channel_interface.traffic_engineering.srlg is arista.avd.defined %}
    traffic-engineering srlg {{ port_channel_interface.traffic_engineering.srlg }}
 {%     endif %}

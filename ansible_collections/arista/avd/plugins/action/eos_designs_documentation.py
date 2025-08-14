@@ -1,24 +1,34 @@
 # Copyright (c) 2023-2025 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
+from __future__ import annotations
+
 import json
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+import yaml
 from ansible.errors import AnsibleActionFail
+from ansible.parsing.yaml.dumper import AnsibleDumper
 from ansible.plugins.action import ActionBase, display
-from yaml import load
 
+from ansible_collections.arista.avd.plugins.plugin_utils.pyavd_wrappers import RaiseOnUse
 from ansible_collections.arista.avd.plugins.plugin_utils.utils import PythonToAnsibleHandler, YamlLoader, write_file
 
+PLUGIN_NAME = "arista.avd.eos_designs_documentation"
 try:
+    from pyavd._eos_designs.eos_designs_facts.schema import EosDesignsFacts
     from pyavd._utils import get, strip_empties_from_dict
     from pyavd.get_fabric_documentation import get_fabric_documentation
-
-    HAS_PYAVD = True
-except ImportError:
-    HAS_PYAVD = False
+except ImportError as e:
+    EosDesignsFacts = get = strip_empties_from_dict = get_fabric_documentation = RaiseOnUse(
+        AnsibleActionFail(
+            f"The '{PLUGIN_NAME}' plugin requires the 'pyavd' Python library. Got import error",
+            orig_exc=e,
+        ),
+    )
 
 
 LOGGER = logging.getLogger("ansible_collections.arista.avd")
@@ -36,11 +46,13 @@ ARGUMENT_SPEC = {
     "p2p_links_csv_file": {"type": "str", "required": True},
     "p2p_links_csv": {"type": "bool", "default": False},
     "toc": {"type": "bool", "default": True},
+    "digital_twin_file": {"type": "str", "default": "DIGITAL-TWIN-TOPOLOGY.yml"},
+    "digital_twin": {"type": "bool", "default": False},
 }
 
 
 class ActionModule(ActionBase):
-    def run(self, tmp: Any = None, task_vars: dict | None = None) -> None:
+    def run(self, tmp: Any = None, task_vars: dict | None = None) -> dict:
         self._supports_check_mode = False
 
         if task_vars is None:
@@ -48,10 +60,6 @@ class ActionModule(ActionBase):
 
         result = super().run(tmp, task_vars)
         del tmp  # tmp no longer has any effect
-
-        if not HAS_PYAVD:
-            msg = "The arista.avd.eos_designs_documentation' plugin requires the 'pyavd' Python library. Got import error"
-            raise AnsibleActionFail(msg)
 
         # Setup module logging
         setup_module_logging(result)
@@ -66,8 +74,11 @@ class ActionModule(ActionBase):
         return self.main(validated_args, task_vars, result)
 
     def main(self, validated_args: dict, task_vars: dict, result: dict) -> dict:
-        avd_switch_facts: dict = get(task_vars, "avd_switch_facts", required=True)
+        avd_switch_facts: dict[str, dict] = get(task_vars, "avd_switch_facts", required=True)
         device_list = list(avd_switch_facts.keys())
+
+        # Create dict of all facts.
+        all_facts = {host: EosDesignsFacts._from_dict(facts_as_dict) for host, facts_as_dict in avd_switch_facts.items()}
 
         structured_configs = self.read_structured_configs(
             device_list=device_list,
@@ -76,7 +87,7 @@ class ActionModule(ActionBase):
         )
         fabric_name = get(task_vars, "fabric_name", required=True)
         output = get_fabric_documentation(
-            {"avd_switch_facts": avd_switch_facts},
+            avd_facts=all_facts,
             structured_configs=structured_configs,
             fabric_name=fabric_name,
             fabric_documentation=validated_args["fabric_documentation"],
@@ -84,6 +95,7 @@ class ActionModule(ActionBase):
             topology_csv=validated_args["topology_csv"],
             p2p_links_csv=validated_args["p2p_links_csv"],
             toc=validated_args["toc"],
+            digital_twin=validated_args["digital_twin"],
         )
         if output.fabric_documentation:
             result["changed"] = write_file(
@@ -103,6 +115,17 @@ class ActionModule(ActionBase):
             changed = write_file(
                 content=output.p2p_links_csv,
                 filename=validated_args["p2p_links_csv_file"],
+                file_mode=validated_args["mode"],
+            )
+            result["changed"] = result.get("changed") or changed
+
+        if output.digital_twin:
+            content = strip_empties_from_dict(
+                {str(key).replace("_", "-"): list(value) if isinstance(value, tuple) else value for key, value in asdict(output.digital_twin).items()}
+            )
+            changed = write_file(
+                content=yaml.dump(content, Dumper=AnsibleDumper, sort_keys=False, indent=2, width=130),
+                filename=validated_args["digital_twin_file"],
                 file_mode=validated_args["mode"],
             )
             result["changed"] = result.get("changed") or changed
@@ -129,7 +152,7 @@ class ActionModule(ActionBase):
 
         with path.open(encoding="UTF-8") as stream:
             if structured_config_suffix in ["yml", "yaml"]:
-                return load(stream, Loader=YamlLoader)  # noqa: S506
+                return yaml.load(stream, Loader=YamlLoader)  # noqa: S506
 
             # JSON
             return json.load(stream)

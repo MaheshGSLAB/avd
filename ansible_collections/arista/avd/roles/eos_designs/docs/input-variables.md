@@ -134,6 +134,10 @@ ansible_collections/arista/avd/roles/eos_designs/docs/tables/fabric-ip-addressin
 
 Fabric Numbering controls how various numbers are derived across the fabric.
 
+--8<--
+ansible_collections/arista/avd/roles/eos_designs/docs/tables/fabric-numbering.md
+--8<--
+
 ### Node ID Algorithm
 
 IDs will be automatically assigned according to the configured algorithm.
@@ -149,10 +153,6 @@ IDs will be automatically assigned according to the configured algorithm.
 
     The pool manager will not change IDs if they are already set under the node settings,
     so it is possible to enable the pool manager on an existing inventory without changes.
-
---8<--
-roles/eos_designs/docs/tables/fabric-numbering.md
---8<--
 
 #### Details on `pool_manager` for Node IDs
 
@@ -200,8 +200,8 @@ To customize or create new node types, please refer to [node type customization]
 | l2spine            | ✘               | port-channel | none      | ✘           | ✅                  | ✘                   | ✘    | ✅           | ✅                  | ✘        | ✘                         | ✘                        | |
 | super_spine        | ✅              | p2p          | none      | ✘           | ✘                   | ✘                   | ✘    | ✘            | ✘                   | ✘        | eBGP                      | eBGP                     | |
 | overlay_controller | ✅              | p2p          | server    | ✘           | ✘                   | ✘                   | ✘    | ✘            | ✘                   | ✘        | eBGP                      | eBGP                     | |
-| wan_rr             | ✅              | p2p          | server    | ✘           | ✘                   | ✅                  | ✅   | ✘            | ✘                   | server   | none                      | iBGP                     | AutoVPN RR or Pathfinder depending on the e` value. |
-| wan_router         | ✅              | p2p          | client    | ✘           | ✘                   | ✅                  | ✅   | ✘            | ✘                   | client   | none                      | iBGP                     | Edge routers for AutoVPN or Edge and Transit routers for CV Pathfindeing on the `wan_mode` value. |
+| wan_rr             | ✅              | p2p          | server    | ✘           | ✘                   | ✅                  | ✅   | ✘            | ✘                   | server   | none                      | iBGP                     | AutoVPN RR or Pathfinder depending on the `wan_mode` value. |
+| wan_router         | ✅              | p2p          | client    | ✘           | ✘                   | ✅                  | ✅   | ✘            | ✘                   | client   | none                      | iBGP                     | Edge routers for AutoVPN or Edge and Transit routers for CV Pathfinder on the `wan_mode` value. |
 | p                  | ✅              | p2p          | none      | none, LSR   | ✘                   | ✘                   | ✘    | ✘            | ✘                   | ✘        | ISIS-SR                   | iBGP                     | |
 | rr                 | ✅              | p2p          | server    | server, LSR | ✘                   | ✘                   | ✘    | ✘            | ✘                   | ✘        | ISIS-SR                   | iBGP                     | EVPN with MPLS encapsulation |
 | pe                 | ✅              | p2p          | client    | client, LSR | ✅                  | ✅                  | ✘    | ✘            | ✅                  | ✘        | ISIS-SR                   | iBGP                     | EVPN with MPLS encapsulation, L1 Network Services (PW) |
@@ -477,7 +477,7 @@ underlay_ethernet_interfaces:
 
 - `{{ link.peer }}`
 - `{{ link.peer_interface }}`
-- `{{ link.type }} (underlay_p2p or underlay_l2)`
+- `{{ link.type }} (underlay_p2p, underlay_l2, l3_edge or core_interfaces)`
 - All group/hostvars
 
 underlay_port_channel_interfaces:
@@ -486,6 +486,8 @@ underlay_port_channel_interfaces:
 - `{{ link.channel_group_id }}`
 - `{{ link.peer }}`
 - `{{ link.peer_channel_group_id }}`
+- `{{ link.wan_carrier }}` for `l3_port_channels` defined under the node config.
+- `{{ link.main_interface_wan_carrier }}` for `l3_port_channels` subintefaces defined under the node config.
 - All group/hostvars
 
 mlag_ethernet_interfaces:
@@ -511,6 +513,7 @@ connected_endpoints_ethernet_interfaces:
 connected_endpoints_port_channel_interfaces:
 
 - `{{ peer }}`
+- `{{ peer_interface }}`
 - `{{ adapter_port_channel_id }}`
 - `{{ adapter_port_channel_description }}`
 - `{{ adapter_description }}`
@@ -1467,6 +1470,12 @@ ansible_collections/arista/avd/roles/eos_designs/docs/tables/network-services-vr
 ansible_collections/arista/avd/roles/eos_designs/docs/tables/network-services-vrfs-l3-interfaces-settings.md
 --8<--
 
+#### Network services VRF L3 Port-Channels configuration
+
+--8<--
+ansible_collections/arista/avd/roles/eos_designs/docs/tables/network-services-vrfs-l3-port-channel-settings.md
+--8<--
+
 #### Network services VRF Loopbacks configuration
 
 Loopbacks are usually configured with `vtep_diagnostic` which supports IP pools etc.
@@ -1649,4 +1658,104 @@ This feature currently provides the following configurations based on the given 
 
 --8<--
 ansible_collections/arista/avd/roles/eos_designs/docs/tables/cv-topology.md
+--8<--
+
+## PREVIEW - Digital Twin settings
+
+!!! note
+    To easily switch between production mode and digital twin mode, it is recommended to create a dedicated playbook where `avd_digital_twin_mode: true` is set in the playbook vars.
+
+    By default, Digital Twin artifacts (such as the topology file, adjusted structured and EOS configuration, device and fabric documentation)
+    will replace original fabric artifacts.
+
+    To keep Digital Twin artifacts separate, adjust the `output_dir_name` and `documentation_dir_name` variables for both `eos_designs`
+    and `eos_cli_config_gen` to point to a dedicated output location.
+
+AVD Digital Twin functionality natively generates all artifacts required to deploy a virtual replica of a production AVD fabric.
+The generated artifacts are automatically optimized for the specific Digital Twin environment. For example, an EOS configuration generated for an ACT environment will automatically remove or adjust any unsupported features.
+
+AVD currently supports the following Digital Twin environments:
+
+- ACT (Arista Cloud Test)
+
+To generate the ACT Digital Twin artifacts, run the `eos_designs` and `eos_cli_config_gen` roles with the `avd_digital_twin_mode`  flag set to `true` in your Ansible playbook:
+
+```yaml
+---
+
+# Production playbook to generate production fabric artifacts
+- name: Build Configurations and Documentation
+  hosts: FABRIC
+  gather_facts: false
+  tasks:
+
+    - name: Generate AVD Structured Configurations and Fabric Documentation
+      ansible.builtin.import_role:
+        name: arista.avd.eos_designs
+
+    - name: Generate Device Configurations and Documentation
+      ansible.builtin.import_role:
+        name: arista.avd.eos_cli_config_gen
+
+# Digital Twin playbook to generate Digital Twin mode artifacts
+- name: Build Configurations and Documentation
+  hosts: FABRIC
+  gather_facts: false
+  vars:
+    # Adjust the output dirs to keep Digital Twin artifacts in a separate directory
+    output_dir_name: "digital_twin/intended"
+    documentation_dir_name: "digital_twin/documentation"
+    # Set this flag to True to enable Digital Twin mode
+    avd_digital_twin_mode: true
+  tasks:
+
+    - name: Generate AVD Structured Configurations and Fabric Documentation
+      ansible.builtin.import_role:
+        name: arista.avd.eos_designs
+
+    - name: Generate Device Configurations and Documentation
+      ansible.builtin.import_role:
+        name: arista.avd.eos_cli_config_gen
+
+```
+
+Produced artifacts:
+
+```text
+.
+├── digital_twin
+│   ├── documentation
+│   │   ├── devices
+│   │   │   ├── <DEVICE_NAME>.md
+│   │   │   └── ...
+│   │   └── fabric
+│   │       ├── <FABRIC_NAME>-documentation.md
+│   │       ├── <FABRIC_NAME>-p2p-links.csv
+│   │       ├── <FABRIC_NAME>-topology.csv
+│   │       └── <FABRIC_NAME>-topology.yml
+│   └── intended
+│       ├── configs
+│       │   ├── <DEVICE_NAME>.cfg
+│       │   └── ...
+│       └── structured_configs
+│           ├── <DEVICE_NAME>.yml
+│           └── ...
+```
+
+If not specified otherwise, AVD uses the following default values when generating ACT Digital Twin artifacts:
+
+| Attribute | Description | Default value | Source of information |
+| --------- | ----------- | ------------- | --------------------- |
+| act_os_version | OS version of the replica device | `cloudeos`: `4.33.2F`<br>`cvp`: `2024.3.2`<br>`generic`: `ubuntu-2204-lts`<br>`third-party`: `byod`<br>`tools-server`: `ubuntu-2204-lts`<br>`veos`: `4.33.1.1F` | `node_config.digital_twin.act_os_version` or `digital_twin.fabric.act_os_version` |
+| act_username | username of the default account deployed on the replica device | `admin` | `digital_twin.fabric.act_username` |
+| act_password | password of the default account deployed on the replica device | `admin` | `digital_twin.fabric.act_password` |
+
+--8<--
+ansible_collections/arista/avd/roles/eos_designs/docs/tables/digital-twin-configuration.md
+--8<--
+
+### Node type Digital Twin configuration
+
+--8<--
+ansible_collections/arista/avd/roles/eos_designs/docs/tables/node-type-digital-twin-configuration.md
 --8<--

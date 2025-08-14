@@ -55,8 +55,23 @@ class AvdInterfaceDescriptions(AvdFacts):
             - type
             - vrf
             - wan_carrier
-            - wan_circuit_id.
+            - wan_circuit_id
+            - main_interface_wan_carrier
         """
+        # This is historic behavior for these two modules where the defined description
+        # should take precedence over anything. This was broken from AVD 5.0 to 5.3
+        if data.link_type in ["core_interface", "l3_edge"] and data.description is not None:
+            return AvdStringFormatter().format(
+                data.description,
+                **strip_null_from_data(
+                    {
+                        "peer": data.peer,
+                        "peer_interface": data.peer_interface,
+                        "vrf": data.vrf,
+                    }
+                ),
+            )
+
         if template_path := self.shared_utils.node_type_key_data.interface_descriptions.underlay_ethernet_interfaces:
             return self._template(
                 template_path,
@@ -64,6 +79,9 @@ class AvdInterfaceDescriptions(AvdFacts):
                     "type": data.link_type,
                     "peer": data.peer,
                     "peer_interface": data.peer_interface,
+                    "wan_carrier": data.wan_carrier,
+                    "wan_circuit_id": data.wan_circuit_id,
+                    "main_interface_wan_carrier": data.main_interface_wan_carrier,
                 },
             )
 
@@ -85,6 +103,9 @@ class AvdInterfaceDescriptions(AvdFacts):
                     "peer": data.peer,
                     "peer_interface": data.peer_interface,
                     "vrf": data.vrf,
+                    "wan_carrier": data.wan_carrier,
+                    "wan_circuit_id": data.wan_circuit_id,
+                    "main_interface_wan_carrier": data.main_interface_wan_carrier,
                 }
             ),
         )
@@ -107,8 +128,28 @@ class AvdInterfaceDescriptions(AvdFacts):
             - overlay_routing_protocol
             - type
             - wan_carrier
-            - wan_circuit_id.
+            - wan_circuit_id
+            - main_interface_wan_carrier.
         """
+        # This is historic behavior for these two modules where the defined description
+        # should take precedence over anything. This was broken from AVD 5.0 to 5.3
+        if data.link_type in ["core_interface", "l3_edge"] and data.port_channel_description is not None:
+            return AvdStringFormatter().format(
+                data.port_channel_description,
+                **strip_null_from_data(
+                    {
+                        "peer": data.peer,
+                        "interface": data.interface,
+                        "peer_interface": data.peer_interface,
+                        "port_channel_id": data.port_channel_id,
+                        "peer_port_channel_id": data.peer_channel_group_id,
+                        "peer_node_group": data.peer_node_group,
+                        "peer_node_group_or_peer": data.peer_node_group or data.peer,
+                        "peer_node_group_or_uppercase_peer": data.peer_node_group or str(data.peer or "").upper() or None,
+                    }
+                ),
+            )
+
         if template_path := self.shared_utils.node_type_key_data.interface_descriptions.underlay_port_channel_interfaces:
             return self._template(
                 template_path,
@@ -118,6 +159,9 @@ class AvdInterfaceDescriptions(AvdFacts):
                     "peer_channel_group_id": data.peer_channel_group_id,
                     "channel_description": data.port_channel_description,
                     "peer_node_group": data.peer_node_group,
+                    "wan_carrier": data.wan_carrier,
+                    "wan_circuit_id": data.wan_circuit_id,
+                    "main_interface_wan_carrier": data.main_interface_wan_carrier,
                 },
             )
 
@@ -145,6 +189,9 @@ class AvdInterfaceDescriptions(AvdFacts):
                     "peer_node_group": data.peer_node_group,
                     "peer_node_group_or_peer": data.peer_node_group or data.peer,
                     "peer_node_group_or_uppercase_peer": data.peer_node_group or str(data.peer or "").upper() or None,
+                    "wan_carrier": data.wan_carrier,
+                    "wan_circuit_id": data.wan_circuit_id,
+                    "main_interface_wan_carrier": data.main_interface_wan_carrier,
                 }
             ),
         )
@@ -370,6 +417,7 @@ class AvdInterfaceDescriptions(AvdFacts):
             return self._template(
                 template_path,
                 peer=data.peer,
+                peer_interface=data.peer_interface,
                 adapter_port_channel_id=data.port_channel_id,
                 adapter_port_channel_description=data.port_channel_description,
                 adapter_description=data.description,
@@ -520,8 +568,11 @@ class InterfaceDescriptionData:
     """The WAN Carrier this interface is connected to"""
     wan_circuit_id: str | None
     """The WAN Circuit ID for this interface."""
+    main_interface_wan_carrier: str | None
+    """ WAN carrier of parent interface"""
 
-    def __init__(
+    # We accept more arguments than max-args number for this method.
+    def __init__(  # noqa: PLR0913
         self,
         shared_utils: SharedUtilsProtocol,
         description: str | None = None,
@@ -538,6 +589,7 @@ class InterfaceDescriptionData:
         vrf: str | None = None,
         wan_carrier: str | None = None,
         wan_circuit_id: str | None = None,
+        main_interface_wan_carrier: str | None = None,
     ) -> None:
         self._shared_utils = shared_utils
         self.description = description
@@ -554,6 +606,7 @@ class InterfaceDescriptionData:
         self.vrf = vrf
         self.wan_carrier = wan_carrier
         self.wan_circuit_id = wan_circuit_id
+        self.main_interface_wan_carrier = main_interface_wan_carrier
 
     @property
     def mpls_overlay_role(self) -> str | None:

@@ -487,6 +487,9 @@ keys:
                   type: bool
                 igp_sync:
                   type: bool
+        ntp_serve:
+          type: bool
+          description: Enable/disable serving NTP to clients.
         trunk_private_vlan_secondary:
           type: bool
           deprecation:
@@ -907,6 +910,11 @@ keys:
                   description: Set the default for whether Bidirectional Forwarding Detection is enabled for PIM.
                 bidirectional:
                   type: bool
+                neighbor_filter:
+                  type: str
+                  convert_types:
+                    - int
+                  description: Standard access list name.
                 hello:
                   type: dict
                   keys:
@@ -1411,9 +1419,22 @@ keys:
                 type: str
                 convert_types:
                   - int
+            srlgs:
+              description: List of SRLGs.
+              type: list
+              items:
+                type: str
+                description: SRLG name or number.
+                convert_types:
+                  - int
             srlg:
               description: SRLG name or number.
               type: str
+              deprecation:
+                warning: true
+                removed: false
+                remove_in_version: 6.0.0
+                new_key: srlgs
               convert_types:
                 - int
             metric:

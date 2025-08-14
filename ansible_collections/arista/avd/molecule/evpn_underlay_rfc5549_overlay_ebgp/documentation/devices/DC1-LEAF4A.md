@@ -183,14 +183,14 @@ Enable password has been disabled
 
 | CV Compression | CloudVision Servers | VRF | Authentication | Smash Excludes | Ingest Exclude | Bypass AAA |
 | -------------- | ------------------- | --- | -------------- | -------------- | -------------- | ---------- |
-| gzip | 192.168.200.11:9910 | MGMT | key,<removed> | ale,flexCounter,hardware,kni,pulse,strata | /Sysdb/cell/1/agent,/Sysdb/cell/2/agent | False |
+| gzip | 192.168.200.11:9910 | MGMT | token,/tmp/token | ale,flexCounter,hardware,kni,pulse,strata | - | False |
 
 #### TerminAttr Daemon Device Configuration
 
 ```eos
 !
 daemon TerminAttr
-   exec /usr/bin/TerminAttr -cvaddr=192.168.200.11:9910 -cvauth=key,<removed> -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -ingestexclude=/Sysdb/cell/1/agent,/Sysdb/cell/2/agent -taillogs
+   exec /usr/bin/TerminAttr -cvaddr=192.168.200.11:9910 -cvauth=token,/tmp/token -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -taillogs -cvsourceintf=Management1
    no shutdown
 ```
 
@@ -944,14 +944,14 @@ ASN Notation: asplain
 
 #### Router BGP VRFs
 
-| VRF | Route-Distinguisher | Redistribute |
-| --- | ------------------- | ------------ |
-| Tenant_A_APP_Zone | 192.168.255.14:12 | connected |
-| Tenant_A_DB_Zone | 192.168.255.14:13 | connected |
-| Tenant_A_OP_Zone | 192.168.255.14:10 | connected |
-| Tenant_A_WEB_Zone | 192.168.255.14:11 | connected |
-| Tenant_B_OP_Zone | 192.168.255.14:20 | connected |
-| Tenant_C_OP_Zone | 192.168.255.14:30 | connected |
+| VRF | Route-Distinguisher | Redistribute | Graceful Restart |
+| --- | ------------------- | ------------ | ---------------- |
+| Tenant_A_APP_Zone | 192.168.255.14:12 | connected | - |
+| Tenant_A_DB_Zone | 192.168.255.14:13 | connected | - |
+| Tenant_A_OP_Zone | 192.168.255.14:10 | connected | - |
+| Tenant_A_WEB_Zone | 192.168.255.14:11 | connected | - |
+| Tenant_B_OP_Zone | 192.168.255.14:20 | connected | - |
+| Tenant_C_OP_Zone | 192.168.255.14:30 | connected | - |
 
 #### Router BGP Device Configuration
 

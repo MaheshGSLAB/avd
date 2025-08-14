@@ -4,27 +4,89 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Protocol, cast
+from functools import wraps
+from typing import TYPE_CHECKING, Literal, Protocol, cast, overload
 
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.avdfacts import AvdFacts, AvdFactsProtocol
+from pyavd._utils.get import get_v2
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from typing import TypeVar
 
     from typing_extensions import Self
 
+    from pyavd._eos_designs.eos_designs_facts.schema import EosDesignsFacts
     from pyavd._eos_designs.schema import EosDesigns
     from pyavd._eos_designs.shared_utils import SharedUtilsProtocol
 
     T_StructuredConfigGeneratorSubclass = TypeVar("T_StructuredConfigGeneratorSubclass", bound="StructuredConfigGeneratorProtocol")
 
 
-def structured_config_contributor(func: Callable[[T_StructuredConfigGeneratorSubclass], None]) -> Callable[[T_StructuredConfigGeneratorSubclass], None]:
-    """Decorator to mark methods that contribute to the structured config."""
-    func._is_structured_config_contributor = True
-    return func
+# Overload when assigned with args.
+@overload
+def structured_config_contributor(
+    func: None = None, *, toggle_and_value: tuple[str, bool] | None = None
+) -> Callable[[Callable[[T_StructuredConfigGeneratorSubclass], None]], Callable[[T_StructuredConfigGeneratorSubclass], None]]: ...
+
+
+# Overload when assigned without args.
+@overload
+def structured_config_contributor(func: Callable[[T_StructuredConfigGeneratorSubclass], None]) -> Callable[[T_StructuredConfigGeneratorSubclass], None]: ...
+
+
+def structured_config_contributor(
+    func: Callable[[T_StructuredConfigGeneratorSubclass], None] | None = None, *, toggle_and_value: tuple[str, bool] | None = None
+) -> (
+    Callable[[T_StructuredConfigGeneratorSubclass], None]
+    | Callable[[Callable[[T_StructuredConfigGeneratorSubclass], None]], Callable[[T_StructuredConfigGeneratorSubclass], None]]
+):
+    """
+    Decorator to mark methods that contribute to the structured config.
+
+    The decorator can be attached with or without args:
+        ```
+        @structured_config_contributor
+        def ...
+        ```
+        or
+        ```
+        @structured_config_contributor(toggle_and_value=("avd_6_behaviors.snmp_settings.vrfs", True))
+        def ...
+        ```
+
+    Args:
+        func: The method to decorate.
+        toggle_and_value: A tuple of variable path and expected value, deciding if this method should run.
+            The path is a string like `avd_6_behaviors.snmp_settings_vrfs`, pointing to the feature toggle.
+
+    TODO: Store the functions in a class variable on StructuredConfigGeneratorProtocol instead of modifying the func.
+    """
+
+    def decorator(fnc: Callable[[T_StructuredConfigGeneratorSubclass], None]) -> Callable[[T_StructuredConfigGeneratorSubclass], None]:
+        """Inner actual decorator. Nested to handle assignment both with and without args."""
+        fnc._is_structured_config_contributor = True  # pyright: ignore [reportFunctionMemberAccess]
+        if toggle_and_value is None:
+            return fnc
+
+        toggle, toggle_value = toggle_and_value
+
+        @wraps(fnc)
+        def wrapped_func(self: T_StructuredConfigGeneratorSubclass) -> None:
+            if get_v2(self.inputs, toggle, default=False) == toggle_value:
+                return fnc(self)
+
+            return None
+
+        return wrapped_func
+
+    if func is not None:
+        # This is a @structured_config_contributor assignment without args.
+        return decorator(func)
+
+    # This is a @structured_config_contributor(...) assignment with args.
+    return decorator
 
 
 @dataclass
@@ -50,7 +112,7 @@ class StructCfgs:
             msg = f"Unsupported list merge strategy: {ansible_strategy}"
             raise ValueError(msg)
 
-        list_merge_strategy = cast(Literal["append_unique", "append", "replace", "keep", "prepend", "prepend_unique"], list_merge_strategy)
+        list_merge_strategy = cast("Literal['append_unique', 'append', 'replace', 'keep', 'prepend', 'prepend_unique']", list_merge_strategy)
         return cls(list_merge_strategy=list_merge_strategy)
 
 
@@ -63,6 +125,7 @@ class StructuredConfigGeneratorProtocol(AvdFactsProtocol, Protocol):
     returning a dict.
     """
 
+    facts: EosDesignsFacts
     structured_config: EosCliConfigGen
     custom_structured_configs: StructCfgs
     _complete_structured_config: EosCliConfigGen
@@ -74,29 +137,20 @@ class StructuredConfigGeneratorProtocol(AvdFactsProtocol, Protocol):
 
     def render(self) -> None:
         """
-        In-place update the structured_config by deepmerging the rendered dict over the structured_config object.
+        In-place update self.structured_config.
 
-        This method is bridging the gap between older classes which returns builtin types on all methods,
-        and refactored classes which inplace updates the self.structured_config.
+        If 'avd_eos_designs_enforce_duplication_checks_across_all_models' is `true` (new behavior for AVD 6.0.0 (?)),
+        all code is updating the same instance of self.structured_config.
+        Otherwise a fresh structured_config instance is initialized for each module, and they are deepmerged on top of the final structured_config.
         """
-        # This knob makes us keep the legacy behavior of maintaining a single structured config object per module and merging them.
-        # Without it set, we will just in-place update the same structured_config, which means any duplication checks will be enforced across all modules.
-        # Note that methods that have not been refactored to update structured_config directly will still be merged on top.
         if not self.inputs.avd_eos_designs_enforce_duplication_checks_across_all_models and not getattr(
             self, "ignore_avd_eos_designs_enforce_duplication_checks_across_all_models", False
         ):
             self._complete_structured_config = self.structured_config
             self.structured_config = EosCliConfigGen()
 
-        # In-place update self.structured_config by calling all the refactored methods marked with @structured_config_contributor
+        # In-place update self.structured_config by calling all methods marked with @structured_config_contributor
         self.render_structured_config()
-
-        # The render method on AvdFacts class will only execute methods with @cached_property not starting with _.
-        # These are the legacy methods which will be refactored to use the @structured_config_contributor decorator instead.
-        generated_structured_config_as_dict = super().render()
-        if generated_structured_config_as_dict:
-            generated_structured_config = EosCliConfigGen._from_dict(generated_structured_config_as_dict)
-            self.structured_config._deepmerge(generated_structured_config, list_merge="append_unique")
 
         # If we run with the legacy behavior we now have to restore the original structured config and merge in the things we generated here.
         if not self.inputs.avd_eos_designs_enforce_duplication_checks_across_all_models and not getattr(
@@ -126,13 +180,18 @@ class StructuredConfigGenerator(AvdFacts, StructuredConfigGeneratorProtocol):
     Base class for structured config generators.
 
     This differs from AvdFacts by also taking structured_config and custom_structured_configs as argument
-    and by the render function which updates the structured_config instead of
-    returning a dict.
     """
 
     def __init__(
-        self, hostvars: dict, inputs: EosDesigns, shared_utils: SharedUtilsProtocol, structured_config: EosCliConfigGen, custom_structured_configs: StructCfgs
+        self,
+        hostvars: Mapping,
+        inputs: EosDesigns,
+        facts: EosDesignsFacts,
+        shared_utils: SharedUtilsProtocol,
+        structured_config: EosCliConfigGen,
+        custom_structured_configs: StructCfgs,
     ) -> None:
+        self.facts = facts
         self.structured_config = structured_config
         self.custom_structured_configs = custom_structured_configs
         super().__init__(hostvars=hostvars, inputs=inputs, shared_utils=shared_utils)

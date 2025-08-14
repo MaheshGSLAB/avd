@@ -16,7 +16,7 @@ SCHEMA = create_store()["eos_cli_config_gen"]
 @pytest.mark.molecule_scenarios(
     "eos_designs_unit_tests",
     "eos_designs_deprecated_vars",
-    "eos_designs_l2l2",
+    "eos_designs-l2ls",
     "eos_designs-mpls-isis-sr-ldp",
     # TODO: "eos_designs-twodc-5stage-clos", # Remove inline jinja
     "evpn_underlay_ebgp_overlay_ebgp",
@@ -30,6 +30,7 @@ SCHEMA = create_store()["eos_cli_config_gen"]
     "example-l2ls-fabric",
     "example-single-dc-l3ls",
     "eos_cli_config_gen",
+    "example-single-dc-l3ls-ipv6",
     "eos_cli_config_gen_deprecated_vars",
 )
 def test_eos_cli_config_gen_initialize_dict_with_valid_data(molecule_host: MoleculeHost) -> None:
@@ -48,7 +49,7 @@ def test_eos_cli_config_gen_initialize_dict_with_valid_data(molecule_host: Molec
 @pytest.mark.molecule_scenarios(
     "eos_designs_unit_tests",
     "eos_designs_deprecated_vars",
-    "eos_designs_l2l2",
+    "eos_designs-l2ls",
     "eos_designs-mpls-isis-sr-ldp",
     # TODO: "eos_designs-twodc-5stage-clos", # Remove inline jinja
     "evpn_underlay_ebgp_overlay_ebgp",
@@ -61,6 +62,7 @@ def test_eos_cli_config_gen_initialize_dict_with_valid_data(molecule_host: Molec
     "example-isis-ldp-ipvpn",
     "example-l2ls-fabric",
     "example-single-dc-l3ls",
+    "example-single-dc-l3ls-ipv6",
     "eos_cli_config_gen",
     "eos_cli_config_gen_deprecated_vars",
 )

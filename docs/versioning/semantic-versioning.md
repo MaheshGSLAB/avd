@@ -28,6 +28,7 @@ All roles input variables follow SemVer. Any breaking changes will, at a minimum
 | `eos_config_deploy_cvp` | ✅ | ✘ | Structured configuration output may change during minor releases to accommodate changes in the ansible-cvp collection. <br>The resulting CloudVision configuration will be maintained, unless in rare cases, when addressing a bug.<br>Breaking changes will be communicated in the release notes. |
 | `cv_deploy` | ✅ | ✅ | The resulting CloudVision configuration will be maintained, unless in rare cases, when addressing a bug. |
 | `eos_config_deploy_eapi` | ✅ | ✅ | |
+| `anta_runner` | ✅ | ✘ | The generated reports and other artifacts may change between minor releases.<br>Breaking changes to JSON & CSV outputs will be communicated in the release notes.|
 | `eos_validate_state` | ✅ | ✘ | The generated reports and other artifacts may change between minor releases.<br>Breaking changes to CSV outputs will be communicated in the release notes.|
 | `dhcp_provisioner` | ✅ | ✘ | Structured configuration output may change during minor releases to accommodate changes in the ansible-cvp collection.<br>The resulting DHCP configuration will be maintained, unless in rare cases, when addressing a bug. |
 | `build_output_folders` | ✅ | ✅ | |
@@ -51,6 +52,7 @@ All roles input variables follow SemVer. Any breaking changes will, at a minimum
 | Action: `cv_workflow` | ✅ | ✅ | The resulting CloudVision configuration will be maintained, unless in rare cases, when addressing a bug. |
 | Action: `eos_designs_facts` | ✘ | ✘ | Internal plugin, not intended for external use.  |
 | Action: `eos_designs_structured_config` | ✘ | ✘ | Internal plugin, not intended for external use. |
+| Action: `anta_workflow` | ✘ | ✘ | Internal plugin, not intended for external use. |
 | Action: `eos_validate_state_reports` | ✘ | ✘ | Internal plugin, not intended for external use. |
 | Action: `eos_validate_state_runner` | ✘ | ✘ | Internal plugin, not intended for external use. |
 | Action: `inventory_to_container` | ✘ | ✘ | Internal plugin, not intended for external use. |
@@ -76,3 +78,4 @@ All functions input variables follow SemVer. Any breaking changes will, at a min
 | `validate_structured_config()` | ✅ | ✅ | |
 | `get_device_config()` | ✅ | ✅ | EOS CLI configuration generated from eos_cli_config_gen follows SemVer.<br> Breaking changes may occur in rare cases when addressing a bug.<br> Reordering of the CLI output may occur but without impacting the resulting configuration on EOS. |
 | `get_device_doc()` | ✅ | ✘  | Device documentation artifacts may change during minor releases. |
+| `get_fabric_documentation()` | ✅ | ✘  | Fabric documentation artifacts may change during minor releases. |

@@ -1,15 +1,17 @@
 aaa_root:
   disabled: true
+boot:
+  secret:
+    key: a153de6290ff1409257ade45f
 config_end: true
 daemon_terminattr:
   cvaddrs:
   - 192.168.200.11:9910
   cvauth:
-    method: key
-    key: telarista
+    method: token
+    token_file: /tmp/token
   cvvrf: MGMT
   disable_aaa: false
-  ingestexclude: /Sysdb/cell/1/agent,/Sysdb/cell/2/agent
   smashexcludes: ale,flexCounter,hardware,kni,pulse,strata
 enable_password:
   disabled: true
@@ -195,11 +197,13 @@ snmp_server:
   contact: example@example.com
   location: EOS_DESIGNS_UNIT_TESTS MLAG-OSPF-L3LEAF1A
 spanning_tree:
+  mst:
+    pvst_border: true
   no_spanning_tree_vlan: '4094'
 static_routes:
 - vrf: MGMT
-  destination_address_prefix: 0.0.0.0/0
-  gateway: 192.168.200.5
+  prefix: 0.0.0.0/0
+  next_hop: 192.168.200.5
 transceiver_qsfp_default_mode_4x10: true
 vlan_interfaces:
 - name: Vlan4094
@@ -208,6 +212,14 @@ vlan_interfaces:
   ip_address: 10.10.255.6/31
   ospf_network_point_to_point: true
   ospf_area: 0.0.0.0
+  ospf_authentication: message-digest
+  ospf_message_digest_keys:
+  - id: 1
+    hash_algorithm: sha512
+    key: 0E6UCAn15dG7ENbaNlkv0SDlXMaoCEeJ
+  - id: 2
+    hash_algorithm: sha512
+    key: Z3lX3tpY1Ksv/Kum/NwDj2aiiJ2LKpFj
   mtu: 1500
   no_autostate: true
 vlan_internal_order:

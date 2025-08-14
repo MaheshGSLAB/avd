@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 NATURAL_SORT_PATTERN = re.compile(r"(\d+)")
 
 
-class AvdIndexedList(Sequence[T_AvdModel], Generic[T_PrimaryKey, T_AvdModel], AvdBase):
+class AvdIndexedList(Sequence[T_AvdModel], Generic[T_PrimaryKey, T_AvdModel], AvdBase):  # noqa: PLW1641 - __hash__ will be set to None.
     """
     Base class used for schema-based data classes holding lists-of-dictionaries-with-primary-key loaded from AVD inputs.
 
@@ -56,7 +56,7 @@ class AvdIndexedList(Sequence[T_AvdModel], Generic[T_PrimaryKey, T_AvdModel], Av
             msg = f"Expecting 'data' as a 'Sequence' when loading data into '{cls.__name__}'. Got '{type(data)}"
             raise TypeError(msg)
 
-        cls_items = cast(Iterable[T_AvdModel], (coerce_type(item, cls._item_type) for item in data))
+        cls_items = cast("Iterable[T_AvdModel]", (coerce_type(item, cls._item_type) for item in data))
         return cls(cls_items)
 
     def __init__(self, items: Iterable[T_AvdModel] = ()) -> None:
@@ -112,7 +112,7 @@ class AvdIndexedList(Sequence[T_AvdModel], Generic[T_PrimaryKey, T_AvdModel], Av
     def obtain(self, key: T_PrimaryKey) -> T_AvdModel:
         """Return item with given primary key, autocreating if missing."""
         if key not in self._items:
-            item_type = cast(T_AvdModel, self._item_type)
+            item_type = cast("T_AvdModel", self._item_type)
             self._items[key] = item_type._from_dict({self._primary_key: key})
         return self._items[key]
 

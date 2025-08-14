@@ -7,6 +7,7 @@
   - [Management Interfaces](#management-interfaces)
   - [DNS Domain](#dns-domain)
   - [IP Name Servers](#ip-name-servers)
+  - [Domain Lookup](#domain-lookup)
   - [NTP](#ntp)
   - [Management API HTTP](#management-api-http)
 - [Authentication](#authentication)
@@ -138,6 +139,20 @@ dns domain wan.example.local
 ip name-server vrf MGMT 192.168.17.1
 ```
 
+### Domain Lookup
+
+#### DNS Domain Lookup Summary
+
+| Source interface | vrf |
+| ---------------- | --- |
+| Management1 | MGMT |
+
+#### DNS Domain Lookup Device Configuration
+
+```eos
+ip domain lookup vrf MGMT source-interface Management1
+```
+
 ### NTP
 
 #### NTP Summary
@@ -196,7 +211,7 @@ management api http-commands
 
 | User | Privilege | Role | Disabled | Shell |
 | ---- | --------- | ---- | -------- | ----- |
-| ansible | 15 | network-admin | False | - |
+| admin | 15 | network-admin | False | - |
 | arista | 15 | network-admin | False | - |
 | cvpadmin | 15 | network-admin | False | - |
 
@@ -204,7 +219,7 @@ management api http-commands
 
 ```eos
 !
-username ansible privilege 15 role network-admin secret sha512 <removed>
+username admin privilege 15 role network-admin nopassword
 username arista privilege 15 role network-admin secret sha512 <removed>
 username cvpadmin privilege 15 role network-admin secret sha512 <removed>
 ```
@@ -269,14 +284,14 @@ management security
 
 | CV Compression | CloudVision Servers | VRF | Authentication | Smash Excludes | Ingest Exclude | Bypass AAA |
 | -------------- | ------------------- | --- | -------------- | -------------- | -------------- | ---------- |
-| gzip | www.cv-staging.corp.arista.io:443 | MGMT | token-secure,/tmp/cv-onboarding-token | ale,flexCounter,hardware,kni,pulse,strata | /Sysdb/cell/1/agent,/Sysdb/cell/2/agent | False |
+| gzip | apiserver.arista.io:443 | MGMT | token-secure,/tmp/cv-onboarding-token | ale,flexCounter,hardware,kni,pulse,strata | - | False |
 
 #### TerminAttr Daemon Device Configuration
 
 ```eos
 !
 daemon TerminAttr
-   exec /usr/bin/TerminAttr -cvaddr=www.cv-staging.corp.arista.io:443 -cvauth=token-secure,/tmp/cv-onboarding-token -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -ingestexclude=/Sysdb/cell/1/agent,/Sysdb/cell/2/agent -taillogs
+   exec /usr/bin/TerminAttr -cvaddr=apiserver.arista.io:443 -cvauth=token-secure,/tmp/cv-onboarding-token -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -taillogs -cvsourceintf=Management1
    no shutdown
 ```
 
@@ -294,7 +309,7 @@ daemon TerminAttr
 
 | Tracker Name | Exporter Name | Collector IP/Host | Collector Port | Local Interface |
 | ------------ | ------------- | ----------------- | -------------- | --------------- |
-| FLOW-TRACKER | CV-TELEMETRY | - | - | Loopback0 |
+| FLOW-TRACKER | CV-TELEMETRY | 127.0.0.1 | - | Loopback0 |
 
 #### Flow Tracking Device Configuration
 
@@ -431,8 +446,8 @@ interface Dps1
 | --------- | ----------- | ------------- | ---------- | ----| ---- | -------- | ------ | ------- |
 | Ethernet1.42 | RED-TEST | - | 10.42.3.1/24 | RED | - | False | - | - |
 | Ethernet1.666 | BLUE-TEST | - | 10.66.3.1/24 | BLUE | - | False | - | - |
-| Ethernet4 | inet-cloud_Ethernet8 | 4 | *dhcp | **default | **- | *False | *ACL-INTERNET-IN_Port-Channel4 | **- |
-| Ethernet5 | inet-cloud_Ethernet9 | 4 | *dhcp | **default | **- | *False | *ACL-INTERNET-IN_Port-Channel4 | **- |
+| Ethernet4 | inet-cloud_Ethernet8 | 4 | *dhcp | *default | *- | *False | *ACL-INTERNET-IN_Port-Channel4 | *- |
+| Ethernet5 | inet-cloud_Ethernet9 | 4 | *dhcp | *default | *- | *False | *ACL-INTERNET-IN_Port-Channel4 | *- |
 
 *Inherited from Port-Channel Interface
 
@@ -443,7 +458,7 @@ interface Dps1
 interface Ethernet1
    description L2_site3-leaf1_Ethernet1
    no shutdown
-   mtu 9214
+   mtu 9194
    no switchport
 !
 interface Ethernet1.42
@@ -864,11 +879,11 @@ ASN Notation: asplain
 
 #### Router BGP VRFs
 
-| VRF | Route-Distinguisher | Redistribute |
-| --- | ------------------- | ------------ |
-| BLUE | 192.168.255.11:100 | connected |
-| default | 192.168.255.11:1 | - |
-| RED | 192.168.255.11:101 | connected |
+| VRF | Route-Distinguisher | Redistribute | Graceful Restart |
+| --- | ------------------- | ------------ | ---------------- |
+| BLUE | 192.168.255.11:100 | connected | - |
+| default | 192.168.255.11:1 | - | - |
+| RED | 192.168.255.11:101 | connected | - |
 
 #### Router BGP Device Configuration
 

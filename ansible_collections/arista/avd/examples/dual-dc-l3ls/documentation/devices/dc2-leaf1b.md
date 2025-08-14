@@ -111,14 +111,14 @@ management api http-commands
 | User | Privilege | Role | Disabled | Shell |
 | ---- | --------- | ---- | -------- | ----- |
 | admin | 15 | network-admin | False | - |
-| ansible | 15 | network-admin | False | - |
+| arista | 15 | network-admin | False | - |
 
 #### Local Users Device Configuration
 
 ```eos
 !
 username admin privilege 15 role network-admin nopassword
-username ansible privilege 15 role network-admin secret sha512 <removed>
+username arista privilege 15 role network-admin secret sha512 <removed>
 ```
 
 ### Enable Password
@@ -679,10 +679,10 @@ ASN Notation: asplain
 
 #### Router BGP VRFs
 
-| VRF | Route-Distinguisher | Redistribute |
-| --- | ------------------- | ------------ |
-| VRF10 | 10.255.128.14:10 | connected |
-| VRF11 | 10.255.128.14:11 | connected |
+| VRF | Route-Distinguisher | Redistribute | Graceful Restart |
+| --- | ------------------- | ------------ | ---------------- |
+| VRF10 | 10.255.128.14:10 | connected | - |
+| VRF11 | 10.255.128.14:11 | connected | - |
 
 #### Router BGP Device Configuration
 

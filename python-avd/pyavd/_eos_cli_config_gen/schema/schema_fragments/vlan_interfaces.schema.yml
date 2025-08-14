@@ -87,6 +87,8 @@ keys:
             - str
           min: 1
           max: 3
+        ip_igmp_querier_address_virtual:
+          type: bool
         ip_igmp_host_proxy:
           type: dict
           keys:
@@ -166,6 +168,12 @@ keys:
         ip_nat:
           type: dict
           $ref: "eos_cli_config_gen#/$defs/interface_ip_nat"
+        dhcp_server_ipv4:
+          type: bool
+          description: Enable IPv4 DHCP server.
+        dhcp_server_ipv6:
+          type: bool
+          description: Enable IPv6 DHCP server.
         ipv6_enable:
           type: bool
         ipv6_address:
@@ -341,7 +349,13 @@ keys:
                   type: bool
         ospf_network_point_to_point:
           type: bool
+        ipv6_ospf_network_point_to_point:
+          type: bool
         ospf_area:
+          type: str
+          convert_types:
+            - int
+        ipv6_ospf_area:
           type: str
           convert_types:
             - int
@@ -404,6 +418,9 @@ keys:
                   description: Set the default for whether Bidirectional Forwarding Detection is enabled for PIM.
                 bidirectional:
                   type: bool
+                neighbor_filter:
+                  type: str
+                  description: Standard access list name.
                 hello:
                   type: dict
                   keys:
@@ -547,6 +564,9 @@ keys:
                     type: str
                     required: true
                     description: Virtual IPv6 address.
+              peer_authentication:
+                type: dict
+                $ref: "eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/vrrp_ids/items/keys/peer_authentication"
         ip_attached_host_route_export:
           type: dict
           keys:
@@ -609,6 +629,9 @@ keys:
                 input:
                   type: str
                   description: Name of policy-map used for policy based routing.
+        ntp_serve:
+          type: bool
+          description: Enable/disable serving NTP to clients.
         pvlan_mapping:
           type: str
           description: List of VLANs as string.

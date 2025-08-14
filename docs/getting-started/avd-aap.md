@@ -8,6 +8,9 @@
 
 This guide will walk you through the steps required to get up and running with AVD and Red Hat's Ansible Automation Platform (AAP). AAP is Red Hat's solution to scale automation within an organization, whether by making automation more readily available to team members, adding security capabilities, or simplifying the speed of getting started with Ansible using execution environments.
 
+!!! note
+    Red Hat supports “ansible-core” and Ansible Automation Platform. For non-AVD Ansible issues, please contact Red Hat Ansible TAC.
+
 ## Requirements to get started
 
 - An accessible lab topology running Arista EOS.
@@ -317,7 +320,7 @@ With most jobs, we need a way to authenticate to our CV instance or EOS nodes. A
     ```
 
     !!! note
-        This guide leverages the `cv_deploy` role for provisioning through CV. The `cv_deploy` role requires additional options and tokens to be generated. Please see the `cv_deploy` role [documentation](https://avd.arista.com/stable/roles/cv_deploy/index.html) for the most up-to-date settings. We also set `cv_change_control` to `true`, the default it `false`. This allows the change control to be executed automatically.
+        This guide leverages the `cv_deploy` role for provisioning through CV. The `cv_deploy` role requires additional options and tokens to be generated. Please see the `cv_deploy` role [documentation](https://avd.arista.com/stable/ansible_collections/arista/avd/roles/cv_deploy/index.html) for the most up-to-date settings. We also set `cv_change_control` to `true`, the default it `false`. This allows the change control to be executed automatically.
 
 === "Surveys - Enable"
 

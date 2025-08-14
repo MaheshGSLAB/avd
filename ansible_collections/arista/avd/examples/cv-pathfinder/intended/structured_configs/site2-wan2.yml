@@ -67,13 +67,13 @@ application_traffic_recognition:
 config_end: true
 daemon_terminattr:
   cvaddrs:
-  - www.cv-staging.corp.arista.io:443
+  - apiserver.arista.io:443
   cvauth:
     method: token-secure
     token_file: /tmp/cv-onboarding-token
+  cvsourceintf: Management1
   cvvrf: MGMT
   disable_aaa: false
-  ingestexclude: /Sysdb/cell/1/agent,/Sysdb/cell/2/agent
   smashexcludes: ale,flexCounter,hardware,kni,pulse,strata
 dns_domain: wan.example.local
 dps_interfaces:
@@ -89,7 +89,7 @@ ethernet_interfaces:
 - name: Ethernet1
   description: P2P_site2-leaf2_Ethernet3
   shutdown: false
-  mtu: 9214
+  mtu: 9194
   flow_tracker:
     hardware: FLOW-TRACKER
   ip_address: 10.0.2.15/31
@@ -101,7 +101,7 @@ ethernet_interfaces:
 - name: Ethernet1.100
   description: P2P_site2-leaf2_Ethernet3.100_VRF_BLUE
   shutdown: false
-  mtu: 9214
+  mtu: 9194
   vrf: BLUE
   flow_tracker:
     hardware: FLOW-TRACKER
@@ -114,7 +114,7 @@ ethernet_interfaces:
 - name: Ethernet1.101
   description: P2P_site2-leaf2_Ethernet3.101_VRF_RED
   shutdown: false
-  mtu: 9214
+  mtu: 9194
   vrf: RED
   flow_tracker:
     hardware: FLOW-TRACKER
@@ -190,6 +190,10 @@ ip_access_lists:
     protocol: ip
     source: any
     destination: any
+ip_domain_lookup:
+  source_interfaces:
+  - name: Management1
+    vrf: MGMT
 ip_extcommunity_lists:
 - name: ECL-EVPN-SOO
   entries:
@@ -239,10 +243,10 @@ ip_security:
     profile: DP-PROFILE
 is_deployed: true
 local_users:
-- name: ansible
+- name: admin
   privilege: 15
   role: network-admin
-  sha512_password: $6$7u4j1rkb3VELgcZE$EJt2Qff8kd/TapRoci0XaIZsL4tFzgq1YZBLD9c6f/knXzvcYY0NcMKndZeCv0T268knGKhOEwZAxqKjlMm920
+  no_password: true
 - name: arista
   privilege: 15
   role: network-admin
@@ -282,6 +286,7 @@ management_security:
       file: STUN-DTLS.crt
       key: STUN-DTLS.key
 metadata:
+  platform: CloudEOS
   fabric_name: WAN
   cv_tags:
     device_tags:
@@ -740,7 +745,7 @@ router_path_selection:
     - name: INTERNET
     - name: LAN_HA
   tcp_mss_ceiling:
-    ipv4_segment_size: auto
+    ipv4: auto
 router_traffic_engineering:
   enabled: true
 service_routing_protocols_model: multi-agent
@@ -748,8 +753,8 @@ spanning_tree:
   mode: none
 static_routes:
 - vrf: MGMT
-  destination_address_prefix: 0.0.0.0/0
-  gateway: 192.168.17.1
+  prefix: 0.0.0.0/0
+  next_hop: 192.168.17.1
 stun:
   client:
     server_profiles:

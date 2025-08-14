@@ -27,8 +27,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -41,6 +41,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;policies</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].cv_pathfinder_internet_exit.policies") | List, items: Dictionary |  |  |  | List of Internet-exit policies using this interface as exit. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].name") | String | Required, Unique |  |  | Internet-exit policy name. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tunnel_interface_numbers</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].tunnel_interface_numbers") | String |  |  |  | Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.<br>Examples: '1-3' or '100,200,300' |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raw_eos_cli</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].raw_eos_cli") | String |  |  |  | EOS CLI rendered directly on the interface in the final EOS configuration. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flow_tracking</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].flow_tracking") | Dictionary |  |  |  | Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "<node_type_keys.key>.defaults.l3_interfaces.[].flow_tracking.enabled") | Boolean |  |  |  |  |
@@ -68,8 +73,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -82,6 +87,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;policies</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies") | List, items: Dictionary |  |  |  | List of Internet-exit policies using this interface as exit. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].name") | String | Required, Unique |  |  | Internet-exit policy name. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tunnel_interface_numbers</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].tunnel_interface_numbers") | String |  |  |  | Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.<br>Examples: '1-3' or '100,200,300' |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raw_eos_cli</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].raw_eos_cli") | String |  |  |  | EOS CLI rendered directly on the interface in the final EOS configuration. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flow_tracking</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].flow_tracking") | Dictionary |  |  |  | Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_interfaces.[].flow_tracking.enabled") | Boolean |  |  |  |  |
@@ -105,8 +115,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -119,6 +129,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;policies</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies") | List, items: Dictionary |  |  |  | List of Internet-exit policies using this interface as exit. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].name") | String | Required, Unique |  |  | Internet-exit policy name. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tunnel_interface_numbers</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].tunnel_interface_numbers") | String |  |  |  | Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.<br>Examples: '1-3' or '100,200,300' |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raw_eos_cli</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].raw_eos_cli") | String |  |  |  | EOS CLI rendered directly on the interface in the final EOS configuration. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flow_tracking</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].flow_tracking") | Dictionary |  |  |  | Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "<node_type_keys.key>.node_groups.[].l3_interfaces.[].flow_tracking.enabled") | Boolean |  |  |  |  |
@@ -144,8 +159,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -158,6 +173,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;policies</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies") | List, items: Dictionary |  |  |  | List of Internet-exit policies using this interface as exit. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].name") | String | Required, Unique |  |  | Internet-exit policy name. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tunnel_interface_numbers</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].cv_pathfinder_internet_exit.policies.[].tunnel_interface_numbers") | String |  |  |  | Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.<br>Examples: '1-3' or '100,200,300' |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raw_eos_cli</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].raw_eos_cli") | String |  |  |  | EOS CLI rendered directly on the interface in the final EOS configuration. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flow_tracking</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].flow_tracking") | Dictionary |  |  |  | Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "<node_type_keys.key>.nodes.[].l3_interfaces.[].flow_tracking.enabled") | Boolean |  |  |  |  |
@@ -181,8 +201,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "l3_interface_profiles.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "l3_interface_profiles.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "l3_interface_profiles.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "l3_interface_profiles.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "l3_interface_profiles.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "l3_interface_profiles.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "l3_interface_profiles.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "l3_interface_profiles.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "l3_interface_profiles.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "l3_interface_profiles.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -195,6 +215,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;policies</samp>](## "l3_interface_profiles.[].cv_pathfinder_internet_exit.policies") | List, items: Dictionary |  |  |  | List of Internet-exit policies using this interface as exit. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "l3_interface_profiles.[].cv_pathfinder_internet_exit.policies.[].name") | String | Required, Unique |  |  | Internet-exit policy name. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tunnel_interface_numbers</samp>](## "l3_interface_profiles.[].cv_pathfinder_internet_exit.policies.[].tunnel_interface_numbers") | String |  |  |  | Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.<br>Examples: '1-3' or '100,200,300' |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "l3_interface_profiles.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "l3_interface_profiles.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "l3_interface_profiles.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "l3_interface_profiles.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "l3_interface_profiles.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;raw_eos_cli</samp>](## "l3_interface_profiles.[].raw_eos_cli") | String |  |  |  | EOS CLI rendered directly on the interface in the final EOS configuration. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;flow_tracking</samp>](## "l3_interface_profiles.[].flow_tracking") | Dictionary |  |  |  | Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "l3_interface_profiles.[].flow_tracking.enabled") | Boolean |  |  |  |  |
@@ -282,10 +307,12 @@
 
               # Prefix List Name. Accept routes for only these prefixes from the peer.
               # Required for wan interfaces.
+              # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
               ipv4_prefix_list_in: <str>
 
               # Prefix List Name. Advertise routes for only these prefixes.
               # If not specified, nothing would be advertised.
+              # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
               ipv4_prefix_list_out: <str>
 
             # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -330,6 +357,22 @@
                   # Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.
                   # Examples: '1-3' or '100,200,300'
                   tunnel_interface_numbers: <str>
+
+            # Receive queue parameters for platform SFE interface profile.
+            # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+            rx_queue:
+
+              # Number of receive queues.
+              # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+              count: <int; >=1>
+              workers:
+
+                  # Worker ids specified as values or range of values such as 0-4 or 7.
+                  # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                - <str>
+
+              # Mode applicable to the workers.
+              mode: <str; "shared" | "exclusive">
 
             # EOS CLI rendered directly on the interface in the final EOS configuration.
             raw_eos_cli: <str>
@@ -430,10 +473,12 @@
 
                     # Prefix List Name. Accept routes for only these prefixes from the peer.
                     # Required for wan interfaces.
+                    # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                     ipv4_prefix_list_in: <str>
 
                     # Prefix List Name. Advertise routes for only these prefixes.
                     # If not specified, nothing would be advertised.
+                    # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                     ipv4_prefix_list_out: <str>
 
                   # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -478,6 +523,22 @@
                         # Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.
                         # Examples: '1-3' or '100,200,300'
                         tunnel_interface_numbers: <str>
+
+                  # Receive queue parameters for platform SFE interface profile.
+                  # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+                  rx_queue:
+
+                    # Number of receive queues.
+                    # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                    count: <int; >=1>
+                    workers:
+
+                        # Worker ids specified as values or range of values such as 0-4 or 7.
+                        # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                      - <str>
+
+                    # Mode applicable to the workers.
+                    mode: <str; "shared" | "exclusive">
 
                   # EOS CLI rendered directly on the interface in the final EOS configuration.
                   raw_eos_cli: <str>
@@ -565,10 +626,12 @@
 
                 # Prefix List Name. Accept routes for only these prefixes from the peer.
                 # Required for wan interfaces.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_in: <str>
 
                 # Prefix List Name. Advertise routes for only these prefixes.
                 # If not specified, nothing would be advertised.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_out: <str>
 
               # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -613,6 +676,22 @@
                     # Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.
                     # Examples: '1-3' or '100,200,300'
                     tunnel_interface_numbers: <str>
+
+              # Receive queue parameters for platform SFE interface profile.
+              # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+              rx_queue:
+
+                # Number of receive queues.
+                # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                count: <int; >=1>
+                workers:
+
+                    # Worker ids specified as values or range of values such as 0-4 or 7.
+                    # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                  - <str>
+
+                # Mode applicable to the workers.
+                mode: <str; "shared" | "exclusive">
 
               # EOS CLI rendered directly on the interface in the final EOS configuration.
               raw_eos_cli: <str>
@@ -706,10 +785,12 @@
 
                 # Prefix List Name. Accept routes for only these prefixes from the peer.
                 # Required for wan interfaces.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_in: <str>
 
                 # Prefix List Name. Advertise routes for only these prefixes.
                 # If not specified, nothing would be advertised.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_out: <str>
 
               # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -754,6 +835,22 @@
                     # Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.
                     # Examples: '1-3' or '100,200,300'
                     tunnel_interface_numbers: <str>
+
+              # Receive queue parameters for platform SFE interface profile.
+              # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+              rx_queue:
+
+                # Number of receive queues.
+                # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                count: <int; >=1>
+                workers:
+
+                    # Worker ids specified as values or range of values such as 0-4 or 7.
+                    # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                  - <str>
+
+                # Mode applicable to the workers.
+                mode: <str; "shared" | "exclusive">
 
               # EOS CLI rendered directly on the interface in the final EOS configuration.
               raw_eos_cli: <str>
@@ -842,10 +939,12 @@
 
           # Prefix List Name. Accept routes for only these prefixes from the peer.
           # Required for wan interfaces.
+          # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
           ipv4_prefix_list_in: <str>
 
           # Prefix List Name. Advertise routes for only these prefixes.
           # If not specified, nothing would be advertised.
+          # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
           ipv4_prefix_list_out: <str>
 
         # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -890,6 +989,22 @@
               # Number range to use for Tunnel interfaces to an internet-exit service provider using this local interface.
               # Examples: '1-3' or '100,200,300'
               tunnel_interface_numbers: <str>
+
+        # Receive queue parameters for platform SFE interface profile.
+        # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+        rx_queue:
+
+          # Number of receive queues.
+          # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+          count: <int; >=1>
+          workers:
+
+              # Worker ids specified as values or range of values such as 0-4 or 7.
+              # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+            - <str>
+
+          # Mode applicable to the workers.
+          mode: <str; "shared" | "exclusive">
 
         # EOS CLI rendered directly on the interface in the final EOS configuration.
         raw_eos_cli: <str>

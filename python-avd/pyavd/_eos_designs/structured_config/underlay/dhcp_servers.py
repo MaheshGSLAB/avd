@@ -11,9 +11,9 @@ if TYPE_CHECKING:
     from . import AvdStructuredConfigUnderlayProtocol
 
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
+from pyavd._eos_designs.structured_config.constants import CV_REGION_TO_SERVER_MAP
 from pyavd._eos_designs.structured_config.structured_config_generator import structured_config_contributor
 from pyavd._errors import AristaAvdInvalidInputsError
-from pyavd._utils import get
 
 
 class DhcpServersMixin(Protocol):
@@ -35,7 +35,11 @@ class DhcpServersMixin(Protocol):
         # Set ZTP bootfile
         self._update_ipv4_ztp_boot_file(dhcp_server)
         # Set DNS servers
-        if dns_servers := self.inputs.name_servers:
+        # TODO: Figure out if / how we should filter on VRFs. Currently just adding all servers.
+        if dns_servers := self.inputs.dns_settings.servers:
+            for dns_server in dns_servers:
+                dhcp_server.dns_servers_ipv4.append(dns_server.ip_address)
+        elif dns_servers := self.inputs.name_servers:
             dhcp_server.dns_servers_ipv4 = dns_servers._cast_as(EosCliConfigGen.DhcpServersItem.DnsServersIpv4)
         # Set NTP servers
         self._update_ntp_servers(dhcp_server)
@@ -49,36 +53,51 @@ class DhcpServersMixin(Protocol):
         Used for l3 inband ztp/ztr.
         """
         for peer in self._avd_peers:
-            peer_facts = self.shared_utils.get_peer_facts(peer, required=True)
-            for uplink in peer_facts["uplinks"]:
+            peer_facts = self.shared_utils.get_peer_facts(peer)
+            for uplink in peer_facts.uplinks:
                 if (
-                    uplink["peer"] == self.shared_utils.hostname
-                    and uplink["type"] == "underlay_p2p"
-                    and uplink.get("ip_address")
-                    and "unnumbered" not in uplink["ip_address"]
-                    and get(peer_facts, "inband_ztp")
+                    uplink.peer == self.shared_utils.hostname
+                    and uplink.type == "underlay_p2p"
+                    and uplink.ip_address
+                    and "unnumbered" not in uplink.ip_address
+                    and peer_facts.inband_ztp
                 ):
                     subnet_item = EosCliConfigGen.DhcpServersItem.SubnetsItem(
-                        subnet=str(ip_network(f"{uplink['peer_ip_address']}/{uplink['prefix_length']}", strict=False)),
-                        name=f"inband ztp for {peer}-{uplink['interface']}",
-                        default_gateway=f"{uplink['peer_ip_address']}",
+                        subnet=str(ip_network(f"{uplink.peer_ip_address}/{uplink.prefix_length}", strict=False)),
+                        name=f"inband ztp for {peer}-{uplink.interface}",
+                        default_gateway=f"{uplink.peer_ip_address}",
                     )
-                    subnet_item.ranges.append_new(start=str(uplink["ip_address"]), end=str(uplink["ip_address"]))
+                    subnet_item.ranges.append_new(start=str(uplink.ip_address), end=str(uplink.ip_address))
                     dhcp_server.subnets.append(subnet_item)
+
+    def _get_cvp_server_for_dhcp(self: AvdStructuredConfigUnderlayProtocol) -> str | None:
+        """Return the first CVP server using either new or old data models."""
+        if self.inputs.cv_settings.cvaas.enabled:
+            region = next(iter(self.inputs.cv_settings.cvaas.clusters)).region
+            return CV_REGION_TO_SERVER_MAP[region]
+
+        if self.inputs.cv_settings.onprem_clusters:
+            return next(iter(next(iter(self.inputs.cv_settings.onprem_clusters)).servers)).name
+
+        if self.inputs.cvp_instance_ips:
+            return self.inputs.cvp_instance_ips[0]
+
+        return None
 
     def _update_ipv4_ztp_boot_file(self: AvdStructuredConfigUnderlayProtocol, dhcp_server: EosCliConfigGen.DhcpServersItem) -> None:
         """Update the file name to allow for ZTP to CV."""
         if self.inputs.inband_ztp_bootstrap_file:
             dhcp_server.tftp_server.file_ipv4 = self.inputs.inband_ztp_bootstrap_file
             return
-        if not (cvp_instance_ips := self.inputs.cvp_instance_ips):
+        if not (cvp_server := self._get_cvp_server_for_dhcp()):
             return
 
-        if "arista.io" in cvp_instance_ips[0]:
-            clean_cvaas_fqdn = re.sub(r"https:\/\/|www\.|apiserver\.", "", cvp_instance_ips[0])
-            cvp_instance_ips[0] = f"www.{clean_cvaas_fqdn}"
+        if "arista.io" in cvp_server:
+            # Change apiserver.<...>arista.io to www.<...>arista.io
+            domain = re.sub(r"https:\/\/|www\.|apiserver\.", "", cvp_server)
+            cvp_server = f"www.{domain}"
 
-        dhcp_server.tftp_server.file_ipv4 = f"https://{cvp_instance_ips[0]}/ztp/bootstrap"
+        dhcp_server.tftp_server.file_ipv4 = f"https://{cvp_server}/ztp/bootstrap"
 
     def _update_ntp_servers(self: AvdStructuredConfigUnderlayProtocol, dhcp_server: EosCliConfigGen.DhcpServersItem) -> None:
         """Set list of NTP servers."""

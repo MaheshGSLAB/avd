@@ -17,11 +17,20 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;application_profile</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.application_profile") | String |  | `APP-PROFILE-CONTROL-PLANE` |  | The application profile to use for control plane traffic.<br><br>The application profile should be defined under `application_classification.application_profiles`.<br>If not defined AVD will auto generate an application profile using the provided name or the default value.<br><br>If not overwritten elsewhere, the application profile is generated matching one application matching the control plane traffic either sourced from or destined to the WAN route servers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;traffic_class</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.traffic_class") | Integer |  |  | Min: 0<br>Max: 7 | Set traffic-class for matched traffic. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;dscp</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.dscp") | Integer |  |  | Min: 0<br>Max: 63 | Set DSCP for matched traffic. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;lowest_hop_count</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.lowest_hop_count") | Boolean |  | `False` |  | Prefer paths with lowest hop-count.<br>Only applicable for `wan_mode: "cv-pathfinder"`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;lowest_hop_count</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.lowest_hop_count") | Boolean |  |  |  | Prefer paths with lowest hop-count.<br>Only applicable for `wan_mode: "cv-pathfinder"`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;constraints</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.constraints") | Dictionary |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jitter</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.constraints.jitter") | Integer |  |  | Min: 0<br>Max: 10000 | Jitter requirement for this load balance policy in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;latency</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.constraints.latency") | Integer |  |  | Min: 0<br>Max: 10000 | One way delay requirement for this load balance policy in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loss_rate</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.constraints.loss_rate") | String |  |  | Pattern: `^\d+(\.\d{1,2})?$` | Loss Rate requirement in percentage for this load balance policy.<br>Value between 0.00 and 100.00. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;outlier_elimination</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.outlier_elimination") | Dictionary |  |  |  | AVT path outlier elimination. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;disabled</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.outlier_elimination.disabled") | Boolean |  |  |  | Set true to disable the AVT path outlier elimination. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;threshold</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.outlier_elimination.threshold") | Dictionary |  |  |  | Change the threshold values for path comparison. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jitter</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.outlier_elimination.threshold.jitter") | Integer |  |  | Min: 0<br>Max: 10000 | Jitter threshold in millisecond. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;latency</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.outlier_elimination.threshold.latency") | Integer |  |  | Min: 0<br>Max: 10000 | Latency threshold in millisecond. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;load</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.outlier_elimination.threshold.load") | String |  |  |  | Load threshold percentage. Valid range <0.00-100.00>. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loss_rate</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.outlier_elimination.threshold.loss_rate") | String |  |  |  | Loss-rate threshold percentage. Valid range <0.00-100.00>. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;metric_order</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.metric_order") | Dictionary |  |  |  | Metric order to be used for path comparison. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;preferred_metric</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.metric_order.preferred_metric") | String | Required |  | Valid Values:<br>- <code>jitter</code><br>- <code>latency</code><br>- <code>load</code><br>- <code>loss-rate</code> |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;path_groups</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.path_groups") | List, items: Dictionary |  |  | Min Length: 1 |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;names</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.path_groups.[].names") | List, items: String | Required |  | Min Length: 1 | List of path-group names. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "wan_virtual_topologies.control_plane_virtual_topology.path_groups.[].names.[]") | String |  |  |  |  |
@@ -36,11 +45,20 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;id</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].id") | Integer |  |  | Min: 2<br>Max: 253 | ID of the AVT in each VRFs. ID must be unique across all virtual topologies in a policy.<br>ID 1 is reserved for the default_virtual_toplogy.<br>ID 254 is reserved for the control_plane_virtual_topology.<br><br>`id` is required when `wan_mode` is 'cv-pathfinder'. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;traffic_class</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].traffic_class") | Integer |  |  | Min: 0<br>Max: 7 | Set traffic-class for matched traffic. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dscp</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].dscp") | Integer |  |  | Min: 0<br>Max: 63 | Set DSCP for matched traffic. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lowest_hop_count</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].lowest_hop_count") | Boolean |  | `False` |  | Prefer paths with lowest hop-count.<br>Only applicable for `wan_mode: "cv-pathfinder"`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lowest_hop_count</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].lowest_hop_count") | Boolean |  |  |  | Prefer paths with lowest hop-count.<br>Only applicable for `wan_mode: "cv-pathfinder"`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;constraints</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].constraints") | Dictionary |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jitter</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].constraints.jitter") | Integer |  |  | Min: 0<br>Max: 10000 | Jitter requirement for this load balance policy in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;latency</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].constraints.latency") | Integer |  |  | Min: 0<br>Max: 10000 | One way delay requirement for this load balance policy in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loss_rate</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].constraints.loss_rate") | String |  |  | Pattern: `^\d+(\.\d{1,2})?$` | Loss Rate requirement in percentage for this load balance policy.<br>Value between 0.00 and 100.00. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outlier_elimination</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].outlier_elimination") | Dictionary |  |  |  | AVT path outlier elimination. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;disabled</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].outlier_elimination.disabled") | Boolean |  |  |  | Set true to disable the AVT path outlier elimination. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;threshold</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].outlier_elimination.threshold") | Dictionary |  |  |  | Change the threshold values for path comparison. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jitter</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].outlier_elimination.threshold.jitter") | Integer |  |  | Min: 0<br>Max: 10000 | Jitter threshold in millisecond. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;latency</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].outlier_elimination.threshold.latency") | Integer |  |  | Min: 0<br>Max: 10000 | Latency threshold in millisecond. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;load</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].outlier_elimination.threshold.load") | String |  |  |  | Load threshold percentage. Valid range <0.00-100.00>. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loss_rate</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].outlier_elimination.threshold.loss_rate") | String |  |  |  | Loss-rate threshold percentage. Valid range <0.00-100.00>. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;metric_order</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].metric_order") | Dictionary |  |  |  | Metric order to be used for path comparison. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;preferred_metric</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].metric_order.preferred_metric") | String | Required |  | Valid Values:<br>- <code>jitter</code><br>- <code>latency</code><br>- <code>load</code><br>- <code>loss-rate</code> |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;path_groups</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].path_groups") | List, items: Dictionary |  |  | Min Length: 1 |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;names</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].path_groups.[].names") | List, items: String | Required |  | Min Length: 1 | List of path-group names. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "wan_virtual_topologies.policies.[].application_virtual_topologies.[].path_groups.[].names.[]") | String |  |  |  |  |
@@ -52,11 +70,20 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;drop_unmatched</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.drop_unmatched") | Boolean |  | `False` |  | When set, no `catch-all` match is configured for the policy and unmatched traffic is dropped. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;traffic_class</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.traffic_class") | Integer |  |  | Min: 0<br>Max: 7 | Set traffic-class for matched traffic. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dscp</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.dscp") | Integer |  |  | Min: 0<br>Max: 63 | Set DSCP for matched traffic. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lowest_hop_count</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.lowest_hop_count") | Boolean |  | `False` |  | Prefer paths with lowest hop-count.<br>Only applicable for `wan_mode: "cv-pathfinder"`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lowest_hop_count</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.lowest_hop_count") | Boolean |  |  |  | Prefer paths with lowest hop-count.<br>Only applicable for `wan_mode: "cv-pathfinder"`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;constraints</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.constraints") | Dictionary |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jitter</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.constraints.jitter") | Integer |  |  | Min: 0<br>Max: 10000 | Jitter requirement for this load balance policy in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;latency</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.constraints.latency") | Integer |  |  | Min: 0<br>Max: 10000 | One way delay requirement for this load balance policy in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loss_rate</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.constraints.loss_rate") | String |  |  | Pattern: `^\d+(\.\d{1,2})?$` | Loss Rate requirement in percentage for this load balance policy.<br>Value between 0.00 and 100.00. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outlier_elimination</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.outlier_elimination") | Dictionary |  |  |  | AVT path outlier elimination. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;disabled</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.outlier_elimination.disabled") | Boolean |  |  |  | Set true to disable the AVT path outlier elimination. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;threshold</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.outlier_elimination.threshold") | Dictionary |  |  |  | Change the threshold values for path comparison. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jitter</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.outlier_elimination.threshold.jitter") | Integer |  |  | Min: 0<br>Max: 10000 | Jitter threshold in millisecond. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;latency</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.outlier_elimination.threshold.latency") | Integer |  |  | Min: 0<br>Max: 10000 | Latency threshold in millisecond. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;load</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.outlier_elimination.threshold.load") | String |  |  |  | Load threshold percentage. Valid range <0.00-100.00>. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loss_rate</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.outlier_elimination.threshold.loss_rate") | String |  |  |  | Loss-rate threshold percentage. Valid range <0.00-100.00>. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;metric_order</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.metric_order") | Dictionary |  |  |  | Metric order to be used for path comparison. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;preferred_metric</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.metric_order.preferred_metric") | String | Required |  | Valid Values:<br>- <code>jitter</code><br>- <code>latency</code><br>- <code>load</code><br>- <code>loss-rate</code> |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;path_groups</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.path_groups") | List, items: Dictionary |  |  | Min Length: 1 |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;names</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.path_groups.[].names") | List, items: String | Required |  | Min Length: 1 | List of path-group names. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "wan_virtual_topologies.policies.[].default_virtual_topology.path_groups.[].names.[]") | String |  |  |  |  |
@@ -119,7 +146,7 @@
 
         # Prefer paths with lowest hop-count.
         # Only applicable for `wan_mode: "cv-pathfinder"`.
-        lowest_hop_count: <bool; default=False>
+        lowest_hop_count: <bool>
         constraints:
 
           # Jitter requirement for this load balance policy in milliseconds.
@@ -131,6 +158,31 @@
           # Loss Rate requirement in percentage for this load balance policy.
           # Value between 0.00 and 100.00.
           loss_rate: <str>
+
+        # AVT path outlier elimination.
+        outlier_elimination:
+
+          # Set true to disable the AVT path outlier elimination.
+          disabled: <bool>
+
+          # Change the threshold values for path comparison.
+          threshold:
+
+            # Jitter threshold in millisecond.
+            jitter: <int; 0-10000>
+
+            # Latency threshold in millisecond.
+            latency: <int; 0-10000>
+
+            # Load threshold percentage. Valid range <0.00-100.00>.
+            load: <str>
+
+            # Loss-rate threshold percentage. Valid range <0.00-100.00>.
+            loss_rate: <str>
+
+        # Metric order to be used for path comparison.
+        metric_order:
+          preferred_metric: <str; "jitter" | "latency" | "load" | "loss-rate"; required>
         path_groups: # >=1 items
 
             # List of path-group names.
@@ -204,7 +256,7 @@
 
               # Prefer paths with lowest hop-count.
               # Only applicable for `wan_mode: "cv-pathfinder"`.
-              lowest_hop_count: <bool; default=False>
+              lowest_hop_count: <bool>
               constraints:
 
                 # Jitter requirement for this load balance policy in milliseconds.
@@ -216,6 +268,31 @@
                 # Loss Rate requirement in percentage for this load balance policy.
                 # Value between 0.00 and 100.00.
                 loss_rate: <str>
+
+              # AVT path outlier elimination.
+              outlier_elimination:
+
+                # Set true to disable the AVT path outlier elimination.
+                disabled: <bool>
+
+                # Change the threshold values for path comparison.
+                threshold:
+
+                  # Jitter threshold in millisecond.
+                  jitter: <int; 0-10000>
+
+                  # Latency threshold in millisecond.
+                  latency: <int; 0-10000>
+
+                  # Load threshold percentage. Valid range <0.00-100.00>.
+                  load: <str>
+
+                  # Loss-rate threshold percentage. Valid range <0.00-100.00>.
+                  loss_rate: <str>
+
+              # Metric order to be used for path comparison.
+              metric_order:
+                preferred_metric: <str; "jitter" | "latency" | "load" | "loss-rate"; required>
               path_groups: # >=1 items
 
                   # List of path-group names.
@@ -256,7 +333,7 @@
 
             # Prefer paths with lowest hop-count.
             # Only applicable for `wan_mode: "cv-pathfinder"`.
-            lowest_hop_count: <bool; default=False>
+            lowest_hop_count: <bool>
             constraints:
 
               # Jitter requirement for this load balance policy in milliseconds.
@@ -268,6 +345,31 @@
               # Loss Rate requirement in percentage for this load balance policy.
               # Value between 0.00 and 100.00.
               loss_rate: <str>
+
+            # AVT path outlier elimination.
+            outlier_elimination:
+
+              # Set true to disable the AVT path outlier elimination.
+              disabled: <bool>
+
+              # Change the threshold values for path comparison.
+              threshold:
+
+                # Jitter threshold in millisecond.
+                jitter: <int; 0-10000>
+
+                # Latency threshold in millisecond.
+                latency: <int; 0-10000>
+
+                # Load threshold percentage. Valid range <0.00-100.00>.
+                load: <str>
+
+                # Loss-rate threshold percentage. Valid range <0.00-100.00>.
+                loss_rate: <str>
+
+            # Metric order to be used for path comparison.
+            metric_order:
+              preferred_metric: <str; "jitter" | "latency" | "load" | "loss-rate"; required>
             path_groups: # >=1 items
 
                 # List of path-group names.

@@ -8,8 +8,6 @@ from ipaddress import ip_network
 from typing import TYPE_CHECKING, Protocol
 
 from pyavd._errors import AristaAvdInvalidInputsError
-from pyavd._utils import get
-from pyavd.j2filters import natural_sort
 
 if TYPE_CHECKING:
     from . import SharedUtilsProtocol
@@ -64,9 +62,6 @@ class InbandManagementMixin(Protocol):
 
         Otherwise return None
         """
-        if not self.inband_mgmt_ip:
-            return None
-
         if not self.configure_parent_for_inband_mgmt:
             return self.node_config.inband_mgmt_gateway
 
@@ -87,9 +82,6 @@ class InbandManagementMixin(Protocol):
 
         Otherwise return None
         """
-        if not self.inband_mgmt_ipv6_address:
-            return None
-
         if not self.configure_parent_for_inband_mgmt_ipv6:
             return self.node_config.inband_mgmt_ipv6_gateway
 
@@ -116,7 +108,7 @@ class InbandManagementMixin(Protocol):
             return None
 
         if self.id is None:
-            msg = f"'id' is not set on '{self.hostname}' and is required to set inband_mgmt_ip from inband_mgmt_subnet"
+            msg = "'id' is required to set inband_mgmt_ip from inband_mgmt_subnet"
             raise AristaAvdInvalidInputsError(msg)
 
         subnet = ip_network(self.node_config.inband_mgmt_subnet, strict=False)
@@ -140,7 +132,7 @@ class InbandManagementMixin(Protocol):
             return None
 
         if self.id is None:
-            msg = f"'id' is not set on '{self.hostname}' and is required to set inband_mgmt_ipv6_address from inband_mgmt_ipv6_subnet"
+            msg = "'id' is required to set inband_mgmt_ipv6_address from inband_mgmt_ipv6_subnet"
             raise AristaAvdInvalidInputsError(msg)
 
         subnet = ip_network(self.node_config.inband_mgmt_ipv6_subnet, strict=False)
@@ -171,14 +163,13 @@ class InbandManagementMixin(Protocol):
         svis = {}
         subnets = []
         ipv6_subnets = []
-        peers = natural_sort(get(self.hostvars, f"avd_topology_peers..{self.hostname}", separator="..", default=[]))
-        for peer in peers:
-            peer_facts = self.get_peer_facts(peer, required=True)
-            if (vlan := peer_facts.get("inband_mgmt_vlan")) is None:
+        for peer in self.switch_facts.downlink_switches:
+            peer_facts = self.get_peer_facts(peer)
+            if (vlan := peer_facts.inband_mgmt_vlan) is None:
                 continue
 
-            subnet = peer_facts.get("inband_mgmt_subnet")
-            ipv6_subnet = peer_facts.get("inband_mgmt_ipv6_subnet")
+            subnet = peer_facts.inband_mgmt_subnet
+            ipv6_subnet = peer_facts.inband_mgmt_ipv6_subnet
             if vlan not in svis:
                 svis[vlan] = {"ipv4": None, "ipv6": None}
 

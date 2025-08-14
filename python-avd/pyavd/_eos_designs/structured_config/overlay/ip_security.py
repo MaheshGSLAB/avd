@@ -3,7 +3,7 @@
 # that can be found in the LICENSE file.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.structured_config.structured_config_generator import structured_config_contributor
@@ -36,13 +36,13 @@ class IpSecurityMixin(Protocol):
         if not self.inputs.wan_ipsec_profiles:
             msg = "wan_ipsec_profiles"
             raise AristaAvdMissingVariableError(msg)
-        if not self.inputs.wan_ipsec_profiles.control_plane:
-            msg = "wan_ipsec_profiles.control_plane"
-            raise AristaAvdMissingVariableError(msg)
 
         if self.shared_utils.is_wan_client and self.inputs.wan_ipsec_profiles.data_plane:
             self._set_data_plane()
         self._set_control_plane()
+        # settings applicable to all ipsec connections
+        if self.inputs.ipsec_settings.bind_connection_to_interface:
+            self.structured_config.ip_security.connection_tx_interface_match_source_ip = True
 
     def _set_data_plane(self: AvdStructuredConfigOverlayProtocol) -> None:
         """Set ip_security structured config for DataPlane."""
@@ -50,11 +50,17 @@ class IpSecurityMixin(Protocol):
         ike_policy_name = data_plane_config.ike_policy_name if self.shared_utils.wan_ha_ipsec else None
         sa_policy_name = data_plane_config.sa_policy_name
         profile_name = data_plane_config.profile_name
-        key = data_plane_config.shared_key
+        if data_plane_config.shared_key:
+            key = data_plane_config.shared_key
+        elif data_plane_config.cleartext_shared_key:
+            key = self.shared_utils.get_ipsec_key(data_plane_config.cleartext_shared_key, profile_name)
+        else:
+            msg = "`wan_ipsec_profile.data_plane.shared_key` or `wan_ipsec_profile.data_plane.cleartext_shared_key`"
+            raise AristaAvdMissingVariableError(msg)
 
         # IKE policy for data-plane is not required for dynamic tunnels except for HA cases
         if self.shared_utils.wan_ha_ipsec:
-            self.structured_config.ip_security.ike_policies.append_new(name=ike_policy_name, local_id=self.shared_utils.vtep_ip)
+            self.structured_config.ip_security.ike_policies.append_new(name=cast("str", ike_policy_name), local_id=self.shared_utils.vtep_ip)
         self._set_sa_policy(sa_policy_name)
         self._set_profile(profile_name, ike_policy_name, sa_policy_name, key)
 
@@ -71,7 +77,13 @@ class IpSecurityMixin(Protocol):
         ike_policy_name = control_plane_config.ike_policy_name
         sa_policy_name = control_plane_config.sa_policy_name
         profile_name = control_plane_config.profile_name
-        key = control_plane_config.shared_key
+        if control_plane_config.shared_key:
+            key = control_plane_config.shared_key
+        elif control_plane_config.cleartext_shared_key:
+            key = self.shared_utils.get_ipsec_key(control_plane_config.cleartext_shared_key, profile_name)
+        else:
+            msg = "`wan_ipsec_profile.control_plane.shared_key` or `wan_ipsec_profile.control_plane.cleartext_shared_key`"
+            raise AristaAvdMissingVariableError(msg)
 
         self.structured_config.ip_security.ike_policies.append_new(name=ike_policy_name, local_id=self.shared_utils.vtep_ip)
         self._set_sa_policy(sa_policy_name)
@@ -102,16 +114,15 @@ class IpSecurityMixin(Protocol):
         as suggested would prevent Pathfinders to establish IPsec tunnels between themselves
         which is undesirable.
         """
-        if self.shared_utils.wan_role is not None:
-            self.structured_config.ip_security.profiles.append_new(
-                name=profile_name,
-                ike_policy=ike_policy_name,
-                sa_policy=sa_policy_name,
-                connection="start",
-                shared_key=key,
-                mode="transport",
-                dpd=EosCliConfigGen.IpSecurity.ProfilesItem.Dpd(interval=10, time=50, action="clear"),
-            )
+        self.structured_config.ip_security.profiles.append_new(
+            name=profile_name,
+            ike_policy=ike_policy_name,
+            sa_policy=sa_policy_name,
+            connection="start",
+            shared_key=key,
+            mode="transport",
+            dpd=EosCliConfigGen.IpSecurity.ProfilesItem.Dpd(interval=10, time=50, action="clear"),
+        )
 
     def _set_key_controller(self: AvdStructuredConfigOverlayProtocol, profile_name: str) -> None:
         """Set the key_controller structure if the device is not a RR or pathfinder."""

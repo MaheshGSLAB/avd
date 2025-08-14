@@ -16,7 +16,7 @@ SCHEMA = AvdSchemaTools(schema_id="eos_cli_config_gen").avdschema._schema
 @pytest.mark.molecule_scenarios(
     "eos_designs_unit_tests",
     "eos_designs_deprecated_vars",
-    "eos_designs_l2l2",
+    "eos_designs-l2ls",
     "eos_designs-mpls-isis-sr-ldp",
     # TODO: "eos_designs-twodc-5stage-clos", # Remove inline jinja
     "evpn_underlay_ebgp_overlay_ebgp",
@@ -29,9 +29,11 @@ SCHEMA = AvdSchemaTools(schema_id="eos_cli_config_gen").avdschema._schema
     "example-isis-ldp-ipvpn",
     "example-l2ls-fabric",
     "example-single-dc-l3ls",
+    "example-single-dc-l3ls-ipv6",
     "eos_cli_config_gen",
     "eos_cli_config_gen_deprecated_vars",
 )
+@pytest.mark.digital_twin_molecule_scenarios("eos_designs-twodc-5stage-clos")
 def test_validate_structured_config_with_valid_data(molecule_host: MoleculeHost) -> None:
     """Test validate_structured_config."""
     if molecule_host.scenario.name.startswith("eos_cli_config_gen"):

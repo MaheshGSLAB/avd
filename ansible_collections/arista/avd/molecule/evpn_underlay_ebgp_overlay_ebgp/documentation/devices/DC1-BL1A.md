@@ -157,14 +157,14 @@ Enable password has been disabled
 
 | CV Compression | CloudVision Servers | VRF | Authentication | Smash Excludes | Ingest Exclude | Bypass AAA |
 | -------------- | ------------------- | --- | -------------- | -------------- | -------------- | ---------- |
-| gzip | 192.168.200.11:9910 | MGMT | key,<removed> | ale,flexCounter,hardware,kni,pulse,strata | /Sysdb/cell/1/agent,/Sysdb/cell/2/agent | False |
+| gzip | 192.168.200.11:9910 | MGMT | token,/tmp/token | ale,flexCounter,hardware,kni,pulse,strata | - | False |
 
 #### TerminAttr Daemon Device Configuration
 
 ```eos
 !
 daemon TerminAttr
-   exec /usr/bin/TerminAttr -cvaddr=192.168.200.11:9910 -cvauth=key,<removed> -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -ingestexclude=/Sysdb/cell/1/agent,/Sysdb/cell/2/agent -taillogs
+   exec /usr/bin/TerminAttr -cvaddr=192.168.200.11:9910 -cvauth=token,/tmp/token -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -taillogs -cvsourceintf=Management1
    no shutdown
 ```
 
@@ -676,13 +676,13 @@ ASN Notation: asplain
 
 #### Router BGP VRFs
 
-| VRF | Route-Distinguisher | Redistribute |
-| --- | ------------------- | ------------ |
-| Tenant_A_WAN_Zone | 192.168.255.14:14 | connected<br>static |
-| Tenant_B_OP_Zone | 192.168.255.14:20 | connected |
-| Tenant_B_WAN_Zone | 192.168.255.14:21 | connected |
-| Tenant_C_WAN_Zone | 192.168.255.14:31 | connected |
-| Tenant_L3_VRF_Zone | 192.168.255.14:15 | connected |
+| VRF | Route-Distinguisher | Redistribute | Graceful Restart |
+| --- | ------------------- | ------------ | ---------------- |
+| Tenant_A_WAN_Zone | 192.168.255.14:14 | connected<br>static | - |
+| Tenant_B_OP_Zone | 192.168.255.14:20 | connected | - |
+| Tenant_B_WAN_Zone | 192.168.255.14:21 | connected | - |
+| Tenant_C_WAN_Zone | 192.168.255.14:31 | connected | - |
+| Tenant_L3_VRF_Zone | 192.168.255.14:15 | connected | - |
 
 #### Router BGP Device Configuration
 
@@ -849,9 +849,9 @@ router bfd
 
 ### Queue Monitor Length
 
-| Enabled | Logging Interval | Default Thresholds High | Default Thresholds Low | Notifying | TX Latency | CPU Thresholds High | CPU Thresholds Low |
-| ------- | ---------------- | ----------------------- | ---------------------- | --------- | ---------- | ------------------- | ------------------ |
-| True | 5 | - | - | enabled | disabled | - | - |
+| Enabled | Logging Interval | Default Thresholds High | Default Thresholds Low | Notifying | TX Latency | CPU Thresholds High | CPU Thresholds Low | Mirroring Enabled | Mirror destinations |
+| ------- | ---------------- | ----------------------- | ---------------------- | --------- | ---------- | ------------------- | ------------------ | ----------------- | ------------------ |
+| True | 5 | - | - | enabled | disabled | - | - | - | - |
 
 ### Queue Monitor Configuration
 

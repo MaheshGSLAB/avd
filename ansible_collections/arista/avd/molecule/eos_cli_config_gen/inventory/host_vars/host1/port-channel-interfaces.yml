@@ -18,6 +18,7 @@ port_channel_interfaces:
       trunk:
         allowed_vlan: 110,201
     mlag: 5
+    ntp_serve: true
     storm_control:
       broadcast:
         level: 1
@@ -87,6 +88,7 @@ port_channel_interfaces:
         allowed_vlan: 110,201
         private_vlan_secondary: false
     mlag: 15
+    ntp_serve: false
     spanning_tree_guard: loop
     # Test isis authentication both md5 rx
     isis_authentication:
@@ -554,6 +556,7 @@ port_channel_interfaces:
         sparse_mode: true
         bfd: true
         bidirectional: true
+        neighbor_filter: Test_Filter_PortChannel
         hello:
           count: 4.5
           interval: 15
@@ -1070,6 +1073,8 @@ port_channel_interfaces:
       enabled: true
       administrative_groups:
         - 7
+      srlgs:
+        - 666
       min_delay_dynamic:
         twamp_light_fallback:
           number: 123
@@ -1086,7 +1091,9 @@ port_channel_interfaces:
         - 4
         - 7-100
         - testgrp
-      srlg: 16
+      srlgs:
+        - 16
+        - TEST
       metric: 2
       bandwidth:
         number: 100

@@ -27,9 +27,15 @@ class AristaAvdInvalidInputsError(AristaAvdError):
 
 
 class AristaAvdMissingVariableError(AristaAvdError):
-    def __init__(self, variable: str | None = None) -> None:
-        self.message = f"'{variable}' is required but was not found."
-        super().__init__(self.message)
+    variable: str | None
+    host: str | None
+
+    def __init__(self, variable: str | None = None, host: str | None = None) -> None:
+        self.variable = variable
+        self.host = host
+        host_msg = f" for host '{host}'" if host else ""
+        message = f"'{variable}' is required but was not found{host_msg}."
+        super().__init__(message)
 
 
 class AvdSchemaError(AristaAvdError):
@@ -70,13 +76,11 @@ class AvdDeprecationWarning(AristaAvdError):  # noqa: N818
         if removed:
             messages.append(f"The input data model '{self.path}' was removed.")
         elif conflict and new_key:
-            self.new_key_path = self._json_path_to_string(key[:-1]) + "." + new_key
+            self.new_key_path = ".".join(item for item in [self._json_path_to_string(key[:-1]), new_key] if item)
             messages.append(
                 f"The input data model '{self.path}' is deprecated and cannot be used in conjunction with the new data model '{self.new_key_path}'. "
                 "This usually happens when a data model has been updated and custom structured configuration still uses the old model."
             )
-            if not url:
-                url = "the porting guide on https://avd.arista.com"
         else:
             messages.append(f"The input data model '{self.path}' is deprecated.")
 

@@ -7,6 +7,7 @@
   - [Management Interfaces](#management-interfaces)
   - [DNS Domain](#dns-domain)
   - [IP Name Servers](#ip-name-servers)
+  - [Domain Lookup](#domain-lookup)
   - [NTP](#ntp)
   - [Management API HTTP](#management-api-http)
 - [Authentication](#authentication)
@@ -138,6 +139,20 @@ dns domain wan.example.local
 ip name-server vrf MGMT 192.168.17.1
 ```
 
+### Domain Lookup
+
+#### DNS Domain Lookup Summary
+
+| Source interface | vrf |
+| ---------------- | --- |
+| Management1 | MGMT |
+
+#### DNS Domain Lookup Device Configuration
+
+```eos
+ip domain lookup vrf MGMT source-interface Management1
+```
+
 ### NTP
 
 #### NTP Summary
@@ -196,7 +211,7 @@ management api http-commands
 
 | User | Privilege | Role | Disabled | Shell |
 | ---- | --------- | ---- | -------- | ----- |
-| ansible | 15 | network-admin | False | - |
+| admin | 15 | network-admin | False | - |
 | arista | 15 | network-admin | False | - |
 | cvpadmin | 15 | network-admin | False | - |
 
@@ -204,7 +219,7 @@ management api http-commands
 
 ```eos
 !
-username ansible privilege 15 role network-admin secret sha512 <removed>
+username admin privilege 15 role network-admin nopassword
 username arista privilege 15 role network-admin secret sha512 <removed>
 username cvpadmin privilege 15 role network-admin secret sha512 <removed>
 ```
@@ -269,14 +284,14 @@ management security
 
 | CV Compression | CloudVision Servers | VRF | Authentication | Smash Excludes | Ingest Exclude | Bypass AAA |
 | -------------- | ------------------- | --- | -------------- | -------------- | -------------- | ---------- |
-| gzip | www.cv-staging.corp.arista.io:443 | MGMT | token-secure,/tmp/cv-onboarding-token | ale,flexCounter,hardware,kni,pulse,strata | /Sysdb/cell/1/agent,/Sysdb/cell/2/agent | False |
+| gzip | apiserver.arista.io:443 | MGMT | token-secure,/tmp/cv-onboarding-token | ale,flexCounter,hardware,kni,pulse,strata | - | False |
 
 #### TerminAttr Daemon Device Configuration
 
 ```eos
 !
 daemon TerminAttr
-   exec /usr/bin/TerminAttr -cvaddr=www.cv-staging.corp.arista.io:443 -cvauth=token-secure,/tmp/cv-onboarding-token -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -ingestexclude=/Sysdb/cell/1/agent,/Sysdb/cell/2/agent -taillogs
+   exec /usr/bin/TerminAttr -cvaddr=apiserver.arista.io:443 -cvauth=token-secure,/tmp/cv-onboarding-token -cvvrf=MGMT -smashexcludes=ale,flexCounter,hardware,kni,pulse,strata -taillogs -cvsourceintf=Management1
    no shutdown
 ```
 
@@ -294,7 +309,7 @@ daemon TerminAttr
 
 | Tracker Name | Exporter Name | Collector IP/Host | Collector Port | Local Interface |
 | ------------ | ------------- | ----------------- | -------------- | --------------- |
-| FLOW-TRACKER | CV-TELEMETRY | - | - | Loopback0 |
+| FLOW-TRACKER | CV-TELEMETRY | 127.0.0.1 | - | Loopback0 |
 
 #### Flow Tracking Device Configuration
 
@@ -436,12 +451,12 @@ interface Dps1
 
 | Interface | Description | Channel Group | IP Address | VRF |  MTU | Shutdown | ACL In | ACL Out |
 | --------- | ----------- | ------------- | ---------- | ----| ---- | -------- | ------ | ------- |
-| Ethernet1 | P2P_site1-border1_Ethernet3 | - | 10.0.1.9/31 | default | 9214 | False | - | - |
-| Ethernet1.100 | P2P_site1-border1_Ethernet3.100_VRF_BLUE | - | 10.0.1.9/31 | BLUE | 9214 | False | - | - |
-| Ethernet1.101 | P2P_site1-border1_Ethernet3.101_VRF_RED | - | 10.0.1.9/31 | RED | 9214 | False | - | - |
-| Ethernet2 | P2P_site1-border2_Ethernet3 | - | 10.0.1.11/31 | default | 9214 | False | - | - |
-| Ethernet2.100 | P2P_site1-border2_Ethernet3.100_VRF_BLUE | - | 10.0.1.11/31 | BLUE | 9214 | False | - | - |
-| Ethernet2.101 | P2P_site1-border2_Ethernet3.101_VRF_RED | - | 10.0.1.11/31 | RED | 9214 | False | - | - |
+| Ethernet1 | P2P_site1-border1_Ethernet3 | - | 10.0.1.9/31 | default | 9194 | False | - | - |
+| Ethernet1.100 | P2P_site1-border1_Ethernet3.100_VRF_BLUE | - | 10.0.1.9/31 | BLUE | 9194 | False | - | - |
+| Ethernet1.101 | P2P_site1-border1_Ethernet3.101_VRF_RED | - | 10.0.1.9/31 | RED | 9194 | False | - | - |
+| Ethernet2 | P2P_site1-border2_Ethernet3 | - | 10.0.1.11/31 | default | 9194 | False | - | - |
+| Ethernet2.100 | P2P_site1-border2_Ethernet3.100_VRF_BLUE | - | 10.0.1.11/31 | BLUE | 9194 | False | - | - |
+| Ethernet2.101 | P2P_site1-border2_Ethernet3.101_VRF_RED | - | 10.0.1.11/31 | RED | 9194 | False | - | - |
 | Ethernet3 | ACME-MPLS-INC_mpls-site1-wan1_mpls-cloud_Ethernet5 | - | 172.18.10.2/24 | default | - | False | - | - |
 | Ethernet4 | REGION1-INTERNET-CORP_inet-site1-wan1_inet-cloud_Ethernet5 | - | 100.64.10.2/24 | default | - | False | ACL-INTERNET-IN_Ethernet4 | - |
 
@@ -452,7 +467,7 @@ interface Dps1
 interface Ethernet1
    description P2P_site1-border1_Ethernet3
    no shutdown
-   mtu 9214
+   mtu 9194
    no switchport
    flow tracker hardware FLOW-TRACKER
    ip address 10.0.1.9/31
@@ -460,7 +475,7 @@ interface Ethernet1
 interface Ethernet1.100
    description P2P_site1-border1_Ethernet3.100_VRF_BLUE
    no shutdown
-   mtu 9214
+   mtu 9194
    encapsulation dot1q vlan 100
    flow tracker hardware FLOW-TRACKER
    vrf BLUE
@@ -469,7 +484,7 @@ interface Ethernet1.100
 interface Ethernet1.101
    description P2P_site1-border1_Ethernet3.101_VRF_RED
    no shutdown
-   mtu 9214
+   mtu 9194
    encapsulation dot1q vlan 101
    flow tracker hardware FLOW-TRACKER
    vrf RED
@@ -478,7 +493,7 @@ interface Ethernet1.101
 interface Ethernet2
    description P2P_site1-border2_Ethernet3
    no shutdown
-   mtu 9214
+   mtu 9194
    no switchport
    flow tracker hardware FLOW-TRACKER
    ip address 10.0.1.11/31
@@ -486,7 +501,7 @@ interface Ethernet2
 interface Ethernet2.100
    description P2P_site1-border2_Ethernet3.100_VRF_BLUE
    no shutdown
-   mtu 9214
+   mtu 9194
    encapsulation dot1q vlan 100
    flow tracker hardware FLOW-TRACKER
    vrf BLUE
@@ -495,7 +510,7 @@ interface Ethernet2.100
 interface Ethernet2.101
    description P2P_site1-border2_Ethernet3.101_VRF_RED
    no shutdown
-   mtu 9214
+   mtu 9194
    encapsulation dot1q vlan 101
    flow tracker hardware FLOW-TRACKER
    vrf RED
@@ -624,11 +639,13 @@ ip routing vrf RED
 | --- | ------------------ | ----------- | -------------- | ----------------------- | --- | ---------- | ------ |
 | MGMT | 0.0.0.0/0 | 192.168.17.1 | - | 1 | - | - | - |
 | default | 172.18.0.0/16 | 172.18.10.1 | - | 1 | - | - | - |
+| default | 0.0.0.0/0 | 100.64.10.1 | - | 1 | - | - | - |
 
 #### Static Routes Device Configuration
 
 ```eos
 !
+ip route 0.0.0.0/0 100.64.10.1
 ip route 172.18.0.0/16 172.18.10.1
 ip route vrf MGMT 0.0.0.0/0 192.168.17.1
 ```
@@ -919,11 +936,11 @@ ASN Notation: asplain
 
 #### Router BGP VRFs
 
-| VRF | Route-Distinguisher | Redistribute |
-| --- | ------------------- | ------------ |
-| BLUE | 192.168.255.3:100 | connected |
-| default | 192.168.255.3:1 | - |
-| RED | 192.168.255.3:101 | connected |
+| VRF | Route-Distinguisher | Redistribute | Graceful Restart |
+| --- | ------------------- | ------------ | ---------------- |
+| BLUE | 192.168.255.3:100 | connected | - |
+| default | 192.168.255.3:1 | - | - |
+| RED | 192.168.255.3:101 | connected | - |
 
 #### Router BGP Device Configuration
 

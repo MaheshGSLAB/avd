@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.structured_config.structured_config_generator import structured_config_contributor
-from pyavd._utils import get
+from pyavd.j2filters import natural_sort
 
 if TYPE_CHECKING:
     from . import AvdStructuredConfigUnderlayProtocol
@@ -35,14 +35,17 @@ class RouteMapsMixin(Protocol):
         if (self.shared_utils.overlay_routing_protocol != "none" or self.shared_utils.is_wan_router) and self.inputs.underlay_filter_redistribute_connected:
             # RM-CONN-2-BGP
             sequence_numbers = EosCliConfigGen.RouteMapsItem.SequenceNumbers()
-            sequence_10 = EosCliConfigGen.RouteMapsItem.SequenceNumbersItem(
-                sequence=10, type="permit", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match(["ip address prefix-list PL-LOOPBACKS-EVPN-OVERLAY"])
-            )
-            if self.shared_utils.wan_role:
-                sequence_10.set = EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Set([f"extcommunity soo {self.shared_utils.evpn_soo} additive"])
+            if not self.shared_utils.underlay_ipv6_numbered:
+                sequence_10 = EosCliConfigGen.RouteMapsItem.SequenceNumbersItem(
+                    sequence=10,
+                    type="permit",
+                    match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match(["ip address prefix-list PL-LOOPBACKS-EVPN-OVERLAY"]),
+                )
+                if self.shared_utils.wan_role:
+                    sequence_10.set = EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Set([f"extcommunity soo {self.shared_utils.evpn_soo} additive"])
 
-            sequence_numbers.append(sequence_10)
-            # SEQ 20 is set by inband management if applicable, so avoid setting that here
+                sequence_numbers.append(sequence_10)
+                # SEQ 20 is set by inband management if applicable, so avoid setting that here
 
             if self.shared_utils.underlay_ipv6 is True:
                 sequence_numbers.append_new(
@@ -67,14 +70,14 @@ class RouteMapsMixin(Protocol):
 
             add_p2p_links = False
             for peer in self._avd_peers:
-                peer_facts = self.shared_utils.get_peer_facts(peer, required=True)
-                for uplink in peer_facts["uplinks"]:
+                peer_facts = self.shared_utils.get_peer_facts(peer)
+                for uplink in peer_facts.uplinks:
                     if (
-                        uplink["peer"] == self.shared_utils.hostname
-                        and uplink["type"] == "underlay_p2p"
-                        and uplink.get("ip_address")
-                        and "unnumbered" not in uplink["ip_address"]
-                        and get(peer_facts, "inband_ztp")
+                        uplink.peer == self.shared_utils.hostname
+                        and uplink.type == "underlay_p2p"
+                        and uplink.ip_address
+                        and "unnumbered" not in uplink.ip_address.lower()
+                        and peer_facts.inband_ztp
                     ):
                         add_p2p_links = True
                         break
@@ -87,15 +90,23 @@ class RouteMapsMixin(Protocol):
                     match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match(["ip address prefix-list PL-P2P-LINKS"]),
                 )
 
+            if self.shared_utils.evpn_wan_gateway:
+                sequence_numbers.append_new(
+                    sequence=80, type="permit", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match(["ip address prefix-list PL-DPS-WAN-OVERLAY"])
+                )
+
             self.structured_config.route_maps.append_new(name="RM-CONN-2-BGP", sequence_numbers=sequence_numbers)
 
-        # RM-BGP-AS{{ asn }}-OUT
-        for asn in self._underlay_filter_peer_as_route_maps_asns:
-            route_map_name = f"RM-BGP-AS{asn}-OUT"
-            sequence_numbers = EosCliConfigGen.RouteMapsItem.SequenceNumbers()
-            sequence_numbers.append_new(sequence=10, type="deny", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match([f"as {asn}"]))
-            sequence_numbers.append_new(sequence=20, type="permit")
-            self.structured_config.route_maps.append_new(name=route_map_name, sequence_numbers=sequence_numbers)
+        if self.inputs.underlay_filter_peer_as:
+            # using set comprehension with `{}` to remove duplicates and then run natural_sort to convert to list.
+            underlay_filter_peer_as_route_maps_asns = natural_sort({link.peer_bgp_as for link in self._underlay_links if link.type == "underlay_p2p"})
+            # RM-BGP-AS{{ asn }}-OUT
+            for asn in underlay_filter_peer_as_route_maps_asns:
+                route_map_name = f"RM-BGP-AS{asn}-OUT"
+                sequence_numbers = EosCliConfigGen.RouteMapsItem.SequenceNumbers()
+                sequence_numbers.append_new(sequence=10, type="deny", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match([f"as {asn}"]))
+                sequence_numbers.append_new(sequence=20, type="permit")
+                self.structured_config.route_maps.append_new(name=route_map_name, sequence_numbers=sequence_numbers)
 
         # Route-map IN and OUT for SOO, rendered for WAN routers
         if self.shared_utils.underlay_routing_protocol == "ebgp" and self.shared_utils.wan_role == "client":

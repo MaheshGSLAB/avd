@@ -19,6 +19,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].peer") | String |  |  |  | The peer device name. Used for description and documentation.<br>If not set, this inherits the peer setting on the port-channel interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_interface</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].peer_interface") | String |  |  |  | The peer device interface. Used for description and documentation. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speed</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].speed") | String |  |  |  | Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structured_config</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].member_interfaces.[].structured_config") | Dictionary |  |  |  | Custom structured config for the member ethernet interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ip_address</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].ip_address") | String |  |  |  | Node IPv4 address/Mask or 'dhcp'. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dhcp_ip</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].dhcp_ip") | String |  |  |  | When the `ip_address` is `dhcp`, this optional field allows to indicate the expected<br>IPv4 address (without mask) to be allocated on the interface if known.<br>This is not rendered in the configuration but can be used for substitution of 'interface_ip' in the Access-list<br>set under `ipv4_acl_in` and `ipv4_acl_out`. |
@@ -31,8 +36,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.defaults.l3_port_channels.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -60,6 +65,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].peer") | String |  |  |  | The peer device name. Used for description and documentation.<br>If not set, this inherits the peer setting on the port-channel interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_interface</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].peer_interface") | String |  |  |  | The peer device interface. Used for description and documentation. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speed</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].speed") | String |  |  |  | Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structured_config</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].member_interfaces.[].structured_config") | Dictionary |  |  |  | Custom structured config for the member ethernet interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ip_address</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].ip_address") | String |  |  |  | Node IPv4 address/Mask or 'dhcp'. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dhcp_ip</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].dhcp_ip") | String |  |  |  | When the `ip_address` is `dhcp`, this optional field allows to indicate the expected<br>IPv4 address (without mask) to be allocated on the interface if known.<br>This is not rendered in the configuration but can be used for substitution of 'interface_ip' in the Access-list<br>set under `ipv4_acl_in` and `ipv4_acl_out`. |
@@ -72,8 +82,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.node_groups.[].nodes.[].l3_port_channels.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -97,6 +107,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].peer") | String |  |  |  | The peer device name. Used for description and documentation.<br>If not set, this inherits the peer setting on the port-channel interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_interface</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].peer_interface") | String |  |  |  | The peer device interface. Used for description and documentation. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speed</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].speed") | String |  |  |  | Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structured_config</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].member_interfaces.[].structured_config") | Dictionary |  |  |  | Custom structured config for the member ethernet interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ip_address</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].ip_address") | String |  |  |  | Node IPv4 address/Mask or 'dhcp'. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dhcp_ip</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].dhcp_ip") | String |  |  |  | When the `ip_address` is `dhcp`, this optional field allows to indicate the expected<br>IPv4 address (without mask) to be allocated on the interface if known.<br>This is not rendered in the configuration but can be used for substitution of 'interface_ip' in the Access-list<br>set under `ipv4_acl_in` and `ipv4_acl_out`. |
@@ -109,8 +124,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.node_groups.[].l3_port_channels.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -136,6 +151,11 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].peer") | String |  |  |  | The peer device name. Used for description and documentation.<br>If not set, this inherits the peer setting on the port-channel interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_interface</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].peer_interface") | String |  |  |  | The peer device interface. Used for description and documentation. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speed</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].speed") | String |  |  |  | Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rx_queue</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue") | Dictionary |  |  |  | Receive queue parameters for platform SFE interface profile.<br>This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.count") | Integer |  |  | Min: 1 | Number of receive queues.<br>The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;workers</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.workers") | List, items: String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.workers.[]") | String |  |  |  | Worker ids specified as values or range of values such as 0-4 or 7.<br>Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mode</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].rx_queue.mode") | String |  |  | Valid Values:<br>- <code>shared</code><br>- <code>exclusive</code> | Mode applicable to the workers. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structured_config</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].member_interfaces.[].structured_config") | Dictionary |  |  |  | Custom structured config for the member ethernet interface. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ip_address</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].ip_address") | String |  |  |  | Node IPv4 address/Mask or 'dhcp'. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dhcp_ip</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].dhcp_ip") | String |  |  |  | When the `ip_address` is `dhcp`, this optional field allows to indicate the expected<br>IPv4 address (without mask) to be allocated on the interface if known.<br>This is not rendered in the configuration but can be used for substitution of 'interface_ip' in the Access-list<br>set under `ipv4_acl_in` and `ipv4_acl_out`. |
@@ -148,8 +168,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_ip</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].peer_ip") | String |  |  |  | The peer device IPv4 address (no mask). Used as default route gateway if `set_default_route` is true and `ip` is an IP address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].bgp") | Dictionary |  |  |  | Enforce IPv4 BGP peering for the peer |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_as</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].bgp.peer_as") | String | Required |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces. |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_in</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_in") | String |  |  |  | Prefix List Name. Accept routes for only these prefixes from the peer.<br>Required for wan interfaces.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_prefix_list_out</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].bgp.ipv4_prefix_list_out") | String |  |  |  | Prefix List Name. Advertise routes for only these prefixes.<br>If not specified, nothing would be advertised.<br>The specified prefix list name must exist in `ipv4_prefix_list_catalog`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_in</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].ipv4_acl_in") | String |  |  |  | Name of the IPv4 access-list to be assigned in the ingress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip".<br>Required for all WAN interfaces (`wan_carrier` is set) unless the carrier is marked as 'trusted' under `wan_carriers`. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ipv4_acl_out</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].ipv4_acl_out") | String |  |  |  | Name of the IPv4 Access-list to be assigned in the egress direction.<br>The access-list must be defined under `ipv4_acls` and supports field substitution for "interface_ip" and "peer_ip". |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static_routes</samp>](## "<node_type_keys.key>.nodes.[].l3_port_channels.[].static_routes") | List, items: Dictionary |  |  | Min Length: 1 | Configure IPv4 static routes pointing to `peer_ip`. |
@@ -209,6 +229,22 @@
                 # Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`.
                 speed: <str>
 
+                # Receive queue parameters for platform SFE interface profile.
+                # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+                rx_queue:
+
+                  # Number of receive queues.
+                  # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                  count: <int; >=1>
+                  workers:
+
+                      # Worker ids specified as values or range of values such as 0-4 or 7.
+                      # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                    - <str>
+
+                  # Mode applicable to the workers.
+                  mode: <str; "shared" | "exclusive">
+
                 # Custom structured config for the member ethernet interface.
                 structured_config: <dict>
 
@@ -260,10 +296,12 @@
 
               # Prefix List Name. Accept routes for only these prefixes from the peer.
               # Required for wan interfaces.
+              # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
               ipv4_prefix_list_in: <str>
 
               # Prefix List Name. Advertise routes for only these prefixes.
               # If not specified, nothing would be advertised.
+              # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
               ipv4_prefix_list_out: <str>
 
             # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -359,6 +397,22 @@
                       # Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`.
                       speed: <str>
 
+                      # Receive queue parameters for platform SFE interface profile.
+                      # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+                      rx_queue:
+
+                        # Number of receive queues.
+                        # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                        count: <int; >=1>
+                        workers:
+
+                            # Worker ids specified as values or range of values such as 0-4 or 7.
+                            # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                          - <str>
+
+                        # Mode applicable to the workers.
+                        mode: <str; "shared" | "exclusive">
+
                       # Custom structured config for the member ethernet interface.
                       structured_config: <dict>
 
@@ -410,10 +464,12 @@
 
                     # Prefix List Name. Accept routes for only these prefixes from the peer.
                     # Required for wan interfaces.
+                    # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                     ipv4_prefix_list_in: <str>
 
                     # Prefix List Name. Advertise routes for only these prefixes.
                     # If not specified, nothing would be advertised.
+                    # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                     ipv4_prefix_list_out: <str>
 
                   # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -496,6 +552,22 @@
                   # Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`.
                   speed: <str>
 
+                  # Receive queue parameters for platform SFE interface profile.
+                  # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+                  rx_queue:
+
+                    # Number of receive queues.
+                    # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                    count: <int; >=1>
+                    workers:
+
+                        # Worker ids specified as values or range of values such as 0-4 or 7.
+                        # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                      - <str>
+
+                    # Mode applicable to the workers.
+                    mode: <str; "shared" | "exclusive">
+
                   # Custom structured config for the member ethernet interface.
                   structured_config: <dict>
 
@@ -547,10 +619,12 @@
 
                 # Prefix List Name. Accept routes for only these prefixes from the peer.
                 # Required for wan interfaces.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_in: <str>
 
                 # Prefix List Name. Advertise routes for only these prefixes.
                 # If not specified, nothing would be advertised.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_out: <str>
 
               # Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -639,6 +713,22 @@
                   # Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`.
                   speed: <str>
 
+                  # Receive queue parameters for platform SFE interface profile.
+                  # This setting is ignored unless the `platform_sfe_interface_profile.supported` is set as `true` under `platform_settings.feature_support` for the `platform` set on this device.
+                  rx_queue:
+
+                    # Number of receive queues.
+                    # The maximum value is determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                    count: <int; >=1>
+                    workers:
+
+                        # Worker ids specified as values or range of values such as 0-4 or 7.
+                        # Valid values are between 0 and one less than maximum value determined by `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the `platform` set on this device.
+                      - <str>
+
+                    # Mode applicable to the workers.
+                    mode: <str; "shared" | "exclusive">
+
                   # Custom structured config for the member ethernet interface.
                   structured_config: <dict>
 
@@ -690,10 +780,12 @@
 
                 # Prefix List Name. Accept routes for only these prefixes from the peer.
                 # Required for wan interfaces.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_in: <str>
 
                 # Prefix List Name. Advertise routes for only these prefixes.
                 # If not specified, nothing would be advertised.
+                # The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
                 ipv4_prefix_list_out: <str>
 
               # Name of the IPv4 access-list to be assigned in the ingress direction.

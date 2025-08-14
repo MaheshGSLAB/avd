@@ -231,8 +231,9 @@ class ModelSrc:
         if not self.fields:
             return ""
 
-        fields_types_dict = ", ".join(field.field_as_dict_str() for field in self.fields)
-        src = f"    _fields: ClassVar[dict] = {{{fields_types_dict}}}\n"
+        src = indent("_fields: ClassVar[dict] = {\n", INDENT)
+        src += indent(",\n".join(field.field_as_dict_str() for field in self.fields), INDENT * 2)
+        src += indent("\n}\n", INDENT)
 
         if field_to_key_map := {field.name: field.key for field in self.fields if field.name and field.key and field.name != field.key}:
             src += f"    _field_to_key_map: ClassVar[dict] = {field_to_key_map}\n"
@@ -258,7 +259,9 @@ class ModelSrc:
 
         field_as_args = ["self", "*", *(str(field).split("\n", maxsplit=1)[0] for field in self.fields)]
         src += indent("\n\nif TYPE_CHECKING:\n", INDENT)
-        src += indent(f"def __init__({', '.join(field_as_args)}) -> None:\n", INDENT * 2)
+        src += indent("def __init__(\n", INDENT * 2)
+        src += indent(",\n".join(field_as_args), INDENT * 3)
+        src += indent("\n)-> None:\n", INDENT * 2)
         src += indent(self._init_docstring(), INDENT * 2)
         return src
 
@@ -430,12 +433,12 @@ class FieldTypeHintSrc(AnnotationSrc):
         imports = set()
         if self.field_type == "list" and self.list_item_type in [None, "Any"]:
             imports.add("from typing import Any")
-
-        if "Literal[" in self.field_type:
+        elif "Literal[" in self.field_type:
             imports.add("from typing import Literal")
-
-        if self.field_type.startswith("EosCliConfigGen."):
+        elif self.field_type.startswith("EosCliConfigGen."):
             imports.add("from pyavd._eos_cli_config_gen.schema import EosCliConfigGen")
+        elif self.field_type.startswith("EosDesigns."):
+            imports.add("from pyavd._eos_designs.schema import EosDesigns")
 
         if not self.annotations:
             return imports

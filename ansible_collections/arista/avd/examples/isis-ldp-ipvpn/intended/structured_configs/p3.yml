@@ -87,10 +87,10 @@ local_users:
   privilege: 15
   role: network-admin
   no_password: true
-- name: ansible
+- name: arista
   privilege: 15
   role: network-admin
-  sha512_password: $6$QJUtFkyu9yoecsq.$ysGzlb2YXaIMvezqGEna7RE8CMALJHnv7Q1i.27VygyKUtSeX.n2xRTyOtCR8eOAl.4imBLyhXFc4o97P5n071
+  sha512_password: $6$Enl0WfE32FthwyiJ$yTyGaEJ2uPKLU.F7314YtB7J1jrzrMi7ogXIRTEHQfLdLgKWWmr1UvNlZLN6AyuxET7G5aH3AI9OYRzxVTkB1.
 loopback_interfaces:
 - name: Loopback0
   description: ROUTER_ID
@@ -113,6 +113,9 @@ management_interfaces:
   ip_address: 172.16.1.13/24
   type: oob
   gateway: 172.16.1.1
+management_security:
+  password:
+    encryption_key_common: true
 metadata:
   platform: vEOS-lab
   fabric_name: FABRIC
@@ -138,8 +141,8 @@ spanning_tree:
   mode: none
 static_routes:
 - vrf: MGMT
-  destination_address_prefix: 0.0.0.0/0
-  gateway: 172.16.1.1
+  prefix: 0.0.0.0/0
+  next_hop: 172.16.1.1
 transceiver_qsfp_default_mode_4x10: true
 vlan_internal_order:
   allocation: ascending

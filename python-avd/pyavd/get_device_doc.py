@@ -37,11 +37,11 @@ def get_device_doc(structured_config: dict, add_md_toc: bool = False) -> str:
     Returns:
         Device documentation in Markdown format.
     """
-    # pylint: disable=import-outside-toplevel
-    from .constants import EOS_CLI_CONFIG_GEN_JINJA2_DOCUMENTAITON_TEMPLATE
-    from .j2filters import add_md_toc as filter_add_md_toc
 
     # pylint: enable=import-outside-toplevel
+    from .constants import EOS_CLI_CONFIG_GEN_JINJA2_DOCUMENTAITON_TEMPLATE, EOS_CLI_CONFIG_GEN_JINJA2_PRECOMPILED_TEMPLATE_PATH  # noqa: PLC0415
+    from .j2filters import add_md_toc as filter_add_md_toc  # noqa: PLC0415
+    from .templater import Templar  # noqa: PLC0415
 
     templar = _get_templar()
     result: str = templar.render_template_from_file(EOS_CLI_CONFIG_GEN_JINJA2_DOCUMENTAITON_TEMPLATE, structured_config)

@@ -35,8 +35,8 @@ ethernet_interfaces:
       session_tracker: ST1
     ip_verify_unicast_source_reachable_via: rx
     tcp_mss_ceiling:
-      ipv4_segment_size: 70
-      ipv6_segment_size: 75
+      ipv4: 70
+      ipv6: 75
       direction: egress
     # test for switchport settings
     switchport:
@@ -168,7 +168,7 @@ ethernet_interfaces:
       testing multi line comments with |
       connection to server in pod02
     tcp_mss_ceiling:
-      ipv4_segment_size: 70
+      ipv4: 70
       direction: ingress
     multicast:
       ipv4:
@@ -194,6 +194,10 @@ ethernet_interfaces:
           # no-drop
           no_drop: true
     spanning_tree_bpduguard: disabled
+    spanning_tree_bpduguard_rate_limit:
+      enabled: true
+      count: 10
+      interval: 3
     spanning_tree_bpdufilter: disabled
     # test for switchport settings
     switchport:
@@ -247,8 +251,11 @@ ethernet_interfaces:
     priority_flow_control:
       enabled: false
     spanning_tree_guard: root
+    spanning_tree_bpduguard_rate_limit:
+      enabled: false
+      count: 10
     tcp_mss_ceiling:
-      ipv6_segment_size: 65
+      ipv6: 65
     # test for switchport settings
     switchport:
       enabled: false
@@ -305,8 +312,11 @@ ethernet_interfaces:
     priority_flow_control:
       enabled: true
     spanning_tree_guard: disabled
+    spanning_tree_bpduguard_rate_limit:
+      count: 10
+      interval: 15
     tcp_mss_ceiling:
-      ipv4_segment_size: 65
+      ipv4: 65
     multicast:
       ipv4:
         static: true
@@ -349,6 +359,7 @@ ethernet_interfaces:
         border_router: true
         bfd: true
         bidirectional: true
+        neighbor_filter: Test_Filter_Ethernet
         hello:
           count: 2.5
           interval: 10
@@ -416,6 +427,7 @@ ethernet_interfaces:
         random_detect:
           ecn:
             count: true
+        scheduler_profile_responsive: true
     sync_e:
       enable: true
       priority: disabled
@@ -529,6 +541,7 @@ ethernet_interfaces:
       ip: true
       ldp:
         interface: true
+    ntp_serve: true
     # Test isis auth both sha rx
     isis_authentication:
       both:
@@ -551,6 +564,7 @@ ethernet_interfaces:
       ip: false
       ldp:
         interface: false
+    ntp_serve: false
     # Test isis auth both sha
     isis_authentication:
       both:
@@ -1488,12 +1502,19 @@ ethernet_interfaces:
             reload: 800
         ipv4:
           address: 192.0.2.1
+        peer_authentication:
+          mode: ietf-md5
+          key: auth_key
+          key_type: "0"
       - id: 2
         preempt:
           enabled: true
           delay:
         ipv6:
           address: 2001:db8::1
+        peer_authentication:
+          mode: text
+          key: auth_key
 
   - name: Ethernet66
     description: Multiple VRIDs and tracking
@@ -1521,6 +1542,9 @@ ethernet_interfaces:
             decrement: 5
           - name: ID1TrackedObjectShutdown
             shutdown: true
+        peer_authentication:
+          mode: ietf-md5
+          key: auth_key
       - id: 2
         preempt:
           enabled: true
@@ -1532,6 +1556,10 @@ ethernet_interfaces:
             decrement: 10
           - name: ID2TrackedObjectShutdown
             shutdown: true
+        peer_authentication:
+          mode: text
+          key: auth_key
+          key_type: "0"
       - id: 3
         timers:
           delay:
@@ -1881,7 +1909,10 @@ ethernet_interfaces:
         - 3
         - 15-29
         - testgrp
-      srlg: TEST-SRLG
+      srlgs:
+        - 2
+        - TEST-SRLG
+        - ARISTA
       metric: 4
       bandwidth:
         number: 10
@@ -1902,7 +1933,6 @@ ethernet_interfaces:
         - 4
         - 7-100
         - testgrp
-      srlg: 16
       metric: 2
       bandwidth:
         number: 100
@@ -1915,6 +1945,7 @@ ethernet_interfaces:
   - name: Ethernet82
     description: Switchport_tap_tool
     switchport:
+      mode: tap-tool
       tap:
         allowed_vlan: 25
         default:
@@ -1981,6 +2012,7 @@ ethernet_interfaces:
   - name: Ethernet83
     description: Test_tap_tool
     switchport:
+      mode: tap-tool
       tap:
         identity:
           id: 5
@@ -1999,6 +2031,7 @@ ethernet_interfaces:
 
   - name: Ethernet84
     switchport:
+      mode: tap
       tap:
         encapsulation:
           gre:

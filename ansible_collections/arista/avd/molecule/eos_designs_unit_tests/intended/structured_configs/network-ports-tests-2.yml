@@ -814,8 +814,8 @@ spanning_tree:
   no_spanning_tree_vlan: '4094'
 static_routes:
 - vrf: MGMT
-  destination_address_prefix: 0.0.0.0/0
-  gateway: 192.168.0.1
+  prefix: 0.0.0.0/0
+  next_hop: 192.168.0.1
 transceiver_qsfp_default_mode_4x10: true
 vlan_interfaces:
 - name: Vlan4094
@@ -837,6 +837,9 @@ vlans:
   tenant: system
 - id: 100
   name: VLAN100_ON_L2LEAF_1_AND_2
+  tenant: TEST
+- id: 200
+  name: VLAN200_ON_L2LEAF_1_ONLY
   tenant: TEST
 - id: 300
   name: VLAN300_PHONE_ON_L2LEAF1_AND_2

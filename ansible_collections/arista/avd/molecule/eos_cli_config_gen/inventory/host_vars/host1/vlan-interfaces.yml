@@ -19,6 +19,8 @@ vlan_interfaces:
     ip_address_virtual: 10.2.2.1/24
     no_autostate: true
     isis_enable: "EVPN_UNDERLAY"
+    dhcp_server_ipv4: true
+    dhcp_server_ipv6: true
     isis_bfd: true
     ip_verify_unicast_source_reachable_via: rx
     # Test isis authentication both md5 rx
@@ -44,6 +46,8 @@ vlan_interfaces:
     vrf: Tenant_C
     ip_address_virtual: 10.10.81.1/24
     ipv6_enable: true
+    dhcp_server_ipv4: false
+    dhcp_server_ipv6: false
     ipv6_address_virtuals:
       - fc00:10:10:81::1/64
       - fc00:10:11:81::1/64
@@ -235,6 +239,7 @@ vlan_interfaces:
         sparse_mode: true
         bfd: true
         bidirectional: true
+        neighbor_filter: Test_Filter_Vlan
         hello:
           count: 3.5
           interval: 10
@@ -447,6 +452,9 @@ vlan_interfaces:
       - 1b11:3a00:22b0:16::14
 
   - name: Vlan26
+    ntp_serve: true
+    ipv6_ospf_network_point_to_point: true
+    ipv6_ospf_area: 0.0.0.29
     ospf_network_point_to_point: true
     ospf_area: 0.0.0.24
     ospf_cost: 99
@@ -494,14 +502,15 @@ vlan_interfaces:
         boundaries:
           - boundary: ff00::/16
           - boundary: ff01::/16
+    ntp_serve: false
 
 # IPv6 + helpers + Mcast
-
   - name: Vlan89
     description: SVI Description
     shutdown: false
     ip_igmp: true
     ip_igmp_version: 2
+    ip_igmp_querier_address_virtual: true
     ip_address_virtual: 10.10.144.3/20
     ipv6_address: 1b11:3a00:22b0:5200::15/64
     ipv6_nd_managed_config_flag: true
@@ -582,12 +591,19 @@ vlan_interfaces:
             reload: 800
         ipv4:
           address: 192.0.2.1
+        peer_authentication:
+          mode: ietf-md5
+          key: auth_key
       - id: 2
         preempt:
           enabled: true
           delay:
         ipv6:
           address: 2001:db8:667::1
+        peer_authentication:
+          mode: text
+          key: auth_key
+          key_type: "0"
 
   - name: Vlan333
     description: Multiple VRIDs and tracking
@@ -614,12 +630,19 @@ vlan_interfaces:
             decrement: 5
           - name: ID1TrackedObjectShutdown
             shutdown: true
+        peer_authentication:
+          mode: ietf-md5
+          key: auth_key
+          key_type: "0"
       - id: 2
         preempt:
           enabled: true
           delay:
         ipv6:
           address: 2001:db8:333::1
+        peer_authentication:
+          mode: text
+          key: auth_key
         tracked_object:
           - name: ID2TrackedObjectDecrement
             decrement: 10

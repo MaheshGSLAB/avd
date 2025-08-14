@@ -4,26 +4,13 @@ config_end: true
 enable_password:
   disabled: true
 hostname: source-interfaces
-ip_domain_lookup:
-  source_interfaces:
-  - name: Management1
-  - name: Vlan4092
-    vrf: INBANDMGMT
 ip_http_client_source_interfaces:
 - name: Management1
 - name: Vlan4092
   vrf: INBANDMGMT
 ip_igmp_snooping:
   globally_enabled: true
-ip_radius_source_interfaces:
-- name: Management1
-- name: Vlan4092
-  vrf: INBANDMGMT
 ip_ssh_client_source_interfaces:
-- name: Management1
-- name: Vlan4092
-  vrf: INBANDMGMT
-ip_tacacs_source_interfaces:
 - name: Management1
 - name: Vlan4092
   vrf: INBANDMGMT
@@ -42,15 +29,10 @@ management_interfaces:
 metadata:
   fabric_name: EOS_DESIGNS_UNIT_TESTS
 service_routing_protocols_model: multi-agent
-snmp_server:
-  local_interfaces:
-  - name: Management1
-  - name: Vlan4092
-    vrf: INBANDMGMT
 static_routes:
 - vrf: INBANDMGMT
-  destination_address_prefix: 0.0.0.0/0
-  gateway: 10.20.30.1
+  prefix: 0.0.0.0/0
+  next_hop: 10.20.30.1
 transceiver_qsfp_default_mode_4x10: true
 vlan_interfaces:
 - name: Vlan4092

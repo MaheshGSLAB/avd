@@ -68,8 +68,12 @@ $defs:
                 type: str
                 description: |-
                   Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`.
+              rx_queue:
+                type: dict
+                $ref: "eos_designs#/$defs/rx_queue_settings"
               structured_config:
                 type: dict
+                relaxed_validation: true
                 documentation_options:
                   hide_keys: true
                 description: |-
@@ -145,11 +149,13 @@ $defs:
               description: |-
                 Prefix List Name. Accept routes for only these prefixes from the peer.
                 Required for wan interfaces.
+                The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
             ipv4_prefix_list_out:
               type: str
               description: |-
                 Prefix List Name. Advertise routes for only these prefixes.
                 If not specified, nothing would be advertised.
+                The specified prefix list name must exist in `ipv4_prefix_list_catalog`.
         ipv4_acl_in:
           description: |-
             Name of the IPv4 access-list to be assigned in the ingress direction.
@@ -228,6 +234,7 @@ $defs:
             Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_port_channels` setting.
         structured_config:
           type: dict
+          relaxed_validation: true
           documentation_options:
             hide_keys: true
           description: |-

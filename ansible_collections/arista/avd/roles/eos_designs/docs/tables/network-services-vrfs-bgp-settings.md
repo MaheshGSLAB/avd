@@ -11,6 +11,8 @@
     | [<samp>&nbsp;&nbsp;-&nbsp;name</samp>](## "<network_services_keys.name>.[].name") | String | Required, Unique |  |  | Specify a tenant name.<br>Tenant provide a construct to group L3 VRFs and L2 VLANs.<br>Networks services can be filtered by tenant name.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;bgp_peer_groups</samp>](## "<network_services_keys.name>.[].bgp_peer_groups") | List, items: Dictionary |  |  |  | List of BGP peer groups definitions.<br>This will configure BGP peer groups to be used inside the tenant VRF for peering with external devices.<br>Since BGP peer groups are configured at higher BGP level, shared between VRFs,<br>peer_group names should not overlap between VRFs.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].name") | String | Required, Unique |  |  | BGP peer group name. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;password</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].password") | String |  |  |  | Type 7 encrypted password.<br>Takes precedence over `cleartext_password`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cleartext_password</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].cleartext_password") | String |  |  |  | BGP peer group cleartext password.<br>To protect the password at rest it is strongly recommended to make use of a vault or similar. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nodes</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].nodes") | List, items: String |  |  |  | Nodes is required to restrict configuration of BGP neighbors to certain nodes in the network.<br>If not set the peer-group is created on devices which have a bgp_peer mapped to the corresponding peer_group.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].nodes.[]") | String |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address_family_ipv4</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].address_family_ipv4") | Dictionary |  |  |  |  |
@@ -61,8 +63,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;min_rx</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].bfd_timers.min_rx") | Integer | Required |  | Min: 50<br>Max: 60000 | Rate in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;multiplier</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].bfd_timers.multiplier") | Integer | Required |  | Min: 3<br>Max: 50 |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ebgp_multihop</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].ebgp_multihop") | Integer |  |  | Min: 1<br>Max: 255 | Time-to-live in range of hops. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;next_hop_peer</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].next_hop_peer") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;next_hop_self</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].next_hop_self") | Boolean |  |  |  |  |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;password</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].password") | String |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;passive</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].passive") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default_originate</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].default_originate") | Dictionary |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].default_originate.enabled") | Boolean |  |  |  |  |
@@ -103,14 +105,15 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ttl_maximum_hops</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].ttl_maximum_hops") | Integer |  |  | Min: 0<br>Max: 254 | Maximum number of hops. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_filter</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].peer_filter") <span style="color:red">removed</span> | String |  |  |  | <span style="color:red">This key was removed. Support was removed in AVD version 5.0.0. Use <samp>router_bgp.listen_ranges[].peer_filter</samp> instead.</span> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp_listen_range_prefix</samp>](## "<network_services_keys.name>.[].bgp_peer_groups.[].bgp_listen_range_prefix") <span style="color:red">removed</span> | String |  |  |  | <span style="color:red">This key was removed. Support was removed in AVD version 5.0.0. Use <samp>router_bgp.listen_ranges[].bgp_listen_range_prefix</samp> instead.</span> |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;vrfs</samp>](## "<network_services_keys.name>.[].vrfs") | List, items: Dictionary |  |  |  | VRFs will only be configured on a node if any of the underlying objects like `svis` or `l3_interfaces` apply to the node.<br><br>It is recommended to only define a VRF in one Tenant. If the same VRF name is used across multiple tenants and those tenants<br>are accepted by `filter.tenants` on the node, any object set under the duplicate VRFs must either be unique or be an exact match.<br><br>VRF "default" is partially supported under network-services. Currently the supported options for "default" vrf are route-target,<br>route-distinguisher settings, structured_config, raw_eos_cli in bgp and SVIs are the only supported interface type.<br>Vlan-aware-bundles are supported as well inside default vrf. OSPF is not supported currently.<br> |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;vrfs</samp>](## "<network_services_keys.name>.[].vrfs") | List, items: Dictionary |  |  |  | VRFs will only be configured on a node if any of the underlying objects like `svis`, `l3_interfaces` or `l3_port_channels` apply to the node.<br><br>It is recommended to only define a VRF in one Tenant. If the same VRF name is used across multiple tenants and those tenants<br>are accepted by `filter.tenants` on the node, any object set under the duplicate VRFs must either be unique or be an exact match.<br><br>VRF "default" is partially supported under network-services. Currently the supported options for "default" vrf are route-target,<br>route-distinguisher settings, structured_config, raw_eos_cli in bgp and SVIs are the only supported interface type.<br>Vlan-aware-bundles are supported as well inside default vrf. OSPF is not supported currently.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "<network_services_keys.name>.[].vrfs.[].name") | String | Required, Unique |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp_peers</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers") | List, items: Dictionary |  |  |  | List of BGP peer definitions.<br>This will configure BGP neighbors inside the tenant VRF for peering with external devices.<br>The configured peer will automatically be activated for ipv4 or ipv6 address family based on the ip address.<br>Note, only ipv4 and ipv6 address families are currently supported in eos_designs.<br>For other address families, use custom_structured configuration with eos_cli_config_gen.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;ip_address</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].ip_address") | String | Required |  |  | IPv4_address or IPv6_address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peer_group</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].peer_group") | String |  |  |  | Peer group name. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remote_as</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].remote_as") | String |  |  |  | BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;description</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].description") | String |  |  |  |  |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;password</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].password") | String |  |  |  | Encrypted password. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;password</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].password") | String |  |  |  | Type 7 encrypted password.<br>Takes precedence over `cleartext_password`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cleartext_password</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].cleartext_password") | String |  |  |  | BGP peer group cleartext password.<br>To protect the password at rest it is strongly recommended to make use of a vault or similar. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;send_community</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].send_community") | String |  |  |  | 'all' or a combination of 'standard', 'extended', 'large' and 'link-bandwidth (w/options)'.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;next_hop_self</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].next_hop_self") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;timers</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].timers") | String |  |  |  | BGP Keepalive and Hold Timer values in seconds as string <0-3600> <0-3600>. |
@@ -131,11 +134,17 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;local_as</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].local_as") | String |  |  |  | Local BGP AS <1-4294967295> or AS number in asdot notation "<1-65535>.<0-65535>".<br>For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;weight</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].weight") | Integer |  |  | Min: 0<br>Max: 65535 |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bfd</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].bfd") | Boolean |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bfd_timers</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].bfd_timers") | Dictionary |  |  |  | Override default BFD timers. BFD must be enabled with `bfd: true`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interval</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].bfd_timers.interval") | Integer | Required |  | Min: 50<br>Max: 60000 | Interval in milliseconds. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;min_rx</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].bfd_timers.min_rx") | Integer | Required |  | Min: 50<br>Max: 60000 | Rate in milliseconds. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;multiplier</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].bfd_timers.multiplier") | Integer | Required |  | Min: 3<br>Max: 50 |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shutdown</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peers.[].shutdown") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bgp_peer_groups</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups") | List, items: Dictionary |  |  |  | List of BGP peer groups definitions.<br>This will configure BGP peer groups to be used inside the tenant VRF for peering with external devices.<br>Since BGP peer groups are configured at higher BGP level, shared between VRFs,<br>peer_group names should not overlap between VRFs.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;name</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].name") | String | Required, Unique |  |  | BGP peer group name. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nodes</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].nodes") | List, items: String |  |  |  | Nodes is required to restrict configuration of BGP neighbors to certain nodes in the network.<br>If not set the peer-group is created on devices which have a bgp_peer mapped to the corresponding peer_group.<br> |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&lt;str&gt;</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].nodes.[]") | String |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;password</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].password") | String |  |  |  | Type 7 encrypted password.<br>Takes precedence over `cleartext_password`. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cleartext_password</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].cleartext_password") | String |  |  |  | BGP peer group cleartext password.<br>To protect the password at rest it is strongly recommended to make use of a vault or similar. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address_family_ipv4</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].address_family_ipv4") | Dictionary |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;activate</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].address_family_ipv4.activate") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;route_map_in</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].address_family_ipv4.route_map_in") | String |  |  |  | Inbound route-map name. |
@@ -184,8 +193,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;min_rx</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].bfd_timers.min_rx") | Integer | Required |  | Min: 50<br>Max: 60000 | Rate in milliseconds. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;multiplier</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].bfd_timers.multiplier") | Integer | Required |  | Min: 3<br>Max: 50 |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ebgp_multihop</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].ebgp_multihop") | Integer |  |  | Min: 1<br>Max: 255 | Time-to-live in range of hops. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;next_hop_peer</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].next_hop_peer") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;next_hop_self</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].next_hop_self") | Boolean |  |  |  |  |
-    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;password</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].password") | String |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;passive</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].passive") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default_originate</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].default_originate") | Dictionary |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "<network_services_keys.name>.[].vrfs.[].bgp_peer_groups.[].default_originate.enabled") | Boolean |  |  |  |  |
@@ -245,6 +254,14 @@
 
             # BGP peer group name.
           - name: <str; required; unique>
+
+            # Type 7 encrypted password.
+            # Takes precedence over `cleartext_password`.
+            password: <str>
+
+            # BGP peer group cleartext password.
+            # To protect the password at rest it is strongly recommended to make use of a vault or similar.
+            cleartext_password: <str>
 
             # Nodes is required to restrict configuration of BGP neighbors to certain nodes in the network.
             # If not set the peer-group is created on devices which have a bgp_peer mapped to the corresponding peer_group.
@@ -355,8 +372,8 @@
 
             # Time-to-live in range of hops.
             ebgp_multihop: <int; 1-255>
+            next_hop_peer: <bool>
             next_hop_self: <bool>
-            password: <str>
             passive: <bool>
             default_originate:
               enabled: <bool>
@@ -443,7 +460,7 @@
             # Maximum number of hops.
             ttl_maximum_hops: <int; 0-254>
 
-        # VRFs will only be configured on a node if any of the underlying objects like `svis` or `l3_interfaces` apply to the node.
+        # VRFs will only be configured on a node if any of the underlying objects like `svis`, `l3_interfaces` or `l3_port_channels` apply to the node.
         #
         # It is recommended to only define a VRF in one Tenant. If the same VRF name is used across multiple tenants and those tenants
         # are accepted by `filter.tenants` on the node, any object set under the duplicate VRFs must either be unique or be an exact match.
@@ -472,8 +489,13 @@
                 remote_as: <str>
                 description: <str>
 
-                # Encrypted password.
+                # Type 7 encrypted password.
+                # Takes precedence over `cleartext_password`.
                 password: <str>
+
+                # BGP peer group cleartext password.
+                # To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                cleartext_password: <str>
 
                 # 'all' or a combination of 'standard', 'extended', 'large' and 'link-bandwidth (w/options)'.
                 send_community: <str>
@@ -525,6 +547,16 @@
                 local_as: <str>
                 weight: <int; 0-65535>
                 bfd: <bool>
+
+                # Override default BFD timers. BFD must be enabled with `bfd: true`.
+                bfd_timers:
+
+                  # Interval in milliseconds.
+                  interval: <int; 50-60000; required>
+
+                  # Rate in milliseconds.
+                  min_rx: <int; 50-60000; required>
+                  multiplier: <int; 3-50; required>
                 shutdown: <bool>
 
             # List of BGP peer groups definitions.
@@ -540,6 +572,14 @@
                 # If not set the peer-group is created on devices which have a bgp_peer mapped to the corresponding peer_group.
                 nodes:
                   - <str>
+
+                # Type 7 encrypted password.
+                # Takes precedence over `cleartext_password`.
+                password: <str>
+
+                # BGP peer group cleartext password.
+                # To protect the password at rest it is strongly recommended to make use of a vault or similar.
+                cleartext_password: <str>
                 address_family_ipv4:
                   activate: <bool>
 
@@ -645,8 +685,8 @@
 
                 # Time-to-live in range of hops.
                 ebgp_multihop: <int; 1-255>
+                next_hop_peer: <bool>
                 next_hop_self: <bool>
-                password: <str>
                 passive: <bool>
                 default_originate:
                   enabled: <bool>

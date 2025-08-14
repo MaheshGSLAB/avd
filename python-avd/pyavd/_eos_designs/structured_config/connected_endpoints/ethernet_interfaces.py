@@ -10,7 +10,7 @@ from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.schema import EosDesigns
 from pyavd._eos_designs.structured_config.structured_config_generator import structured_config_contributor
 from pyavd._errors import AristaAvdError, AristaAvdInvalidInputsError
-from pyavd._utils import Undefined
+from pyavd._utils import Undefined, default
 from pyavd.api.interface_descriptions import InterfaceDescriptionData
 from pyavd.j2filters import range_expand
 
@@ -91,19 +91,20 @@ class EthernetInterfacesMixin(Protocol):
         connected_endpoint: EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem,
     ) -> None:
         ethernet_interface._update(
-            mtu=adapter.mtu if self.shared_utils.platform_settings.feature_support.per_interface_mtu else None,
-            l2_mtu=adapter.l2_mtu,
-            l2_mru=adapter.l2_mru,
+            mtu=self.shared_utils.get_interface_mtu(ethernet_interface.name, adapter.mtu),
+            l2_mtu=self._get_adapter_l2_mtu(adapter),
+            l2_mru=self._get_adapter_l2_mru(adapter),
             spanning_tree_portfast=adapter.spanning_tree_portfast,
             spanning_tree_bpdufilter=adapter.spanning_tree_bpdufilter,
             spanning_tree_bpduguard=adapter.spanning_tree_bpduguard,
             storm_control=self._get_adapter_storm_control(adapter, output_type=EosCliConfigGen.EthernetInterfacesItem.StormControl),
             ptp=self._get_adapter_ptp(adapter, output_type=EosCliConfigGen.EthernetInterfacesItem.Ptp),
             service_profile=adapter.qos_profile,
-            sflow=self._get_adapter_sflow(adapter, output_type=EosCliConfigGen.EthernetInterfacesItem.Sflow),
-            flow_tracker=self.shared_utils.new_get_flow_tracker(adapter.flow_tracking, output_type=EosCliConfigGen.EthernetInterfacesItem.FlowTracker),
+            flow_tracker=self.shared_utils.get_flow_tracker(adapter.flow_tracking, output_type=EosCliConfigGen.EthernetInterfacesItem.FlowTracker),
             link_tracking_groups=self._get_adapter_link_tracking_groups(adapter, output_type=EosCliConfigGen.EthernetInterfacesItem.LinkTrackingGroups),
         )
+        if self.shared_utils.platform_settings.feature_support.sflow:
+            ethernet_interface.sflow.enable = default(adapter.sflow, self.inputs.fabric_sflow.endpoints)
         ethernet_interface.switchport._update(
             enabled=True,
             mode=adapter.mode,
@@ -193,7 +194,7 @@ class EthernetInterfacesMixin(Protocol):
             validate_state=None if (adapter.validate_state if adapter.validate_state is not None else True) else False,
             validate_lldp=None if (adapter.validate_lldp if adapter.validate_lldp is not None else True) else False,
             dot1x=adapter.dot1x,
-            poe=self._get_adapter_poe(adapter),
+            poe=adapter.poe if self.shared_utils.platform_settings.feature_support.poe else Undefined,
             eos_cli=adapter.raw_eos_cli,
         )
 
@@ -239,5 +240,9 @@ class EthernetInterfacesMixin(Protocol):
         # More common ethernet_interface settings
         if adapter.flowcontrol:
             ethernet_interface.flowcontrol = adapter.flowcontrol
+
+        # Propagate campus_link_type for campus devices
+        if self.shared_utils.is_campus_device and adapter.campus_link_type:
+            ethernet_interface._internal_data.campus_link_type = list(adapter.campus_link_type)
 
         return ethernet_interface

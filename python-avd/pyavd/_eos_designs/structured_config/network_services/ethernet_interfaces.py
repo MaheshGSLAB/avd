@@ -45,6 +45,9 @@ class EthernetInterfacesMixin(Protocol):
                     # to only contain entries with our hostname
                     self._set_l3_interfaces(vrf, tenant, subif_parent_interface_names)
 
+                    # Member ethernet ports for Port-Channel interface
+                    self._set_l3_port_channel_members(vrf)
+
         if self.shared_utils.network_services_l1:
             for tenant in self.shared_utils.filtered_tenants:
                 if not tenant.point_to_point_services:
@@ -55,8 +58,45 @@ class EthernetInterfacesMixin(Protocol):
         if missing_parent_interface_names := subif_parent_interface_names.difference(eth_int.name for eth_int in self.structured_config.ethernet_interfaces):
             self._set_subif_parent_interfaces(missing_parent_interface_names)
 
-        # Add interfaces used for Internet Exit policies
-        self._set_internet_exit_policy_interfaces()
+    def _set_l3_port_channel_members(
+        self: AvdStructuredConfigNetworkServicesProtocol,
+        vrf: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.VrfsItem,
+    ) -> None:
+        """Set the structured_config for ethernet_interfaces which are members of l3_port_channels."""
+        for l3_port_channel in vrf.l3_port_channels:
+            # sub-interface for l3_port_channel cannot have member eth ports
+            # skip any logic to generate member port config for such sub-interfaces
+            if "." in l3_port_channel.name:
+                continue
+
+            channel_group_id = l3_port_channel.name.removeprefix("Port-Channel")
+            for member_intf in l3_port_channel.member_interfaces:
+                interface_description = member_intf.description
+                # derive values for peer from parent L3 port-channel
+                # if not defined explicitly for member interface
+                peer = member_intf.peer if member_intf.peer else l3_port_channel.peer
+                if not interface_description:
+                    elems = [peer, member_intf.peer_interface]
+                    if elems:
+                        interface_description = "_".join([elem for elem in elems if elem])
+
+                ethernet_interface = EosCliConfigGen.EthernetInterfacesItem(
+                    name=member_intf.name,
+                    description=interface_description or None,
+                    peer_type="l3_port_channel_member",
+                    peer=peer or None,
+                    peer_interface=member_intf.peer_interface or None,
+                    shutdown=not l3_port_channel.enabled,
+                    speed=member_intf.speed if member_intf.speed else None,
+                )
+                ethernet_interface.channel_group.id = int(channel_group_id)
+                ethernet_interface.channel_group.mode = l3_port_channel.mode
+
+                if member_intf.structured_config:
+                    self.custom_structured_configs.nested.ethernet_interfaces.obtain(member_intf.name)._deepmerge(
+                        member_intf.structured_config, list_merge=self.custom_structured_configs.list_merge_strategy
+                    )
+                self.structured_config.ethernet_interfaces.append(ethernet_interface)
 
     def _set_l3_interfaces(
         self: AvdStructuredConfigNetworkServicesProtocol,
@@ -92,13 +132,11 @@ class EthernetInterfacesMixin(Protocol):
                     name=interface_name,
                     peer_type="l3_interface",
                     ip_address=l3_interface.ip_addresses[node_index],
-                    mtu=l3_interface.mtu if self.shared_utils.platform_settings.feature_support.per_interface_mtu else None,
+                    mtu=self.shared_utils.get_interface_mtu(interface_name, l3_interface.mtu),
                     shutdown=not l3_interface.enabled,
                     description=interface_description,
                     eos_cli=l3_interface.raw_eos_cli,
-                    flow_tracker=self.shared_utils.new_get_flow_tracker(
-                        l3_interface.flow_tracking, output_type=EosCliConfigGen.EthernetInterfacesItem.FlowTracker
-                    ),
+                    flow_tracker=self.shared_utils.get_flow_tracker(l3_interface.flow_tracking, output_type=EosCliConfigGen.EthernetInterfacesItem.FlowTracker),
                 )
 
                 if l3_interface.structured_config:
@@ -106,7 +144,7 @@ class EthernetInterfacesMixin(Protocol):
                         l3_interface.structured_config, list_merge=self.custom_structured_configs.list_merge_strategy
                     )
 
-                if self.inputs.fabric_sflow.l3_interfaces is not None:
+                if self.shared_utils.platform_settings.feature_support.sflow and self.inputs.fabric_sflow.l3_interfaces is not None:
                     interface.sflow.enable = self.inputs.fabric_sflow.l3_interfaces
 
                 if l3_interface.ipv4_acl_in:
@@ -150,20 +188,7 @@ class EthernetInterfacesMixin(Protocol):
                         ospf_cost=l3_interface.ospf.cost,
                     )
 
-                    ospf_authentication = l3_interface.ospf.authentication
-                    if ospf_authentication == "simple" and (ospf_simple_auth_key := l3_interface.ospf.simple_auth_key) is not None:
-                        interface._update(ospf_authentication=ospf_authentication, ospf_authentication_key=ospf_simple_auth_key)
-                    elif ospf_authentication == "message-digest" and (ospf_message_digest_keys := l3_interface.ospf.message_digest_keys) is not None:
-                        for ospf_key in ospf_message_digest_keys:
-                            if not (ospf_key.id and ospf_key.key):
-                                continue
-                            interface.ospf_message_digest_keys.append_new(
-                                id=ospf_key.id,
-                                hash_algorithm=ospf_key.hash_algorithm,
-                                key=ospf_key.key,
-                            )
-                        if interface.ospf_message_digest_keys:
-                            interface.ospf_authentication = ospf_authentication
+                    self.shared_utils.update_ospf_authentication(interface, l3_interface, vrf, tenant)
 
                 if l3_interface.pim.enabled:
                     if not getattr(vrf._internal_data, "evpn_l3_multicast_enabled", False):
@@ -189,6 +214,9 @@ class EthernetInterfacesMixin(Protocol):
 
                     interface.pim.ipv4.sparse_mode = True
 
+                # Propagate campus_link_type for campus devices
+                if self.shared_utils.is_campus_device and l3_interface.campus_link_type:
+                    interface._internal_data.campus_link_type = list(l3_interface.campus_link_type)
                 self.structured_config.ethernet_interfaces.append(interface)
 
     def _set_point_to_point_interfaces(
@@ -252,10 +280,16 @@ class EthernetInterfacesMixin(Protocol):
                                 peer_type="point_to_point_service",
                                 shutdown=False,
                             )
+                            if subif.raw_eos_cli:
+                                interface.eos_cli = subif.raw_eos_cli
                             interface.encapsulation_vlan.client.encapsulation = "dot1q"
                             interface.encapsulation_vlan.client.vlan = subif.number
                             interface.encapsulation_vlan.network.encapsulation = "client"
 
+                            if subif.structured_config:
+                                self.custom_structured_configs.nested.ethernet_interfaces.obtain(subif_name)._deepmerge(
+                                    subif.structured_config, list_merge=self.custom_structured_configs.list_merge_strategy
+                                )
                             self.structured_config.ethernet_interfaces.append(interface)
 
                     else:
@@ -281,13 +315,8 @@ class EthernetInterfacesMixin(Protocol):
             interface.switchport.enabled = False
             self.structured_config.ethernet_interfaces.append(interface)
 
-    def _set_internet_exit_policy_interfaces(self: AvdStructuredConfigNetworkServicesProtocol) -> None:
-        """Set the ethernet_interfaces with the interfaces defined for internet exit policies."""
-        # TODO: This should be moved to the place where we configure the same interface in underlay.
-        # Need to get free of _filtered_internet_policies_and_connections.
-        for internet_exit_policy, connections in self._filtered_internet_exit_policies_and_connections:
-            for connection in connections:
-                if connection["type"] == "ethernet":
-                    self.structured_config.ethernet_interfaces.obtain(
-                        connection["source_interface"]
-                    ).ip_nat.service_profile = self.get_internet_exit_nat_profile_name(internet_exit_policy.type)
+    def set_direct_ie_connection_ethernet_interfaces(self: AvdStructuredConfigNetworkServicesProtocol, source_interface: str) -> None:
+        # TODO: This should be moved to the place where we configure the same interface in underlay as this will clash between modules..
+        interface = EosCliConfigGen.EthernetInterfacesItem(name=source_interface)
+        interface.ip_nat.service_profile = self.INTERNET_EXIT_DIRECT_NAT_PROFILE_NAME
+        self.structured_config.ethernet_interfaces.append(interface)

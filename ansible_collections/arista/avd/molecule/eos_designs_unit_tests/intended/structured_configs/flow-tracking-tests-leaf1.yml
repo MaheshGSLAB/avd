@@ -117,8 +117,8 @@ flow_tracking:
         on_interval: 300332
       exporters:
       - name: ayush_exporter
-        collector:
-          host: 127.0.0.2
+        collectors:
+        - host: 127.0.0.2
         local_interface: Loopback0
         template_interval: 40002
     - name: FLOW-TRACKER-3
@@ -127,8 +127,8 @@ flow_tracking:
         on_interval: 300331
       exporters:
       - name: ayush_exporter
-        collector:
-          host: 127.0.0.1
+        collectors:
+        - host: 127.0.0.1
         local_interface: Loopback0
         template_interval: 40000
     shutdown: false
@@ -270,8 +270,8 @@ spanning_tree:
     priority: 4096
 static_routes:
 - vrf: MGMT
-  destination_address_prefix: 0.0.0.0/0
-  gateway: 192.168.0.1
+  prefix: 0.0.0.0/0
+  next_hop: 192.168.0.1
 transceiver_qsfp_default_mode_4x10: true
 vlan_interfaces:
 - name: Vlan11

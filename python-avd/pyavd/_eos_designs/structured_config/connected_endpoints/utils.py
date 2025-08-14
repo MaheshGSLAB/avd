@@ -8,14 +8,15 @@ from functools import cached_property
 from hashlib import sha256
 from typing import TYPE_CHECKING, Literal, Protocol
 
-from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
+from pyavd._eos_designs.schema import EosDesigns
 from pyavd._errors import AristaAvdError, AristaAvdInvalidInputsError
-from pyavd._utils import Undefined, UndefinedType, default, get_v2, short_esi_to_route_target
+from pyavd._utils import Undefined, UndefinedType, get_v2, short_esi_to_route_target
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from typing import TypeVar
 
-    from pyavd._eos_designs.schema import EosDesigns
+    from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 
     from . import AvdStructuredConfigConnectedEndpointsProtocol
 
@@ -45,16 +46,17 @@ class UtilsMixin(Protocol):
     @cached_property
     def _filtered_connected_endpoints(
         self: AvdStructuredConfigConnectedEndpointsProtocol,
-    ) -> list[EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem]:
+    ) -> EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpoints:
         """
         Return list of endpoints defined under one of the keys in "connected_endpoints_keys" which are connected to this switch.
 
         Adapters are filtered to contain only the ones connected to this switch.
         """
-        filtered_connected_endpoints = []
-        for connected_endpoints_key in self.inputs._dynamic_keys.connected_endpoints:
+        connected_endpoints = self.shared_utils.all_connected_endpoints
+        filtered_connected_endpoints = EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpoints()
+        for connected_endpoints_key in connected_endpoints:
             for connected_endpoint in connected_endpoints_key.value:
-                filtered_adapters = []
+                filtered_adapters = EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem.Adapters()
                 for adapter_index, adapter in enumerate(connected_endpoint.adapters):
                     adapter._internal_data.context = f"{connected_endpoints_key.key}[name={connected_endpoint.name}].adapters[{adapter_index}]"
                     adapter_settings = self.shared_utils.get_merged_adapter_settings(adapter)
@@ -78,15 +80,15 @@ class UtilsMixin(Protocol):
                 if filtered_adapters:
                     # The object was deepcopied inside "get_merged_adapter_settings" so we can modify it here.
                     connected_endpoint.adapters = filtered_adapters
-                    connected_endpoint._internal_data.type = self.inputs.connected_endpoints_keys[connected_endpoints_key.key].type
+                    connected_endpoint._internal_data.type = connected_endpoints_key._internal_data.type
                     filtered_connected_endpoints.append(connected_endpoint)
 
         return filtered_connected_endpoints
 
     @cached_property
-    def _filtered_network_ports(self: AvdStructuredConfigConnectedEndpointsProtocol) -> list[EosDesigns.NetworkPortsItem]:
+    def _filtered_network_ports(self: AvdStructuredConfigConnectedEndpointsProtocol) -> EosDesigns.NetworkPorts:
         """Return list of endpoints defined under "network_ports" which are connected to this switch."""
-        filtered_network_ports = []
+        filtered_network_ports = EosDesigns.NetworkPorts()
         for index, network_port in enumerate(self.inputs.network_ports):
             network_port._internal_data.context = f"network_ports[{index}]"
             network_port_settings = self.shared_utils.get_merged_adapter_settings(network_port)
@@ -95,14 +97,16 @@ class UtilsMixin(Protocol):
                 continue
             if network_port_settings.switches and not self._match_regexes(network_port_settings.switches, self.shared_utils.hostname):
                 continue
-            if network_port_settings.platforms and not self._match_regexes(network_port_settings.platforms, self.shared_utils.platform):
+            if network_port_settings.platforms and (
+                not self.shared_utils.platform or not self._match_regexes(network_port_settings.platforms, self.shared_utils.platform)
+            ):
                 continue
 
             filtered_network_ports.append(network_port_settings)
 
         return filtered_network_ports
 
-    def _match_regexes(self: AvdStructuredConfigConnectedEndpointsProtocol, regexes: list, value: str) -> bool:
+    def _match_regexes(self: AvdStructuredConfigConnectedEndpointsProtocol, regexes: Iterable[str], value: str) -> bool:
         """
         Match a list of regexes with the supplied value.
 
@@ -118,20 +122,20 @@ class UtilsMixin(Protocol):
         hash_extra_value: str = "",
     ) -> str | None:
         """Return short_esi for one adapter."""
-        if len(set(adapter.switches)) < 2 or not self.shared_utils.overlay_evpn or not self.shared_utils.overlay_vtep:
-            # Only configure ESI for multi-homing.
+        if len(set(adapter.switches)) < 2 or not self.shared_utils.overlay_evpn or not (self.shared_utils.overlay_vtep or self.shared_utils.overlay_ler):
+            # Only configure ESI for EVPN multi-homing.
             return None
 
         # short_esi is only set when called from sub-interface port-channels.
         if (short_esi is None) and (short_esi := adapter.ethernet_segment.short_esi) is None:
             return None
 
-        endpoint_ports: list = getattr(adapter, "endpoint_ports", [])
+        endpoint_ports = adapter.endpoint_ports
         short_esi = str(short_esi)
         if short_esi.lower() == "auto":
             esi_hash = sha256(
                 "".join(
-                    [hash_extra_value] + adapter.switches[:2] + adapter.switch_ports[:2] + endpoint_ports[:2] + [str(channel_group_id)],
+                    [hash_extra_value, *adapter.switches[:2], *adapter.switch_ports[:2], *endpoint_ports[:2], str(channel_group_id)],
                 ).encode("UTF-8"),
             ).hexdigest()
             short_esi = re.sub(r"([0-9a-f]{4})", "\\1:", esi_hash)[:14]
@@ -228,7 +232,8 @@ class UtilsMixin(Protocol):
             return Undefined
 
         output = output_type()
-        output.append_new(name=adapter.link_tracking.name or self.shared_utils.link_tracking_groups[0]["name"], direction="downstream")
+        default_name = next(iter(self.shared_utils.link_tracking_groups)).name
+        output.append_new(name=adapter.link_tracking.name or default_name, direction="downstream")
         return output
 
     def _get_adapter_ptp(
@@ -237,7 +242,7 @@ class UtilsMixin(Protocol):
         output_type: type[T_Ptp],
     ) -> T_Ptp | UndefinedType:
         """Return ptp for one adapter."""
-        if not adapter.ptp.enabled:
+        if not (adapter.ptp.enabled and self.shared_utils.platform_settings.feature_support.ptp):
             return Undefined
 
         # Apply PTP profile config
@@ -259,16 +264,6 @@ class UtilsMixin(Protocol):
             ptp_config.role = "master"
 
         return ptp_config
-
-    def _get_adapter_poe(
-        self: AvdStructuredConfigConnectedEndpointsProtocol,
-        adapter: EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem.AdaptersItem,
-    ) -> EosCliConfigGen.EthernetInterfacesItem.Poe | UndefinedType:
-        """Return poe settings for one adapter."""
-        if self.shared_utils.platform_settings.feature_support.poe and adapter.poe:
-            return adapter.poe._cast_as(EosCliConfigGen.EthernetInterfacesItem.Poe)
-
-        return Undefined
 
     def _get_adapter_phone(
         self: AvdStructuredConfigConnectedEndpointsProtocol,
@@ -295,12 +290,22 @@ class UtilsMixin(Protocol):
 
         return output_type(trunk=adapter.phone_trunk_mode, vlan=adapter.phone_vlan)
 
-    def _get_adapter_sflow(
+    def _get_adapter_l2_mtu(
         self: AvdStructuredConfigConnectedEndpointsProtocol,
         adapter: EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem.AdaptersItem,
-        output_type: type[T_Sflow],
-    ) -> T_Sflow | UndefinedType:
-        if (adapter_sflow := default(adapter.sflow, self.inputs.fabric_sflow.endpoints)) is not None:
-            return output_type(enable=adapter_sflow)
+    ) -> int | None:
+        """Return l2_mtu for one adapter."""
+        if self.shared_utils.platform_settings.feature_support.per_interface_l2_mtu and adapter.l2_mtu:
+            return adapter.l2_mtu
 
-        return Undefined
+        return None
+
+    def _get_adapter_l2_mru(
+        self: AvdStructuredConfigConnectedEndpointsProtocol,
+        adapter: EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem.AdaptersItem,
+    ) -> int | None:
+        """Return l2_mru for one adapter."""
+        if self.shared_utils.platform_settings.feature_support.per_interface_l2_mru and adapter.l2_mru:
+            return adapter.l2_mru
+
+        return None

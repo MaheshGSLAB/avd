@@ -677,6 +677,11 @@ keys:
                   description: Set the default for whether Bidirectional Forwarding Detection is enabled for PIM.
                 bidirectional:
                   type: bool
+                neighbor_filter:
+                  type: str
+                  convert_types:
+                    - int
+                  description: Standard access list name.
                 hello:
                   type: dict
                   keys:
@@ -698,6 +703,9 @@ keys:
           keys:
             profile:
               type: str
+        ntp_serve:
+          type: bool
+          description: Enable/disable serving NTP to clients.
         tcp_mss_ceiling:
           type: dict
           description: |-
@@ -710,7 +718,27 @@ keys:
                 - str
               min: 64
               max: 65475
+              deprecation:
+                warning: true
+                remove_in_version: 6.0.0
+                new_key: ipv4
+            ipv4:
+              type: int
+              convert_types:
+                - str
+              min: 64
+              max: 65475
             ipv6_segment_size:
+              type: int
+              convert_types:
+                - str
+              min: 64
+              max: 65475
+              deprecation:
+                warning: true
+                remove_in_version: 6.0.0
+                new_key: ipv6
+            ipv6:
               type: int
               convert_types:
                 - str
@@ -1188,6 +1216,26 @@ keys:
           convert_types:
             - bool
           valid_values: ["enabled", "disabled", "True", "False", "true", "false"]
+        spanning_tree_bpduguard_rate_limit:
+          type: dict
+          keys:
+            enabled:
+              type: bool
+              description: Enable/Disable rate limiter on this port.
+            count:
+              type: int
+              convert_types:
+                - str
+              description: Max number of BPDUs per timer interval.
+              min: 1
+              max: 20000
+            interval:
+              type: int
+              convert_types:
+                - str
+              description: Number of seconds in the BPDU input rate limiter timer.
+              min: 1
+              max: 15
         spanning_tree_guard:
           type: str
           valid_values: ["loop", "root", "disabled"]
@@ -1481,6 +1529,9 @@ keys:
                   - str
                 required: true
                 description: TX-Queue ID.
+              scheduler_profile_responsive:
+                type: bool
+                description: Set scheduler profile to optimize latency at the expense of burstiness.
               random_detect:
                 type: dict
                 keys:
@@ -1633,6 +1684,31 @@ keys:
                     type: str
                     required: true
                     description: Virtual IPv6 address.
+              peer_authentication:
+                type: dict
+                keys:
+                  mode:
+                    type: str
+                    description: Authentication mode.
+                    valid_values:
+                      - text
+                      - ietf-md5
+                    required: true
+                  key:
+                    type: str
+                    required: true
+                    description: Authentication key.
+                    convert_types:
+                      - int
+                  key_type:
+                    type: str
+                    convert_types:
+                      - int
+                    description: Authentication key type.
+                    valid_values:
+                      - "0"
+                      - "7"
+                      - "8a"
         validate_state:
           type: bool
           description: Set to false to disable interface state and LLDP topology validation performed by the `eos_validate_state` role.
@@ -1650,7 +1726,7 @@ keys:
                 Warning: This should not be combined with `ethernet_interfaces[].type = routed`.
             mode:
               type: str
-              valid_values: ["access", "dot1q-tunnel", "trunk", "trunk phone"]
+              valid_values: ["access", "dot1q-tunnel", "trunk", "trunk phone", "tap", "tool", "tap-tool"]
               # TODO: AVD6.0 the warning below should be removed when the `ethernet_interfaces[].mode` is removed in AVD6.0
               description: |-
                 Warning: This should not be combined with `ethernet_interfaces[].mode`.
@@ -2219,9 +2295,22 @@ keys:
                 type: str
                 convert_types:
                   - int
+            srlgs:
+              description: List of SRLGs.
+              type: list
+              items:
+                type: str
+                description: SRLG name or number.
+                convert_types:
+                  - int
             srlg:
               description: SRLG name or number.
               type: str
+              deprecation:
+                warning: true
+                removed: false
+                remove_in_version: 6.0.0
+                new_key: srlgs
               convert_types:
                 - int
             metric:
