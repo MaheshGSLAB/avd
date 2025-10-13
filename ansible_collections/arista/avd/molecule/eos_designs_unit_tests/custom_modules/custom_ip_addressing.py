@@ -3,7 +3,7 @@
 # that can be found in the LICENSE file.
 from functools import cached_property
 
-from pyavd.api.ip_addressing import AvdIpAddressing
+from pyavd.api.ip_addressing import AvdIpAddressing  # type: ignore  # noqa: PGH003
 
 
 class CustomAvdIpAddressing(AvdIpAddressing):

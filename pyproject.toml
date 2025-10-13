@@ -121,7 +121,11 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.pyright]
 exclude = [
-  "ansible_collections/arista/avd",                                      # TODO
+  "ansible_collections/arista/avd/plugins/action",                       # TODO
+  "ansible_collections/arista/avd/plugins/filter",                       # TODO
+  "ansible_collections/arista/avd/plugins/module_utils",                 # TODO
+  "ansible_collections/arista/avd/plugins/modules",                      # TODO
+  "ansible_collections/arista/avd/tests",                                # TODO
   "python/avdutils/tests",                                               # TODO
   "python-avd/pyavd/api",                                                # TODO
   "python-avd/pyavd/_anta",                                              # TODO

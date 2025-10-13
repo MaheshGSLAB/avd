@@ -59,6 +59,7 @@ def cprofile(sort_by: str = "cumtime") -> Callable:
                 result = func(*args, **kwargs)
             finally:
                 if profiling_enabled:
+                    profiler = cProfile.Profile()
                     profiler.disable()
                     stats = pstats.Stats(profiler).sort_stats(sort_by)
                     stats.dump_stats(cprofile_file)

@@ -53,7 +53,11 @@ class PythonToAnsibleHandler(Handler):
 
     def _format_msg(self, record: LogRecord) -> str:
         """Used to format an augmented LogRecord that contains the 'hostname' attribute."""
-        return f"<{record.hostname}> {self.format(record)}" if hasattr(record, "hostname") else self.format(record)
+        hostname = getattr(record, "hostname", None)
+
+        if hostname:
+            return f"<{hostname}> {self.format(record)}"
+        return self.format(record)
 
 
 class PythonToAnsibleContextFilter(Filter):

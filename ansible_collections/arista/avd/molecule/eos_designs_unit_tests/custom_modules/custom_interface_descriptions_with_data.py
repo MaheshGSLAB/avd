@@ -3,7 +3,7 @@
 # that can be found in the LICENSE file.
 from functools import cached_property
 
-from pyavd.api.interface_descriptions import AvdInterfaceDescriptions, InterfaceDescriptionData
+from pyavd.api.interface_descriptions import AvdInterfaceDescriptions, InterfaceDescriptionData  # type: ignore  # noqa: PGH003
 
 
 class CustomAvdInterfaceDescriptions(AvdInterfaceDescriptions):

@@ -28,7 +28,7 @@ from ansible_collections.arista.avd.plugins.plugin_utils.pyavd_wrappers import R
 PLUGIN_NAME = "arista.avd.contains"
 
 try:
-    from pyavd.j2tests.contains import contains
+    from pyavd.j2tests.contains import contains  # type: ignore  # noqa: PGH003
 except ImportError as e:
     contains = RaiseOnUse(
         AnsibleFilterError(

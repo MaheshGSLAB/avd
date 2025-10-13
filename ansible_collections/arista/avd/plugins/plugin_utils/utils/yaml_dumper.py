@@ -12,7 +12,7 @@ except ImportError:
 
 
 # https://ttl255.com/yaml-anchors-and-aliases-and-how-to-disable-them/
-class NoAliasDumper(YamlDumper):
+class NoAliasDumper(YamlDumper): # type: ignore  # noqa: PGH003
     def ignore_aliases(self, _data: Any) -> bool:
         return True
 

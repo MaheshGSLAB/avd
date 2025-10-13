@@ -90,6 +90,7 @@ from ansible.errors import AnsibleParserError
 from ansible.inventory.group import Group
 from ansible.inventory.host import Host
 from ansible.module_utils._text import to_native
+from ansible.parsing.dataloader import DataLoader
 from ansible.plugins.vars import BaseVarsPlugin
 from ansible.utils.vars import combine_vars
 
@@ -97,7 +98,7 @@ FOUND: list = []
 
 
 class VarsModule(BaseVarsPlugin):
-    def find_variable_source(self, path: str, loader: object) -> list:
+    def find_variable_source(self, path: str, loader: DataLoader) -> list:
         """Return the source files from which to load data, if the path is a directory - lookup vars file inside."""
         global_vars_paths = self.get_option("paths")
         extensions = self.get_option("_valid_extensions")
@@ -124,7 +125,7 @@ class VarsModule(BaseVarsPlugin):
 
         return found_files
 
-    def get_vars(self, loader: object, path: str, entities: Any, _cache: bool = True) -> dict:
+    def get_vars(self, loader: DataLoader, path: str, entities: Any, _cache: bool = True) -> None:
         """Return global variables for the `all` group in the inventory file."""
         global FOUND  # noqa: PLW0603 TODO: improve to avoid using global
         if not isinstance(entities, list):
@@ -144,8 +145,9 @@ class VarsModule(BaseVarsPlugin):
                 continue
 
             for found_path in FOUND:
-                new_data = loader.load_from_file(found_path, cache=True, unsafe=True)
+                new_data = loader.load_from_file(found_path, cache=str(True), unsafe=True)
                 if new_data:
                     variables = combine_vars(variables, new_data)
 
-        return variables
+        if variables:
+            self.data = combine_vars(self.data, variables)

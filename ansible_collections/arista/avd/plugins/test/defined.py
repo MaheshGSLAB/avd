@@ -29,7 +29,7 @@ from ansible_collections.arista.avd.plugins.plugin_utils.pyavd_wrappers import R
 PLUGIN_NAME = "arista.avd.defined"
 
 try:
-    from pyavd.j2tests.defined import defined
+    from pyavd.j2tests.defined import defined  # type: ignore  # noqa: PGH003
 except ImportError as e:
     defined = RaiseOnUse(
         AnsibleTemplateError(
