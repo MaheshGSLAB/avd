@@ -44,6 +44,7 @@ jobs:
       - test_pyavd
       - cargo_build_and_test
       - pyavd_utils_build_and_test_cross_platform
+      - remap_j2_coverage
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -730,6 +731,45 @@ jobs:
         with:
           name: pytest-coverage
           path: coverage.xml
+
+  remap_j2_coverage:
+    name: Remap J2 coverage
+    runs-on: ubuntu-latest
+    needs: [generate_pyavd_coverage_report]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install coverage
+        run: pip install --group coverage
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: pytest-coverage
+      - name: Download eos_designs compiled templates artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: pytest-eos-designs-compiled-templates
+          path: python-avd/pyavd/_eos_designs/j2templates/compiled_templates/
+      - name: Download eos_cli_config_gen compiled templates artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: pytest-eos-cli-config-gen-compiled-templates
+          path: python-avd/pyavd/_eos_cli_config_gen/j2templates/compiled_templates/
+      - name: Remap coverage to j2 files
+        run: |
+          set -ex
+          coverage combine
+          # Should we fail if we have no data?
+          coverage report
+          coverage xml -o coverage-j2.xml
+      - name: Upload pytest coverage report
+        uses: actions/upload-artifact@v5
+        with:
+          name: j2-coverage
+          path: coverage-j2.xml
 
   # ----------------------------------- #
   # Cargo build, test and linting
