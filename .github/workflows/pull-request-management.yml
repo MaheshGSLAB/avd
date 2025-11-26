@@ -762,7 +762,7 @@ jobs:
       - name: Remap coverage to j2 files
         run: |
           set -ex
-          coverage combine
+          coverage combine coverage-*.dat
           # Should we fail if we have no data?
           coverage report
           coverage xml -o coverage-j2.xml
