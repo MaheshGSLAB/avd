@@ -12,7 +12,7 @@ from pyavd.constants import (
     EOS_DESIGNS_JINJA2_TEMPLATE_PATH,
     RUNNING_FROM_SRC,
 )
-from pyavd.templater import Templar
+from pyavd.templater import get_templar
 
 from .hash_dir import changed_hash, hash_dir
 
@@ -21,7 +21,9 @@ LOGGER = logging.getLogger(__name__)
 
 def compile_eos_cli_config_gen_templates() -> None:
     """Compile eos_cli_config_gen Jinja2 templates."""
-    templar = Templar(precompiled_templates_path=EOS_CLI_CONFIG_GEN_JINJA2_PRECOMPILED_TEMPLATE_PATH, searchpaths=[EOS_CLI_CONFIG_GEN_JINJA2_TEMPLATE_PATH])
+    templar = get_templar(
+        precompiled_templates_path=EOS_CLI_CONFIG_GEN_JINJA2_PRECOMPILED_TEMPLATE_PATH, searchpaths=[EOS_CLI_CONFIG_GEN_JINJA2_TEMPLATE_PATH]
+    )
     templar.compile_templates_in_paths(
         precompiled_templates_path=EOS_CLI_CONFIG_GEN_JINJA2_PRECOMPILED_TEMPLATE_PATH, searchpaths=[EOS_CLI_CONFIG_GEN_JINJA2_TEMPLATE_PATH]
     )
@@ -29,7 +31,7 @@ def compile_eos_cli_config_gen_templates() -> None:
 
 def compile_eos_designs_templates() -> None:
     """Compile eos_designs Jinja2 templates."""
-    templar = Templar(precompiled_templates_path=EOS_DESIGNS_JINJA2_PRECOMPILED_TEMPLATE_PATH, searchpaths=[EOS_DESIGNS_JINJA2_TEMPLATE_PATH])
+    templar = get_templar(precompiled_templates_path=EOS_DESIGNS_JINJA2_PRECOMPILED_TEMPLATE_PATH, searchpaths=[EOS_DESIGNS_JINJA2_TEMPLATE_PATH])
     templar.compile_templates_in_paths(precompiled_templates_path=EOS_DESIGNS_JINJA2_PRECOMPILED_TEMPLATE_PATH, searchpaths=[EOS_DESIGNS_JINJA2_TEMPLATE_PATH])
 
 
