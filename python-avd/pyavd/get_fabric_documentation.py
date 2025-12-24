@@ -4,6 +4,12 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from .constants import EOS_DESIGNS_JINJA2_PRECOMPILED_TEMPLATE_PATH, EOS_DESIGNS_JINJA2_TEMPLATE_PATH  # noqa: PLC0415
+from .templater import get_templar
+
+doc_templar = get_templar(
+    precompiled_templates_path=EOS_DESIGNS_JINJA2_PRECOMPILED_TEMPLATE_PATH, searchpaths=[EOS_DESIGNS_JINJA2_TEMPLATE_PATH]
+)
 
 from pyavd._utils import get
 from pyavd.api.fabric_documentation import (
@@ -55,12 +61,8 @@ def get_fabric_documentation(
     from pyavd._eos_designs.fabric_documentation_facts import FabricDocumentationFacts  # noqa: PLC0415
     from pyavd.j2filters import add_md_toc  # noqa: PLC0415
 
-    from .constants import EOS_DESIGNS_JINJA2_PRECOMPILED_TEMPLATE_PATH  # noqa: PLC0415
-    from .templater import Templar  # noqa: PLC0415
-
     fabric_documentation_facts = FabricDocumentationFacts(avd_facts, structured_configs, fabric_name, include_connected_endpoints, toc)
     result = FabricDocumentation()
-    doc_templar = Templar(precompiled_templates_path=EOS_DESIGNS_JINJA2_PRECOMPILED_TEMPLATE_PATH)
     if fabric_documentation:
         fabric_documentation_facts_dict = fabric_documentation_facts.render()
         result.fabric_documentation = doc_templar.render_template_from_file("fabric_documentation.j2", fabric_documentation_facts_dict)
