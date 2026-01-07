@@ -3,7 +3,7 @@
 # that can be found in the LICENSE file.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast, overload
 
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.structured_config.structured_config_generator import structured_config_contributor
@@ -41,6 +41,22 @@ class IpIgmpSnoopingMixin(Protocol):
 
             for l2vlan in tenant.l2vlans:
                 self._set_ip_igmp_snooping_vlan(l2vlan, tenant, vrf=None)
+
+    @overload
+    def _set_ip_igmp_snooping_vlan(
+        self: AvdStructuredConfigNetworkServicesProtocol,
+        vlan: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.VrfsItem.SvisItem,
+        tenant: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem,
+        vrf: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.VrfsItem,
+    ) -> None: ...
+
+    @overload
+    def _set_ip_igmp_snooping_vlan(
+        self: AvdStructuredConfigNetworkServicesProtocol,
+        vlan: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.L2vlansItem,
+        tenant: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem,
+        vrf: None,
+    ) -> None: ...
 
     def _set_ip_igmp_snooping_vlan(
         self: AvdStructuredConfigNetworkServicesProtocol,
@@ -81,11 +97,12 @@ class IpIgmpSnoopingMixin(Protocol):
             vlan_item.querier.enabled = igmp_snooping_querier_enabled
             if igmp_snooping_querier_enabled:
                 if vrf is None:
-                    l2vlan: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.L2vlansItem = vlan  # type: ignore[AssigmentType]
-                    vlan_item.querier.address = self._get_l2vlan_igmp_querier_source_address(l2vlan, tenant)
+                    vlan = cast("EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.L2vlansItem", vlan)
+                    vlan_item.querier.address = self._get_l2vlan_igmp_querier_source_address(vlan, tenant)
                 else:  # SVI
-                    svi: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.SvisItem = vlan  # type: ignore[AssigmentType]
-                    vlan_item.querier.address = self._get_svi_igmp_querier_source_address(svi, tenant, vrf)
+                    vlan = cast("EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.VrfsItem.SvisItem", vlan)
+                    vlan_item.querier.address = self._get_svi_igmp_querier_source_address(vlan, tenant, vrf)
+
                 vlan_item.querier.version = default(vlan.igmp_snooping_querier.version, tenant.igmp_snooping_querier.version)
 
         if evpn_l2_multicast_enabled:
