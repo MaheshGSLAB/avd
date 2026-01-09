@@ -152,14 +152,14 @@ class IpIgmpSnoopingMixin(Protocol):
             case "diagnostic_loopback":
                 try:
                     source_address = self.get_vrf_router_id(vrf, tenant, source_address_key)
-                except AristaAvdInvalidInputsError as e:
+                except AristaAvdInvalidInputsError:
                     # Re-raise with IGMP-specific context
                     msg = (
                         f"Invalid configuration on VRF '{vrf.name}' in Tenant '{tenant.name}'. 'vtep_diagnostic.loopback' along with either "
                         "'vtep_diagnostic.loopback_ip_pools' or 'vtep_diagnostic.loopback_ip_range' must be defined "
                         "when 'igmp_snooping_querier.source_address' is set to 'diagnostic_loopback' on the VLAN."
                     )
-                    raise AristaAvdInvalidInputsError(msg) from e
+                    raise AristaAvdInvalidInputsError(msg) from None
             case _:
                 source_address = source_address_key
 
