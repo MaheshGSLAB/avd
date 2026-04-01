@@ -10280,7 +10280,6 @@ router bgp 65101
       comment
       Comment created from eos_cli under router_bgp.vrfs.BLUE-C1
       EOF
-
    !
    vrf NHP-PEER
       neighbor 10.10.10.0 peer group NHP

@@ -256,140 +256,72 @@ class RouterBgpGenerator(CliGenerator):
                 agg_cli += " advertise-only"
             cfg.append_l1(agg_cli)
 
+    def _build_redistrib_cli(
+        self,
+        keyword: str,
+        obj: Any,
+        *,
+        isis_level: bool = False,
+        include_leaked: bool = False,
+        nssa_type: bool = False,
+        route_map: bool = True,
+        rcf: bool = False,
+    ) -> str | None:
+        """
+        Build a single 'redistribute {keyword} [options]' CLI string.
+
+        Returns None if ``obj.enabled`` is not True so callers can pass the
+        result directly to ``cfg.append_lN()`` (a None argument is a no-op).
+
+        Args:
+            keyword:        Protocol keyword(s), e.g. ``"connected"``, ``"ospf match internal"``.
+            obj:            Schema object for the protocol (must have ``.enabled``).
+            isis_level:     Append ``obj.isis_level`` after the keyword when set.
+            include_leaked: Append ``" include leaked"`` when ``obj.include_leaked is True``.
+            nssa_type:      Append ``obj.nssa_type`` after the keyword when set.
+            route_map:      When True (default), append ``" route-map {obj.route_map}"`` if present.
+            rcf:            When True, append ``" rcf {obj.rcf}"`` if present (as elif to route_map).
+        """
+        if obj.enabled is not True:
+            return None
+        cli = f"redistribute {keyword}"
+        if isis_level and obj.isis_level is not None:
+            cli += f" {obj.isis_level}"
+        if nssa_type and obj.nssa_type is not None:
+            cli += f" {obj.nssa_type}"
+        if include_leaked and obj.include_leaked is True:
+            cli += " include leaked"
+        if route_map and obj.route_map is not None:
+            cli += f" route-map {obj.route_map}"
+        elif rcf and obj.rcf is not None:
+            cli += f" rcf {obj.rcf}"
+        return cli
+
     def _render_redistribute(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render global 'redistribute' entries (J2 lines 511-673)."""
         cfg = self.cli_config.router_bgp
-        redist = bgp.redistribute
+        r = bgp.redistribute
 
-        if redist.connected.enabled is True:
-            cli = "redistribute connected"
-            if redist.connected.include_leaked is True:
-                cli += " include leaked"
-            if redist.connected.route_map is not None:
-                cli += f" route-map {redist.connected.route_map}"
-            elif redist.connected.rcf is not None:
-                cli += f" rcf {redist.connected.rcf}"
-            cfg.append_l1(cli)
-
-        if redist.isis.enabled is True:
-            cli = "redistribute isis"
-            if redist.isis.isis_level is not None:
-                cli += f" {redist.isis.isis_level}"
-            if redist.isis.include_leaked is True:
-                cli += " include leaked"
-            if redist.isis.route_map is not None:
-                cli += f" route-map {redist.isis.route_map}"
-            elif redist.isis.rcf is not None:
-                cli += f" rcf {redist.isis.rcf}"
-            cfg.append_l1(cli)
-
-        if redist.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if redist.ospf.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospf.route_map is not None:
-                cli += f" route-map {redist.ospf.route_map}"
-            cfg.append_l1(cli)
-        elif redist.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if redist.ospf.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospf.match_internal.route_map is not None:
-                cli += f" route-map {redist.ospf.match_internal.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if redist.ospf.match_external.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospf.match_external.route_map is not None:
-                cli += f" route-map {redist.ospf.match_external.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if redist.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {redist.ospf.match_nssa_external.nssa_type}"
-            if redist.ospf.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {redist.ospf.match_nssa_external.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if redist.ospfv3.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospfv3.route_map is not None:
-                cli += f" route-map {redist.ospfv3.route_map}"
-            cfg.append_l1(cli)
-        elif redist.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if redist.ospfv3.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {redist.ospfv3.match_internal.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if redist.ospfv3.match_external.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {redist.ospfv3.match_external.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if redist.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {redist.ospfv3.match_nssa_external.nssa_type}"
-            if redist.ospfv3.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if redist.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {redist.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.static.enabled is True:
-            cli = "redistribute static"
-            if redist.static.include_leaked is True:
-                cli += " include leaked"
-            if redist.static.route_map is not None:
-                cli += f" route-map {redist.static.route_map}"
-            elif redist.static.rcf is not None:
-                cli += f" rcf {redist.static.rcf}"
-            cfg.append_l1(cli)
-
-        if redist.rip.enabled is True:
-            cli = "redistribute rip"
-            if redist.rip.route_map is not None:
-                cli += f" route-map {redist.rip.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if redist.attached_host.route_map is not None:
-                cli += f" route-map {redist.attached_host.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.dynamic.enabled is True:
-            cli = "redistribute dynamic"
-            if redist.dynamic.route_map is not None:
-                cli += f" route-map {redist.dynamic.route_map}"
-            elif redist.dynamic.rcf is not None:
-                cli += f" rcf {redist.dynamic.rcf}"
-            cfg.append_l1(cli)
-
-        if redist.bgp.enabled is True:
-            cli = "redistribute bgp leaked"
-            if redist.bgp.route_map is not None:
-                cli += f" route-map {redist.bgp.route_map}"
-            cfg.append_l1(cli)
-
-        if redist.user.enabled is True:
-            cli = "redistribute user"
-            if redist.user.rcf is not None:
-                cli += f" rcf {redist.user.rcf}"
-            cfg.append_l1(cli)
+        cfg.append_l1(self._build_redistrib_cli("connected", r.connected, include_leaked=True, rcf=True))
+        cfg.append_l1(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l1(
+            self._build_redistrib_cli("ospf", r.ospf, include_leaked=True)
+            or self._build_redistrib_cli("ospf match internal", r.ospf.match_internal, include_leaked=True)
+        )
+        cfg.append_l1(self._build_redistrib_cli("ospf match external", r.ospf.match_external, include_leaked=True))
+        cfg.append_l1(self._build_redistrib_cli("ospf match nssa-external", r.ospf.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l1(
+            self._build_redistrib_cli("ospfv3", r.ospfv3, include_leaked=True)
+            or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal, include_leaked=True)
+        )
+        cfg.append_l1(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external, include_leaked=True))
+        cfg.append_l1(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l1(self._build_redistrib_cli("static", r.static, include_leaked=True, rcf=True))
+        cfg.append_l1(self._build_redistrib_cli("rip", r.rip))
+        cfg.append_l1(self._build_redistrib_cli("attached-host", r.attached_host))
+        cfg.append_l1(self._build_redistrib_cli("dynamic", r.dynamic, rcf=True))
+        cfg.append_l1(self._build_redistrib_cli("bgp leaked", r.bgp))
+        cfg.append_l1(self._build_redistrib_cli("user", r.user, route_map=False, rcf=True))
 
     def _render_neighbor_interfaces(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'neighbor interface' entries sorted by name (J2 lines 674-680)."""
@@ -426,15 +358,14 @@ class RouterBgpGenerator(CliGenerator):
                 cfg.append_l2(f"no redistribute {r}")
             if vlan.eos_cli is not None:
                 cfg.append_l2("!")
-                cfg.append_l2(vlan.eos_cli)
+                for line in vlan.eos_cli.split("\n"):
+                    cfg.append_l2(line) if line else cfg._lines.append("")
 
     def _render_vpws(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render VPWS BGP service entries sorted by name (J2 lines 722-752)."""
         cfg = self.cli_config.router_bgp
         for svc in natural_sort(bgp.vpws or [], sort_key="name"):
             cfg.append_l1("!")
-            if svc.name is None:
-                continue
             cfg.append_l1(f"vpws {svc.name}")
             cfg.append_l2("rd {}", svc.rd)
             cfg.append_l2("route-target import export evpn {}", svc.route_targets.import_export)
@@ -474,7 +405,8 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2("vlan {}", bundle.vlan)
             if bundle.eos_cli is not None:
                 cfg.append_l2("!")
-                cfg.append_l2(bundle.eos_cli)
+                for line in bundle.eos_cli.split("\n"):
+                    cfg.append_l2(line) if line else cfg._lines.append("")
 
     def _render_address_family_evpn(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family evpn' block (J2 lines 793-1018)."""
@@ -1091,135 +1023,26 @@ class RouterBgpGenerator(CliGenerator):
         """Render redistribute entries for address-family ipv4 at L2 (J2 lines 1250-1412)."""
         cfg = self.cli_config.router_bgp
 
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            cfg.append_l2(cli)
-
-        if r.bgp.enabled is True:
-            cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
-            cfg.append_l2(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.include_leaked is True:
-                cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
-            cfg.append_l2(cli)
-
-        if r.dynamic.enabled is True:
-            cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
-            cfg.append_l2(cli)
-
-        if r.user.enabled is True:
-            cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
-            cfg.append_l2(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            cfg.append_l2(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.rip.enabled is True:
-            cli = "redistribute rip"
-            if r.rip.route_map is not None:
-                cli += f" route-map {r.rip.route_map}"
-            cfg.append_l2(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.include_leaked is True:
-                cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
-            cfg.append_l2(cli)
+        cfg.append_l2(self._build_redistrib_cli("attached-host", r.attached_host))
+        cfg.append_l2(self._build_redistrib_cli("bgp leaked", r.bgp))
+        cfg.append_l2(self._build_redistrib_cli("connected", r.connected, include_leaked=True, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("dynamic", r.dynamic, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("user", r.user, route_map=False, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l2(
+            self._build_redistrib_cli("ospf", r.ospf, include_leaked=True)
+            or self._build_redistrib_cli("ospf match internal", r.ospf.match_internal, include_leaked=True)
+        )
+        cfg.append_l2(
+            self._build_redistrib_cli("ospfv3", r.ospfv3, include_leaked=True)
+            or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal, include_leaked=True)
+        )
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("ospf match external", r.ospf.match_external, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("ospf match nssa-external", r.ospf.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("rip", r.rip))
+        cfg.append_l2(self._build_redistrib_cli("static", r.static, include_leaked=True, rcf=True))
 
     def _build_missing_policy_cli(self, prefix: str, missing_policy: Any) -> list[str]:
         """
@@ -1427,85 +1250,16 @@ class RouterBgpGenerator(CliGenerator):
         """Render IPv4 multicast address-family redistribute commands at L2."""
         cfg = self.cli_config.router_bgp
 
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            cfg.append_l2(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            cfg.append_l2(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            cfg.append_l2(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            cfg.append_l2(cli)
+        cfg.append_l2(self._build_redistrib_cli("attached-host", r.attached_host))
+        cfg.append_l2(self._build_redistrib_cli("connected", r.connected))
+        cfg.append_l2(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("ospf", r.ospf) or self._build_redistrib_cli("ospf match internal", r.ospf.match_internal))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3", r.ospfv3) or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True))
+        cfg.append_l2(self._build_redistrib_cli("ospf match external", r.ospf.match_external))
+        cfg.append_l2(self._build_redistrib_cli("ospf match nssa-external", r.ospf.match_nssa_external, nssa_type=True))
+        cfg.append_l2(self._build_redistrib_cli("static", r.static))
 
     def _render_address_family_ipv4_sr_te(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family ipv4 sr-te' block (J2 lines 1866-1908)."""
@@ -1631,102 +1385,20 @@ class RouterBgpGenerator(CliGenerator):
         """Render IPv6 address-family redistribute commands at L2."""
         cfg = self.cli_config.router_bgp
 
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            cfg.append_l2(cli)
-
-        if r.bgp.enabled is True:
-            cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
-            cfg.append_l2(cli)
-
-        if r.dhcp.enabled is True:
-            cli = "redistribute dhcp"
-            if r.dhcp.route_map is not None:
-                cli += f" route-map {r.dhcp.route_map}"
-            cfg.append_l2(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.include_leaked is True:
-                cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
-            cfg.append_l2(cli)
-
-        if r.dynamic.enabled is True:
-            cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
-            cfg.append_l2(cli)
-
-        if r.user.enabled is True:
-            cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
-            cfg.append_l2(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.include_leaked is True:
-                cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
-            cfg.append_l2(cli)
+        cfg.append_l2(self._build_redistrib_cli("attached-host", r.attached_host))
+        cfg.append_l2(self._build_redistrib_cli("bgp leaked", r.bgp))
+        cfg.append_l2(self._build_redistrib_cli("dhcp", r.dhcp))
+        cfg.append_l2(self._build_redistrib_cli("connected", r.connected, include_leaked=True, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("dynamic", r.dynamic, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("user", r.user, route_map=False, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l2(
+            self._build_redistrib_cli("ospfv3", r.ospfv3, include_leaked=True)
+            or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal, include_leaked=True)
+        )
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("static", r.static, include_leaked=True, rcf=True))
 
     def _render_address_family_ipv6_multicast(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family ipv6 multicast' block (J2 lines 2178-2320)."""
@@ -1775,79 +1447,15 @@ class RouterBgpGenerator(CliGenerator):
         """Render IPv6 multicast address-family redistribute commands at L2."""
         cfg = self.cli_config.router_bgp
 
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            cfg.append_l2(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            cfg.append_l2(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            cfg.append_l2(cli)
+        cfg.append_l2(self._build_redistrib_cli("connected", r.connected))
+        cfg.append_l2(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("ospf", r.ospf) or self._build_redistrib_cli("ospf match internal", r.ospf.match_internal))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3", r.ospfv3) or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True))
+        cfg.append_l2(self._build_redistrib_cli("ospf match external", r.ospf.match_external))
+        cfg.append_l2(self._build_redistrib_cli("ospf match nssa-external", r.ospf.match_nssa_external, nssa_type=True))
+        cfg.append_l2(self._build_redistrib_cli("static", r.static))
 
     def _render_address_family_ipv6_sr_te(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family ipv6 sr-te' block (J2 lines 2321-2363)."""
@@ -2294,142 +1902,33 @@ class RouterBgpGenerator(CliGenerator):
         self._render_vrf_evpn_multicast(vrf)
         if vrf.eos_cli is not None:
             cfg.append_l2(self._SEP)
-            for line in vrf.eos_cli.splitlines():
-                cfg.append_l2(line)
+            for line in vrf.eos_cli.split("\n"):
+                cfg.append_l2(line) if line else cfg._lines.append("")
 
     def _render_vrf_redistribute(self, r: Any) -> None:
         """Render VRF-level redistribute commands at L2 (J2 lines 2982-3144)."""
         cfg = self.cli_config.router_bgp
 
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.include_leaked is True:
-                cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
-            cfg.append_l2(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            cfg.append_l2(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            cfg.append_l2(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l2(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.include_leaked is True:
-                cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
-            cfg.append_l2(cli)
-
-        if r.rip.enabled is True:
-            cli = "redistribute rip"
-            if r.rip.route_map is not None:
-                cli += f" route-map {r.rip.route_map}"
-            cfg.append_l2(cli)
-
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            cfg.append_l2(cli)
-
-        if r.dynamic.enabled is True:
-            cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
-            cfg.append_l2(cli)
-
-        if r.bgp.enabled is True:
-            cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
-            cfg.append_l2(cli)
-
-        if r.user.enabled is True:
-            cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
-            cfg.append_l2(cli)
+        cfg.append_l2(self._build_redistrib_cli("connected", r.connected, include_leaked=True, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l2(
+            self._build_redistrib_cli("ospf", r.ospf, include_leaked=True)
+            or self._build_redistrib_cli("ospf match internal", r.ospf.match_internal, include_leaked=True)
+        )
+        cfg.append_l2(self._build_redistrib_cli("ospf match external", r.ospf.match_external, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("ospf match nssa-external", r.ospf.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l2(
+            self._build_redistrib_cli("ospfv3", r.ospfv3, include_leaked=True)
+            or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal, include_leaked=True)
+        )
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l2(self._build_redistrib_cli("static", r.static, include_leaked=True, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("rip", r.rip))
+        cfg.append_l2(self._build_redistrib_cli("attached-host", r.attached_host))
+        cfg.append_l2(self._build_redistrib_cli("dynamic", r.dynamic, rcf=True))
+        cfg.append_l2(self._build_redistrib_cli("bgp leaked", r.bgp))
+        cfg.append_l2(self._build_redistrib_cli("user", r.user, route_map=False, rcf=True))
 
     def _render_vrf_af_flow_spec(self, af: Any, protocol: str) -> None:
         """Render VRF 'address-family flow-spec {ipv4|ipv6}' block at L2/L3."""
@@ -2531,135 +2030,26 @@ class RouterBgpGenerator(CliGenerator):
         """Render VRF address-family ipv4 redistribute commands at L3 (J2 lines 3280-3411+)."""
         cfg = self.cli_config.router_bgp
 
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            cfg.append_l3(cli)
-
-        if r.bgp.enabled is True:
-            cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
-            cfg.append_l3(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.include_leaked is True:
-                cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
-            cfg.append_l3(cli)
-
-        if r.dynamic.enabled is True:
-            cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
-            cfg.append_l3(cli)
-
-        if r.user.enabled is True:
-            cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
-            cfg.append_l3(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            cfg.append_l3(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            cfg.append_l3(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            cfg.append_l3(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.rip.enabled is True:
-            cli = "redistribute rip"
-            if r.rip.route_map is not None:
-                cli += f" route-map {r.rip.route_map}"
-            cfg.append_l3(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.include_leaked is True:
-                cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
-            cfg.append_l3(cli)
+        cfg.append_l3(self._build_redistrib_cli("attached-host", r.attached_host))
+        cfg.append_l3(self._build_redistrib_cli("bgp leaked", r.bgp))
+        cfg.append_l3(self._build_redistrib_cli("connected", r.connected, include_leaked=True, rcf=True))
+        cfg.append_l3(self._build_redistrib_cli("dynamic", r.dynamic, rcf=True))
+        cfg.append_l3(self._build_redistrib_cli("user", r.user, route_map=False, rcf=True))
+        cfg.append_l3(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l3(
+            self._build_redistrib_cli("ospf", r.ospf, include_leaked=True)
+            or self._build_redistrib_cli("ospf match internal", r.ospf.match_internal, include_leaked=True)
+        )
+        cfg.append_l3(
+            self._build_redistrib_cli("ospfv3", r.ospfv3, include_leaked=True)
+            or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal, include_leaked=True)
+        )
+        cfg.append_l3(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external, include_leaked=True))
+        cfg.append_l3(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l3(self._build_redistrib_cli("ospf match external", r.ospf.match_external, include_leaked=True))
+        cfg.append_l3(self._build_redistrib_cli("ospf match nssa-external", r.ospf.match_nssa_external, nssa_type=True, include_leaked=True))
+        cfg.append_l3(self._build_redistrib_cli("rip", r.rip))
+        cfg.append_l3(self._build_redistrib_cli("static", r.static, include_leaked=True, rcf=True))
 
     def _render_vrf_af_ipv4mc(self, vrf: Any) -> None:
         """Render VRF 'address-family ipv4 multicast' block at L2/L3 (J2 lines 3444-3582)."""
@@ -2698,85 +2088,16 @@ class RouterBgpGenerator(CliGenerator):
         """Render VRF address-family ipv4 multicast redistribute commands at L3 (J2 lines 3485-3580)."""
         cfg = self.cli_config.router_bgp
 
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            cfg.append_l3(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            cfg.append_l3(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            cfg.append_l3(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            cfg.append_l3(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            cfg.append_l3(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            cfg.append_l3(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            cfg.append_l3(cli)
+        cfg.append_l3(self._build_redistrib_cli("attached-host", r.attached_host))
+        cfg.append_l3(self._build_redistrib_cli("connected", r.connected))
+        cfg.append_l3(self._build_redistrib_cli("isis", r.isis, isis_level=True, include_leaked=True, rcf=True))
+        cfg.append_l3(self._build_redistrib_cli("ospf", r.ospf) or self._build_redistrib_cli("ospf match internal", r.ospf.match_internal))
+        cfg.append_l3(self._build_redistrib_cli("ospfv3", r.ospfv3) or self._build_redistrib_cli("ospfv3 match internal", r.ospfv3.match_internal))
+        cfg.append_l3(self._build_redistrib_cli("ospfv3 match external", r.ospfv3.match_external))
+        cfg.append_l3(self._build_redistrib_cli("ospfv3 match nssa-external", r.ospfv3.match_nssa_external, nssa_type=True))
+        cfg.append_l3(self._build_redistrib_cli("ospf match external", r.ospf.match_external))
+        cfg.append_l3(self._build_redistrib_cli("ospf match nssa-external", r.ospf.match_nssa_external, nssa_type=True))
+        cfg.append_l3(self._build_redistrib_cli("static", r.static))
 
     def _render_vrf_af_ipv6(self, vrf: Any) -> None:
         """Render VRF 'address-family ipv6' block at L2/L3 (J2 lines 3583-3791)."""
@@ -3095,5 +2416,5 @@ class RouterBgpGenerator(CliGenerator):
             return
         cfg = self.cli_config.router_bgp
         cfg.append_l1(self._SEP)
-        for line in bgp.eos_cli.splitlines():
-            cfg.append_l1(line)
+        for line in bgp.eos_cli.split("\n"):
+            cfg.append_l1(line) if line else cfg._lines.append("")
