@@ -74,22 +74,17 @@ class RouterBgpGenerator(CliGenerator):
         """
         cfg = self.cli_config.router_bgp
 
-        if bgp.as_notation is not None:
-            cfg.append_l1(f"bgp asn notation {bgp.as_notation}")
-        if bgp.router_id is not None:
-            cfg.append_l1(f"router-id {bgp.router_id}")
-        if bgp.updates.wait_for_convergence is True:
-            cfg.append_l1("update wait-for-convergence")
-        if bgp.updates.wait_install is True:
-            cfg.append_l1("update wait-install")
+        cfg.append_l1("bgp asn notation {}", bgp.as_notation)
+        cfg.append_l1("router-id {}", bgp.router_id)
+        cfg.append_l1("update wait-for-convergence", bgp.updates.wait_for_convergence)
+        cfg.append_l1("update wait-install", bgp.updates.wait_install)
 
         self._render_bgp_default_flags(bgp)
         self._render_timers(bgp)
         self._render_distance(bgp)
         self._render_graceful_restart(bgp)
 
-        if bgp.bgp_cluster_id is not None:
-            cfg.append_l1(f"bgp cluster-id {bgp.bgp_cluster_id}")
+        cfg.append_l1("bgp cluster-id {}", bgp.bgp_cluster_id)
 
         self._render_graceful_restart_helper(bgp)
         self._render_route_reflector_preserve(bgp)
@@ -101,8 +96,7 @@ class RouterBgpGenerator(CliGenerator):
         self._render_additional_paths(bgp)
         self._render_listen_ranges(bgp)
 
-        if bgp.bgp.bestpath.d_path is True:
-            cfg.append_l1("bgp bestpath d-path")
+        cfg.append_l1("bgp bestpath d-path", bgp.bgp.bestpath.d_path)
 
         if bgp.neighbor_default.send_community == "all":
             cfg.append_l1("neighbor default send-community")
@@ -121,8 +115,7 @@ class RouterBgpGenerator(CliGenerator):
 
         cfg.append_l1(f"neighbor {name} peer group")
 
-        if peer_group.remote_as is not None:
-            cfg.append_l1(f"neighbor {name} remote-as {peer_group.remote_as}")
+        cfg.append_l1("neighbor {} remote-as {}", name, peer_group.remote_as)
         if peer_group.shutdown is True:
             cfg.append_l1(f"neighbor {name} shutdown")
 
@@ -130,33 +123,25 @@ class RouterBgpGenerator(CliGenerator):
         self._render_remove_private_as(name, peer_group.remove_private_as)
         self._render_as_path(name, peer_group.as_path)
 
-        if peer_group.local_as is not None:
-            cfg.append_l1(f"neighbor {name} local-as {peer_group.local_as} no-prepend replace-as")
-        if peer_group.weight is not None:
-            cfg.append_l1(f"neighbor {name} weight {peer_group.weight}")
+        cfg.append_l1("neighbor {} local-as {} no-prepend replace-as", name, peer_group.local_as)
+        cfg.append_l1("neighbor {} weight {}", name, peer_group.weight)
         if peer_group.passive is True:
             cfg.append_l1(f"neighbor {name} passive")
-        if peer_group.update_source is not None:
-            cfg.append_l1(f"neighbor {name} update-source {peer_group.update_source}")
+        cfg.append_l1("neighbor {} update-source {}", name, peer_group.update_source)
 
         self._render_bfd(name, peer_group.bfd, peer_group.bfd_timers)
 
-        if peer_group.description is not None:
-            cfg.append_l1(f"neighbor {name} description {peer_group.description}")
+        cfg.append_l1("neighbor {} description {}", name, peer_group.description)
 
         self._render_allowas_in(name, peer_group.allowas_in)
         self._render_rib_in_pre_policy_retain(name, peer_group.rib_in_pre_policy_retain)
 
-        if peer_group.ebgp_multihop is not None:
-            cfg.append_l1(f"neighbor {name} ebgp-multihop {peer_group.ebgp_multihop}")
-        if peer_group.ttl_maximum_hops is not None:
-            cfg.append_l1(f"neighbor {name} ttl maximum-hops {peer_group.ttl_maximum_hops}")
+        cfg.append_l1("neighbor {} ebgp-multihop {}", name, peer_group.ebgp_multihop)
+        cfg.append_l1("neighbor {} ttl maximum-hops {}", name, peer_group.ttl_maximum_hops)
         if peer_group.route_reflector_client is True:
             cfg.append_l1(f"neighbor {name} route-reflector-client")
-        if peer_group.session_tracker is not None:
-            cfg.append_l1(f"neighbor {name} session tracker {peer_group.session_tracker}")
-        if peer_group.timers is not None:
-            cfg.append_l1(f"neighbor {name} timers {peer_group.timers}")
+        cfg.append_l1("neighbor {} session tracker {}", name, peer_group.session_tracker)
+        cfg.append_l1("neighbor {} timers {}", name, peer_group.timers)
 
         self._render_route_maps(name, peer_group.route_map_in, peer_group.route_map_out)
 
@@ -192,10 +177,8 @@ class RouterBgpGenerator(CliGenerator):
         cfg = self.cli_config.router_bgp
         ip = neighbor.ip_address
 
-        if neighbor.peer_group is not None:
-            cfg.append_l1(f"neighbor {ip} peer group {neighbor.peer_group}")
-        if neighbor.remote_as is not None:
-            cfg.append_l1(f"neighbor {ip} remote-as {neighbor.remote_as}")
+        cfg.append_l1("neighbor {} peer group {}", ip, neighbor.peer_group)
+        cfg.append_l1("neighbor {} remote-as {}", ip, neighbor.remote_as)
         if neighbor.shutdown is True:
             cfg.append_l1(f"neighbor {ip} shutdown")
 
@@ -203,28 +186,22 @@ class RouterBgpGenerator(CliGenerator):
         self._render_remove_private_as(ip, neighbor.remove_private_as)
         self._render_as_path(ip, neighbor.as_path)
 
-        if neighbor.local_as is not None:
-            cfg.append_l1(f"neighbor {ip} local-as {neighbor.local_as} no-prepend replace-as")
-        if neighbor.weight is not None:
-            cfg.append_l1(f"neighbor {ip} weight {neighbor.weight}")
+        cfg.append_l1("neighbor {} local-as {} no-prepend replace-as", ip, neighbor.local_as)
+        cfg.append_l1("neighbor {} weight {}", ip, neighbor.weight)
         if neighbor.passive is True:
             cfg.append_l1(f"neighbor {ip} passive")
-        if neighbor.update_source is not None:
-            cfg.append_l1(f"neighbor {ip} update-source {neighbor.update_source}")
+        cfg.append_l1("neighbor {} update-source {}", ip, neighbor.update_source)
 
         # Neighbors can disable bfd inherited from a peer-group; peer-groups cannot.
         self._render_bfd(ip, neighbor.bfd, neighbor.bfd_timers, allow_negation=neighbor.peer_group is not None)
 
-        if neighbor.description is not None:
-            cfg.append_l1(f"neighbor {ip} description {neighbor.description}")
+        cfg.append_l1("neighbor {} description {}", ip, neighbor.description)
 
         self._render_allowas_in(ip, neighbor.allowas_in)
         self._render_rib_in_pre_policy_retain(ip, neighbor.rib_in_pre_policy_retain)
 
-        if neighbor.ebgp_multihop is not None:
-            cfg.append_l1(f"neighbor {ip} ebgp-multihop {neighbor.ebgp_multihop}")
-        if neighbor.ttl_maximum_hops is not None:
-            cfg.append_l1(f"neighbor {ip} ttl maximum-hops {neighbor.ttl_maximum_hops}")
+        cfg.append_l1("neighbor {} ebgp-multihop {}", ip, neighbor.ebgp_multihop)
+        cfg.append_l1("neighbor {} ttl maximum-hops {}", ip, neighbor.ttl_maximum_hops)
 
         # Neighbors support negation for route-reflector-client; peer-groups do not.
         if neighbor.route_reflector_client is True:
@@ -232,10 +209,8 @@ class RouterBgpGenerator(CliGenerator):
         elif neighbor.route_reflector_client is False:
             cfg.append_l1(f"no neighbor {ip} route-reflector-client")
 
-        if neighbor.session_tracker is not None:
-            cfg.append_l1(f"neighbor {ip} session tracker {neighbor.session_tracker}")
-        if neighbor.timers is not None:
-            cfg.append_l1(f"neighbor {ip} timers {neighbor.timers}")
+        cfg.append_l1("neighbor {} session tracker {}", ip, neighbor.session_tracker)
+        cfg.append_l1("neighbor {} timers {}", ip, neighbor.timers)
 
         self._render_route_maps(ip, neighbor.route_map_in, neighbor.route_map_out)
 
@@ -431,10 +406,8 @@ class RouterBgpGenerator(CliGenerator):
         for vlan in natural_sort(bgp.vlans or [], sort_key="id"):
             cfg.append_l1("!")
             cfg.append_l1(f"vlan {vlan.id}")
-            if vlan.rd is not None:
-                cfg.append_l2(f"rd {vlan.rd}")
-            if vlan.rd_evpn_domain.domain is not None and vlan.rd_evpn_domain.rd is not None:
-                cfg.append_l2(f"rd evpn domain {vlan.rd_evpn_domain.domain} {vlan.rd_evpn_domain.rd}")
+            cfg.append_l2("rd {}", vlan.rd)
+            cfg.append_l2("rd evpn domain {} {}", vlan.rd_evpn_domain.domain, vlan.rd_evpn_domain.rd)
             for rt in natural_sort(vlan.route_targets.both or []):
                 cfg.append_l2(f"route-target both {rt}")
             for rt in natural_sort(vlan.route_targets.field_import or []):
@@ -463,16 +436,11 @@ class RouterBgpGenerator(CliGenerator):
             if svc.name is None:
                 continue
             cfg.append_l1(f"vpws {svc.name}")
-            if svc.rd is not None:
-                cfg.append_l2(f"rd {svc.rd}")
-            if svc.route_targets.import_export is not None:
-                cfg.append_l2(f"route-target import export evpn {svc.route_targets.import_export}")
-            if svc.mpls_control_word is True:
-                cfg.append_l2("mpls control-word")
-            if svc.label_flow is True:
-                cfg.append_l2("label flow")
-            if svc.mtu is not None:
-                cfg.append_l2(f"mtu {svc.mtu}")
+            cfg.append_l2("rd {}", svc.rd)
+            cfg.append_l2("route-target import export evpn {}", svc.route_targets.import_export)
+            cfg.append_l2("mpls control-word", svc.mpls_control_word)
+            cfg.append_l2("label flow", svc.label_flow)
+            cfg.append_l2("mtu {}", svc.mtu)
             for pw in natural_sort(svc.pseudowires or [], sort_key="name"):
                 if pw.name is not None and pw.id_local is not None and pw.id_remote is not None:
                     cfg.append_l2("!")
@@ -485,10 +453,8 @@ class RouterBgpGenerator(CliGenerator):
         for bundle in natural_sort(bgp.vlan_aware_bundles or [], sort_key="name"):
             cfg.append_l1("!")
             cfg.append_l1(f"vlan-aware-bundle {bundle.name}")
-            if bundle.rd is not None:
-                cfg.append_l2(f"rd {bundle.rd}")
-            if bundle.rd_evpn_domain.domain is not None and bundle.rd_evpn_domain.rd is not None:
-                cfg.append_l2(f"rd evpn domain {bundle.rd_evpn_domain.domain} {bundle.rd_evpn_domain.rd}")
+            cfg.append_l2("rd {}", bundle.rd)
+            cfg.append_l2("rd evpn domain {} {}", bundle.rd_evpn_domain.domain, bundle.rd_evpn_domain.rd)
             for rt in natural_sort(bundle.route_targets.both or []):
                 cfg.append_l2(f"route-target both {rt}")
             for rt in natural_sort(bundle.route_targets.field_import or []):
@@ -505,8 +471,7 @@ class RouterBgpGenerator(CliGenerator):
                 cfg.append_l2(f"redistribute {r}")
             for r in natural_sort(bundle.no_redistribute_routes or []):
                 cfg.append_l2(f"no redistribute {r}")
-            if bundle.vlan is not None:
-                cfg.append_l2(f"vlan {bundle.vlan}")
+            cfg.append_l2("vlan {}", bundle.vlan)
             if bundle.eos_cli is not None:
                 cfg.append_l2("!")
                 cfg.append_l2(bundle.eos_cli)
@@ -520,15 +485,11 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l1("!")
         cfg.append_l1("address-family evpn")
 
-        if af.route.export_ethernet_segment_ip_mass_withdraw is True:
-            cfg.append_l2("route export ethernet-segment ip mass-withdraw")
-        if af.route.import_ethernet_segment_ip_mass_withdraw is True:
-            cfg.append_l2("route import ethernet-segment ip mass-withdraw")
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("route export ethernet-segment ip mass-withdraw", af.route.export_ethernet_segment_ip_mass_withdraw)
+        cfg.append_l2("route import ethernet-segment ip mass-withdraw", af.route.import_ethernet_segment_ip_mass_withdraw)
+        cfg.append_l2("bgp additional-paths receive", af.bgp.additional_paths.receive)
         self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
-        if af.next_hop_unchanged is True:
-            cfg.append_l2("bgp next-hop-unchanged")
+        cfg.append_l2("bgp next-hop-unchanged", af.next_hop_unchanged)
         if af.neighbor_default.encapsulation is not None:
             enc_cli = f"neighbor default encapsulation {af.neighbor_default.encapsulation}"
             if af.neighbor_default.encapsulation == "mpls" and af.neighbor_default.next_hop_self_source_interface is not None:
@@ -551,12 +512,9 @@ class RouterBgpGenerator(CliGenerator):
         for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
             self._render_af_evpn_neighbor(neighbor)
 
-        if af.domain_identifier is not None:
-            cfg.append_l2(f"domain identifier {af.domain_identifier}")
-        if af.domain_identifier_remote is not None:
-            cfg.append_l2(f"domain identifier {af.domain_identifier_remote} remote")
-        if af.next_hop.resolution_disabled is True:
-            cfg.append_l2("next-hop resolution disabled")
+        cfg.append_l2("domain identifier {}", af.domain_identifier)
+        cfg.append_l2("domain identifier {} remote", af.domain_identifier_remote)
+        cfg.append_l2("next-hop resolution disabled", af.next_hop.resolution_disabled)
         if af.route.import_match_failure_action == "discard":
             cfg.append_l2("route import match-failure action discard")
         if af.neighbor_default.next_hop_self_received_evpn_routes.enable is True:
@@ -584,16 +542,13 @@ class RouterBgpGenerator(CliGenerator):
                 l2_cli += f" timeout {af.layer_2_fec_in_place_update.timeout} seconds"
             cfg.append_l2(l2_cli)
 
-        if af.route.import_overlay_index_gateway is True:
-            cfg.append_l2("route import overlay-index gateway")
+        cfg.append_l2("route import overlay-index gateway", af.route.import_overlay_index_gateway)
 
         for segment in natural_sort(af.evpn_ethernet_segment or [], sort_key="domain"):
             cfg.append_l2("!")
             cfg.append_l2(f"evpn ethernet-segment domain {segment.domain}")
-            if segment.identifier is not None:
-                cfg.append_l3(f"identifier {segment.identifier}")
-            if segment.route_target_import is not None:
-                cfg.append_l3(f"route-target import {segment.route_target_import}")
+            cfg.append_l3("identifier {}", segment.identifier)
+            cfg.append_l3("route-target import {}", segment.route_target_import)
 
     def _render_address_family_flow_spec_ipv4(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family flow-spec ipv4' block (J2 lines 1019-1041)."""
@@ -610,10 +565,8 @@ class RouterBgpGenerator(CliGenerator):
         cfg = self.cli_config.router_bgp
         cfg.append_l1("!")
         cfg.append_l1(f"address-family flow-spec {ip_version}")
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l2(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l2(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
+        cfg.append_l2("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l2("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
         for pg in natural_sort(af.peer_groups or [], sort_key="name"):
             if pg.activate is True:
                 cfg.append_l2(f"neighbor {pg.name} activate")
@@ -636,8 +589,7 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2("bgp additional-paths install")
         elif af.bgp.additional_paths.install_ecmp_primary is True:
             cfg.append_l2("bgp additional-paths install ecmp-primary")
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("bgp additional-paths receive", af.bgp.additional_paths.receive)
         self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
 
         for pg in natural_sort(af.peer_groups or [], sort_key="name"):
@@ -703,10 +655,8 @@ class RouterBgpGenerator(CliGenerator):
         if bgp.graceful_restart.enabled is not True:
             return
         cfg = self.cli_config.router_bgp
-        if bgp.graceful_restart.restart_time is not None:
-            cfg.append_l1(f"graceful-restart restart-time {bgp.graceful_restart.restart_time}")
-        if bgp.graceful_restart.stalepath_time is not None:
-            cfg.append_l1(f"graceful-restart stalepath-time {bgp.graceful_restart.stalepath_time}")
+        cfg.append_l1("graceful-restart restart-time {}", bgp.graceful_restart.restart_time)
+        cfg.append_l1("graceful-restart stalepath-time {}", bgp.graceful_restart.stalepath_time)
         cfg.append_l1("graceful-restart")
 
     def _render_graceful_restart_helper(self, bgp: EosCliConfigGen.RouterBgp) -> None:
@@ -812,18 +762,15 @@ class RouterBgpGenerator(CliGenerator):
         cfg = self.cli_config.router_bgp
         if bfd is True:
             cfg.append_l1(f"neighbor {entity_id} bfd")
-            if bfd_timers.interval is not None and bfd_timers.min_rx is not None and bfd_timers.multiplier is not None:
-                cfg.append_l1(f"neighbor {entity_id} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}")
+            cfg.append_l1("neighbor {} bfd interval {} min-rx {} multiplier {}", entity_id, bfd_timers.interval, bfd_timers.min_rx, bfd_timers.multiplier)
         elif bfd is False and allow_negation:
             cfg.append_l1(f"no neighbor {entity_id} bfd")
 
     def _render_route_maps(self, entity_id: str, route_map_in: str | None, route_map_out: str | None) -> None:
         """Render inbound and outbound route-map assignments."""
         cfg = self.cli_config.router_bgp
-        if route_map_in is not None:
-            cfg.append_l1(f"neighbor {entity_id} route-map {route_map_in} in")
-        if route_map_out is not None:
-            cfg.append_l1(f"neighbor {entity_id} route-map {route_map_out} out")
+        cfg.append_l1("neighbor {} route-map {} in", entity_id, route_map_in)
+        cfg.append_l1("neighbor {} route-map {} out", entity_id, route_map_out)
 
     def _render_password_key(self, entity_id: str, password: str | None, password_type: str | None) -> None:
         """Render 'neighbor X password [type] key' (type defaults to 7)."""
@@ -844,10 +791,8 @@ class RouterBgpGenerator(CliGenerator):
     def _render_peer_tags(self, entity_id: str, peer_tag_in: str | None, peer_tag_out_discard: str | None) -> None:
         """Render 'peer-tag in' and 'peer-tag out discard'."""
         cfg = self.cli_config.router_bgp
-        if peer_tag_in is not None:
-            cfg.append_l1(f"neighbor {entity_id} peer-tag in {peer_tag_in}")
-        if peer_tag_out_discard is not None:
-            cfg.append_l1(f"neighbor {entity_id} peer-tag out discard {peer_tag_out_discard}")
+        cfg.append_l1("neighbor {} peer-tag in {}", entity_id, peer_tag_in)
+        cfg.append_l1("neighbor {} peer-tag out discard {}", entity_id, peer_tag_out_discard)
 
     def _render_remove_private_as(self, entity_id: str, remove_private_as: Any) -> None:
         """Render 'remove-private-as [all [replace-as]]' or its negation."""
@@ -986,8 +931,7 @@ class RouterBgpGenerator(CliGenerator):
         elif send == "ecmp" and send_limit is not None:
             cfg.append_l2(f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}")
         elif send == "limit":
-            if send_limit is not None:
-                cfg.append_l2(f"neighbor {entity_id} additional-paths send limit {send_limit}")
+            cfg.append_l2("neighbor {} additional-paths send limit {}", entity_id, send_limit)
         else:
             cfg.append_l2(f"neighbor {entity_id} additional-paths send {send}")
 
@@ -1001,14 +945,10 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(f"no neighbor {name} activate")
         if pg.additional_paths.receive is True:
             cfg.append_l2(f"neighbor {name} additional-paths receive")
-        if pg.route_map_in is not None:
-            cfg.append_l2(f"neighbor {name} route-map {pg.route_map_in} in")
-        if pg.route_map_out is not None:
-            cfg.append_l2(f"neighbor {name} route-map {pg.route_map_out} out")
-        if pg.rcf_in is not None:
-            cfg.append_l2(f"neighbor {name} rcf in {pg.rcf_in}")
-        if pg.rcf_out is not None:
-            cfg.append_l2(f"neighbor {name} rcf out {pg.rcf_out}")
+        cfg.append_l2("neighbor {} route-map {} in", name, pg.route_map_in)
+        cfg.append_l2("neighbor {} route-map {} out", name, pg.route_map_out)
+        cfg.append_l2("neighbor {} rcf in {}", name, pg.rcf_in)
+        cfg.append_l2("neighbor {} rcf out {}", name, pg.rcf_out)
         if pg.default_route.enabled is True:
             dr_cli = f"neighbor {name} default-route"
             if pg.default_route.rcf is not None:
@@ -1017,10 +957,8 @@ class RouterBgpGenerator(CliGenerator):
                 dr_cli += f" route-map {pg.default_route.route_map}"
             cfg.append_l2(dr_cli)
         self._render_af_neighbor_additional_paths_send(name, pg.additional_paths)
-        if pg.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {name} peer-tag in {pg.peer_tag_in}")
-        if pg.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {name} peer-tag out discard {pg.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag in {}", name, pg.peer_tag_in)
+        cfg.append_l2("neighbor {} peer-tag out discard {}", name, pg.peer_tag_out_discard)
         if pg.encapsulation is not None:
             enc_cli = f"neighbor {name} encapsulation {pg.encapsulation}"
             if pg.encapsulation == "mpls" and pg.next_hop_self_source_interface is not None:
@@ -1039,14 +977,10 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(f"no neighbor {ip} activate")
         if neighbor.additional_paths.receive is True:
             cfg.append_l2(f"neighbor {ip} additional-paths receive")
-        if neighbor.route_map_in is not None:
-            cfg.append_l2(f"neighbor {ip} route-map {neighbor.route_map_in} in")
-        if neighbor.route_map_out is not None:
-            cfg.append_l2(f"neighbor {ip} route-map {neighbor.route_map_out} out")
-        if neighbor.rcf_in is not None:
-            cfg.append_l2(f"neighbor {ip} rcf in {neighbor.rcf_in}")
-        if neighbor.rcf_out is not None:
-            cfg.append_l2(f"neighbor {ip} rcf out {neighbor.rcf_out}")
+        cfg.append_l2("neighbor {} route-map {} in", ip, neighbor.route_map_in)
+        cfg.append_l2("neighbor {} route-map {} out", ip, neighbor.route_map_out)
+        cfg.append_l2("neighbor {} rcf in {}", ip, neighbor.rcf_in)
+        cfg.append_l2("neighbor {} rcf out {}", ip, neighbor.rcf_out)
         if neighbor.default_route.enabled is True:
             dr_cli = f"neighbor {ip} default-route"
             if neighbor.default_route.rcf is not None:
@@ -1055,10 +989,8 @@ class RouterBgpGenerator(CliGenerator):
                 dr_cli += f" route-map {neighbor.default_route.route_map}"
             cfg.append_l2(dr_cli)
         self._render_af_neighbor_additional_paths_send(ip, neighbor.additional_paths)
-        if neighbor.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {ip} peer-tag in {neighbor.peer_tag_in}")
-        if neighbor.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {ip} peer-tag out discard {neighbor.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
+        cfg.append_l2("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
         if neighbor.encapsulation is not None:
             enc_cli = f"neighbor {ip} encapsulation {neighbor.encapsulation}"
             if neighbor.encapsulation == "mpls" and neighbor.next_hop_self_source_interface is not None:
@@ -1099,18 +1031,12 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(f"no neighbor {name} activate")
         if pg.additional_paths.receive is True:
             cfg.append_l2(f"neighbor {name} additional-paths receive")
-        if pg.route_map_in is not None:
-            cfg.append_l2(f"neighbor {name} route-map {pg.route_map_in} in")
-        if pg.route_map_out is not None:
-            cfg.append_l2(f"neighbor {name} route-map {pg.route_map_out} out")
-        if pg.rcf_in is not None:
-            cfg.append_l2(f"neighbor {name} rcf in {pg.rcf_in}")
-        if pg.rcf_out is not None:
-            cfg.append_l2(f"neighbor {name} rcf out {pg.rcf_out}")
-        if pg.prefix_list_in is not None:
-            cfg.append_l2(f"neighbor {name} prefix-list {pg.prefix_list_in} in")
-        if pg.prefix_list_out is not None:
-            cfg.append_l2(f"neighbor {name} prefix-list {pg.prefix_list_out} out")
+        cfg.append_l2("neighbor {} route-map {} in", name, pg.route_map_in)
+        cfg.append_l2("neighbor {} route-map {} out", name, pg.route_map_out)
+        cfg.append_l2("neighbor {} rcf in {}", name, pg.rcf_in)
+        cfg.append_l2("neighbor {} rcf out {}", name, pg.rcf_out)
+        cfg.append_l2("neighbor {} prefix-list {} in", name, pg.prefix_list_in)
+        cfg.append_l2("neighbor {} prefix-list {} out", name, pg.prefix_list_out)
         if pg.default_originate:
             do_cli = f"neighbor {name} default-originate"
             if pg.default_originate.route_map is not None:
@@ -1124,10 +1050,8 @@ class RouterBgpGenerator(CliGenerator):
             if pg.next_hop.address_family_ipv6.originate is True:
                 nhv6_cli += " originate"
             cfg.append_l2(nhv6_cli)
-        if pg.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {name} peer-tag in {pg.peer_tag_in}")
-        if pg.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {name} peer-tag out discard {pg.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag in {}", name, pg.peer_tag_in)
+        cfg.append_l2("neighbor {} peer-tag out discard {}", name, pg.peer_tag_out_discard)
 
     def _render_af_ipv4_neighbor(self, neighbor: Any) -> None:
         """Render address-family ipv4 commands for a neighbor at L2 (J2 lines 1162-1237)."""
@@ -1139,18 +1063,12 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(f"no neighbor {ip} activate")
         if neighbor.additional_paths.receive is True:
             cfg.append_l2(f"neighbor {ip} additional-paths receive")
-        if neighbor.route_map_in is not None:
-            cfg.append_l2(f"neighbor {ip} route-map {neighbor.route_map_in} in")
-        if neighbor.route_map_out is not None:
-            cfg.append_l2(f"neighbor {ip} route-map {neighbor.route_map_out} out")
-        if neighbor.rcf_in is not None:
-            cfg.append_l2(f"neighbor {ip} rcf in {neighbor.rcf_in}")
-        if neighbor.rcf_out is not None:
-            cfg.append_l2(f"neighbor {ip} rcf out {neighbor.rcf_out}")
-        if neighbor.prefix_list_in is not None:
-            cfg.append_l2(f"neighbor {ip} prefix-list {neighbor.prefix_list_in} in")
-        if neighbor.prefix_list_out is not None:
-            cfg.append_l2(f"neighbor {ip} prefix-list {neighbor.prefix_list_out} out")
+        cfg.append_l2("neighbor {} route-map {} in", ip, neighbor.route_map_in)
+        cfg.append_l2("neighbor {} route-map {} out", ip, neighbor.route_map_out)
+        cfg.append_l2("neighbor {} rcf in {}", ip, neighbor.rcf_in)
+        cfg.append_l2("neighbor {} rcf out {}", ip, neighbor.rcf_out)
+        cfg.append_l2("neighbor {} prefix-list {} in", ip, neighbor.prefix_list_in)
+        cfg.append_l2("neighbor {} prefix-list {} out", ip, neighbor.prefix_list_out)
         if neighbor.default_originate:
             do_cli = f"neighbor {ip} default-originate"
             if neighbor.default_originate.route_map is not None:
@@ -1166,10 +1084,8 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(nhv6_cli)
         elif neighbor.next_hop.address_family_ipv6.enabled is False:
             cfg.append_l2(f"no neighbor {ip} next-hop address-family ipv6")
-        if neighbor.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {ip} peer-tag in {neighbor.peer_tag_in}")
-        if neighbor.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {ip} peer-tag out discard {neighbor.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
+        cfg.append_l2("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
 
     def _render_af_ipv4_redistribute(self, r: Any) -> None:
         """Render redistribute entries for address-family ipv4 at L2 (J2 lines 1250-1412)."""
@@ -1345,23 +1261,19 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l1(self._SEP)
         cfg.append_l1("address-family ipv4 labeled-unicast")
 
-        if af.update_wait_for_convergence is True:
-            cfg.append_l2("update wait-for-convergence")
+        cfg.append_l2("update wait-for-convergence", af.update_wait_for_convergence)
 
         if af.bgp.missing_policy:
             for line in self._build_missing_policy_cli("bgp missing-policy", af.bgp.missing_policy):
                 cfg.append_l2(line)
 
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
 
-        if af.bgp.next_hop_unchanged is True:
-            cfg.append_l2("bgp next-hop-unchanged")
+        cfg.append_l2("bgp next-hop-unchanged", af.bgp.next_hop_unchanged)
 
-        if af.neighbor_default.next_hop_self is True:
-            cfg.append_l2("neighbor default next-hop-self")
+        cfg.append_l2("neighbor default next-hop-self", af.neighbor_default.next_hop_self)
 
         next_hop_ribs = af.next_hop_resolution_ribs
         if next_hop_ribs:
@@ -1395,14 +1307,11 @@ class RouterBgpGenerator(CliGenerator):
                 cli += " lfib-backup ip-forwarding"
             cfg.append_l2(cli)
 
-        if af.lfib_entry_installation_skipped is True:
-            cfg.append_l2("lfib entry installation skipped")
+        cfg.append_l2("lfib entry installation skipped", af.lfib_entry_installation_skipped)
 
-        if af.label_local_termination is not None:
-            cfg.append_l2(f"label local-termination {af.label_local_termination}")
+        cfg.append_l2("label local-termination {}", af.label_local_termination)
 
-        if af.graceful_restart is True:
-            cfg.append_l2("graceful-restart")
+        cfg.append_l2("graceful-restart", af.graceful_restart)
 
         for tunnel_protocol in af.tunnel_source_protocols or []:
             cli = f"tunnel source-protocol {tunnel_protocol.protocol}"
@@ -1431,20 +1340,15 @@ class RouterBgpGenerator(CliGenerator):
         if entity.graceful_restart is True:
             cfg.append_l2(f"neighbor {entity_id} graceful-restart")
 
-        if entity.graceful_restart_helper.stale_route_map is not None:
-            cfg.append_l2(f"neighbor {entity_id} graceful-restart-helper stale-route route-map {entity.graceful_restart_helper.stale_route_map}")
+        cfg.append_l2("neighbor {} graceful-restart-helper stale-route route-map {}", entity_id, entity.graceful_restart_helper.stale_route_map)
 
-        if entity.route_map_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_in} in")
+        cfg.append_l2("neighbor {} route-map {} in", entity_id, entity.route_map_in)
 
-        if entity.route_map_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_out} out")
+        cfg.append_l2("neighbor {} route-map {} out", entity_id, entity.route_map_out)
 
-        if entity.rcf_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} rcf in {entity.rcf_in}")
+        cfg.append_l2("neighbor {} rcf in {}", entity_id, entity.rcf_in)
 
-        if entity.rcf_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} rcf out {entity.rcf_out}")
+        cfg.append_l2("neighbor {} rcf out {}", entity_id, entity.rcf_out)
 
         self._render_af_neighbor_additional_paths_send(entity_id, entity.additional_paths)
 
@@ -1469,11 +1373,9 @@ class RouterBgpGenerator(CliGenerator):
             for line in self._build_missing_policy_cli(f"neighbor {entity_id} missing-policy", entity.missing_policy):
                 cfg.append_l2(line)
 
-        if entity.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag in {entity.peer_tag_in}")
+        cfg.append_l2("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
 
-        if entity.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag out discard {entity.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
 
         if entity.aigp_session is True:
             cfg.append_l2(f"neighbor {entity_id} aigp-session")
@@ -1490,8 +1392,7 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l1(self._SEP)
         cfg.append_l1("address-family ipv4 multicast")
 
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         for pg in natural_sort(af.peer_groups or [], sort_key="name"):
             self._render_af_ipv4mc_entity(pg.name, pg)
@@ -1514,17 +1415,13 @@ class RouterBgpGenerator(CliGenerator):
         if entity.additional_paths.receive is True:
             cfg.append_l2(f"neighbor {entity_id} additional-paths receive")
 
-        if entity.route_map_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_in} in")
+        cfg.append_l2("neighbor {} route-map {} in", entity_id, entity.route_map_in)
 
-        if entity.route_map_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_out} out")
+        cfg.append_l2("neighbor {} route-map {} out", entity_id, entity.route_map_out)
 
-        if entity.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag in {entity.peer_tag_in}")
+        cfg.append_l2("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
 
-        if entity.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag out discard {entity.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
 
     def _render_af_ipv4mc_redistribute(self, r: Any) -> None:
         """Render IPv4 multicast address-family redistribute commands at L2."""
@@ -1633,17 +1530,13 @@ class RouterBgpGenerator(CliGenerator):
         elif entity.activate is False:
             cfg.append_l2(f"no neighbor {entity_id} activate")
 
-        if entity.route_map_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_in} in")
+        cfg.append_l2("neighbor {} route-map {} in", entity_id, entity.route_map_in)
 
-        if entity.route_map_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_out} out")
+        cfg.append_l2("neighbor {} route-map {} out", entity_id, entity.route_map_out)
 
-        if entity.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag in {entity.peer_tag_in}")
+        cfg.append_l2("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
 
-        if entity.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag out discard {entity.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
 
     def _render_address_family_ipv6(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family ipv6' block (J2 lines 1909-2177)."""
@@ -1659,8 +1552,7 @@ class RouterBgpGenerator(CliGenerator):
         elif af.bgp.additional_paths.install_ecmp_primary is True:
             cfg.append_l2("bgp additional-paths install ecmp-primary")
 
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
 
@@ -1699,23 +1591,17 @@ class RouterBgpGenerator(CliGenerator):
         if entity.additional_paths.receive is True:
             cfg.append_l2(f"neighbor {entity_id} additional-paths receive")
 
-        if entity.route_map_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_in} in")
+        cfg.append_l2("neighbor {} route-map {} in", entity_id, entity.route_map_in)
 
-        if entity.route_map_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_out} out")
+        cfg.append_l2("neighbor {} route-map {} out", entity_id, entity.route_map_out)
 
-        if entity.rcf_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} rcf in {entity.rcf_in}")
+        cfg.append_l2("neighbor {} rcf in {}", entity_id, entity.rcf_in)
 
-        if entity.rcf_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} rcf out {entity.rcf_out}")
+        cfg.append_l2("neighbor {} rcf out {}", entity_id, entity.rcf_out)
 
-        if entity.prefix_list_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} prefix-list {entity.prefix_list_in} in")
+        cfg.append_l2("neighbor {} prefix-list {} in", entity_id, entity.prefix_list_in)
 
-        if entity.prefix_list_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} prefix-list {entity.prefix_list_out} out")
+        cfg.append_l2("neighbor {} prefix-list {} out", entity_id, entity.prefix_list_out)
 
         # additional_paths send: section-level prefix_list is appended when set.
         send = entity.additional_paths.send
@@ -1737,11 +1623,9 @@ class RouterBgpGenerator(CliGenerator):
                         cmd += f" prefix-list {bg_prefix_list}"
                     cfg.append_l2(cmd)
 
-        if entity.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag in {entity.peer_tag_in}")
+        cfg.append_l2("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
 
-        if entity.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag out discard {entity.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
 
     def _render_af_ipv6_redistribute(self, r: Any) -> None:
         """Render IPv6 address-family redistribute commands at L2."""
@@ -1854,13 +1738,10 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l1("address-family ipv6 multicast")
 
         # bgp missing-policy uses flat direction_{in,out}_action fields (not nested).
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l2(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l2(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
+        cfg.append_l2("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l2("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
 
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         for pg in natural_sort(af.peer_groups or [], sort_key="name"):
             if pg.activate is True:
@@ -1876,14 +1757,10 @@ class RouterBgpGenerator(CliGenerator):
                 cfg.append_l2(f"neighbor {neighbor.ip_address} activate")
             if neighbor.additional_paths.receive is True:
                 cfg.append_l2(f"neighbor {neighbor.ip_address} additional-paths receive")
-            if neighbor.route_map_in is not None:
-                cfg.append_l2(f"neighbor {neighbor.ip_address} route-map {neighbor.route_map_in} in")
-            if neighbor.route_map_out is not None:
-                cfg.append_l2(f"neighbor {neighbor.ip_address} route-map {neighbor.route_map_out} out")
-            if neighbor.peer_tag_in is not None:
-                cfg.append_l2(f"neighbor {neighbor.ip_address} peer-tag in {neighbor.peer_tag_in}")
-            if neighbor.peer_tag_out_discard is not None:
-                cfg.append_l2(f"neighbor {neighbor.ip_address} peer-tag out discard {neighbor.peer_tag_out_discard}")
+            cfg.append_l2("neighbor {} route-map {} in", neighbor.ip_address, neighbor.route_map_in)
+            cfg.append_l2("neighbor {} route-map {} out", neighbor.ip_address, neighbor.route_map_out)
+            cfg.append_l2("neighbor {} peer-tag in {}", neighbor.ip_address, neighbor.peer_tag_in)
+            cfg.append_l2("neighbor {} peer-tag out discard {}", neighbor.ip_address, neighbor.peer_tag_out_discard)
 
         for network in natural_sort(af.networks or [], sort_key="prefix"):
             cli = f"network {network.prefix}"
@@ -1997,35 +1874,28 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l1("address-family link-state")
 
         # bgp missing-policy uses flat direction_{in,out}_action fields.
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l2(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l2(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
+        cfg.append_l2("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l2("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
 
         for pg in natural_sort(af.peer_groups or [], sort_key="name"):
             if pg.activate is True:
                 cfg.append_l2(f"neighbor {pg.name} activate")
             elif pg.activate is False:
                 cfg.append_l2(f"no neighbor {pg.name} activate")
-            if pg.missing_policy.direction_in_action is not None:
-                cfg.append_l2(f"neighbor {pg.name} missing-policy direction in action {pg.missing_policy.direction_in_action}")
-            if pg.missing_policy.direction_out_action is not None:
-                cfg.append_l2(f"neighbor {pg.name} missing-policy direction out action {pg.missing_policy.direction_out_action}")
+            cfg.append_l2("neighbor {} missing-policy direction in action {}", pg.name, pg.missing_policy.direction_in_action)
+            cfg.append_l2("neighbor {} missing-policy direction out action {}", pg.name, pg.missing_policy.direction_out_action)
 
         for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
             # J2 checks only 'if True' (no elif False) for neighbor activate.
             if neighbor.activate is True:
                 cfg.append_l2(f"neighbor {neighbor.ip_address} activate")
-            if neighbor.missing_policy.direction_in_action is not None:
-                cfg.append_l2(f"neighbor {neighbor.ip_address} missing-policy direction in action {neighbor.missing_policy.direction_in_action}")
-            if neighbor.missing_policy.direction_out_action is not None:
-                cfg.append_l2(f"neighbor {neighbor.ip_address} missing-policy direction out action {neighbor.missing_policy.direction_out_action}")
+            cfg.append_l2("neighbor {} missing-policy direction in action {}", neighbor.ip_address, neighbor.missing_policy.direction_in_action)
+            cfg.append_l2("neighbor {} missing-policy direction out action {}", neighbor.ip_address, neighbor.missing_policy.direction_out_action)
 
         path_selection = af.path_selection
         if path_selection:
             roles = path_selection.roles
-            if roles.producer is True:
-                cfg.append_l2("path-selection")
+            cfg.append_l2("path-selection", roles.producer)
             if roles.consumer is True or roles.propagator is True:
                 cli = "path-selection role"
                 if roles.consumer is True:
@@ -2043,8 +1913,7 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l1(self._SEP)
         cfg.append_l1("address-family path-selection")
 
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
 
@@ -2122,8 +1991,7 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(
                 f"neighbor default encapsulation mpls next-hop-self source-interface {af.neighbor_default_encapsulation_mpls_next_hop_self.source_interface}"
             )
-        if af.domain_identifier is not None:
-            cfg.append_l2(f"domain identifier {af.domain_identifier}")
+        cfg.append_l2("domain identifier {}", af.domain_identifier)
         if af.route.import_match_failure_action == "discard":
             cfg.append_l2("route import match-failure action discard")
 
@@ -2146,8 +2014,7 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(
                 f"neighbor default encapsulation mpls next-hop-self source-interface {af.neighbor_default_encapsulation_mpls_next_hop_self.source_interface}"
             )
-        if af.domain_identifier is not None:
-            cfg.append_l2(f"domain identifier {af.domain_identifier}")
+        cfg.append_l2("domain identifier {}", af.domain_identifier)
         if af.route.import_match_failure_action == "discard":
             cfg.append_l2("route import match-failure action discard")
 
@@ -2158,14 +2025,10 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(f"neighbor {entity_id} activate")
         elif entity.activate is False:
             cfg.append_l2(f"no neighbor {entity_id} activate")
-        if entity.route_map_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_in} in")
-        if entity.route_map_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} route-map {entity.route_map_out} out")
-        if entity.rcf_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} rcf in {entity.rcf_in}")
-        if entity.rcf_out is not None:
-            cfg.append_l2(f"neighbor {entity_id} rcf out {entity.rcf_out}")
+        cfg.append_l2("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        cfg.append_l2("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        cfg.append_l2("neighbor {} rcf in {}", entity_id, entity.rcf_in)
+        cfg.append_l2("neighbor {} rcf out {}", entity_id, entity.rcf_out)
         if entity.default_route.enabled is True:
             cli = f"neighbor {entity_id} default-route"
             if entity.default_route.rcf is not None:
@@ -2173,10 +2036,8 @@ class RouterBgpGenerator(CliGenerator):
             elif entity.default_route.route_map is not None:
                 cli += f" route-map {entity.default_route.route_map}"
             cfg.append_l2(cli)
-        if entity.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag in {entity.peer_tag_in}")
-        if entity.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {entity_id} peer-tag out discard {entity.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        cfg.append_l2("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
 
     def _render_vrfs(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render all 'vrf' blocks (J2 lines 2667+)."""
@@ -2189,8 +2050,7 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l1(self._SEP)
         cfg.append_l1(f"vrf {vrf.name}")
 
-        if vrf.rd is not None:
-            cfg.append_l2(f"rd {vrf.rd}")
+        cfg.append_l2("rd {}", vrf.rd)
 
         for export in natural_sort(vrf.default_route_exports or [], sort_key="address_family"):
             cli = f"default-route export {export.address_family}"
@@ -2211,8 +2071,7 @@ class RouterBgpGenerator(CliGenerator):
                         cfg.append_l2(f"route-target import {af.address_family} rcf {af.rcf} vpn-route filter-rcf {af.vpn_route_filter_rcf}")
                     else:
                         cfg.append_l2(f"route-target import {af.address_family} rcf {af.rcf}")
-                if af.route_map is not None:
-                    cfg.append_l2(f"route-target import {af.address_family} route-map {af.route_map}")
+                cfg.append_l2("route-target import {} route-map {}", af.address_family, af.route_map)
 
         for af in vrf.route_targets.export or []:
             for rt in af.route_targets or []:
@@ -2223,23 +2082,16 @@ class RouterBgpGenerator(CliGenerator):
                         cfg.append_l2(f"route-target export {af.address_family} rcf {af.rcf} vrf-route filter-rcf {af.vrf_route_filter_rcf}")
                     else:
                         cfg.append_l2(f"route-target export {af.address_family} rcf {af.rcf}")
-                if af.route_map is not None:
-                    cfg.append_l2(f"route-target export {af.address_family} route-map {af.route_map}")
+                cfg.append_l2("route-target export {} route-map {}", af.address_family, af.route_map)
 
-        if vrf.router_id is not None:
-            cfg.append_l2(f"router-id {vrf.router_id}")
-        if vrf.updates.wait_for_convergence is True:
-            cfg.append_l2("update wait-for-convergence")
-        if vrf.updates.wait_install is True:
-            cfg.append_l2("update wait-install")
-        if vrf.timers is not None:
-            cfg.append_l2(f"timers bgp {vrf.timers}")
+        cfg.append_l2("router-id {}", vrf.router_id)
+        cfg.append_l2("update wait-for-convergence", vrf.updates.wait_for_convergence)
+        cfg.append_l2("update wait-install", vrf.updates.wait_install)
+        cfg.append_l2("timers bgp {}", vrf.timers)
 
         if vrf.graceful_restart.enabled is True:
-            if vrf.graceful_restart.restart_time is not None:
-                cfg.append_l2(f"graceful-restart restart-time {vrf.graceful_restart.restart_time}")
-            if vrf.graceful_restart.stalepath_time is not None:
-                cfg.append_l2(f"graceful-restart stalepath-time {vrf.graceful_restart.stalepath_time}")
+            cfg.append_l2("graceful-restart restart-time {}", vrf.graceful_restart.restart_time)
+            cfg.append_l2("graceful-restart stalepath-time {}", vrf.graceful_restart.stalepath_time)
             cfg.append_l2("graceful-restart")
 
         if vrf.maximum_paths.paths is not None:
@@ -2252,8 +2104,7 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2("bgp additional-paths install")
         elif vrf.bgp.additional_paths.install_ecmp_primary is True:
             cfg.append_l2("bgp additional-paths install ecmp-primary")
-        if vrf.bgp.additional_paths.receive is True:
-            cfg.append_l2("bgp additional-paths receive")
+        cfg.append_l2("bgp additional-paths receive", vrf.bgp.additional_paths.receive)
         self._render_af_bgp_additional_paths_send(vrf.bgp.additional_paths)
 
         for listen_range in natural_sort(vrf.listen_ranges or [], sort_key="peer_group"):
@@ -2281,10 +2132,8 @@ class RouterBgpGenerator(CliGenerator):
         cfg = self.cli_config.router_bgp
         ip = neighbor.ip_address
 
-        if neighbor.peer_group is not None:
-            cfg.append_l2(f"neighbor {ip} peer group {neighbor.peer_group}")
-        if neighbor.remote_as is not None:
-            cfg.append_l2(f"neighbor {ip} remote-as {neighbor.remote_as}")
+        cfg.append_l2("neighbor {} peer group {}", ip, neighbor.peer_group)
+        cfg.append_l2("neighbor {} remote-as {}", ip, neighbor.remote_as)
         if neighbor.next_hop_self is True:
             cfg.append_l2(f"neighbor {ip} next-hop-self")
         if neighbor.next_hop_peer is True:
@@ -2306,25 +2155,20 @@ class RouterBgpGenerator(CliGenerator):
             cfg.append_l2(f"neighbor {ip} as-path prepend-own disabled")
         if neighbor.as_path.remote_as_replace_out is True:
             cfg.append_l2(f"neighbor {ip} as-path remote-as replace out")
-        if neighbor.local_as is not None:
-            cfg.append_l2(f"neighbor {ip} local-as {neighbor.local_as} no-prepend replace-as")
-        if neighbor.weight is not None:
-            cfg.append_l2(f"neighbor {ip} weight {neighbor.weight}")
+        cfg.append_l2("neighbor {} local-as {} no-prepend replace-as", ip, neighbor.local_as)
+        cfg.append_l2("neighbor {} weight {}", ip, neighbor.weight)
         if neighbor.passive is True:
             cfg.append_l2(f"neighbor {ip} passive")
-        if neighbor.update_source is not None:
-            cfg.append_l2(f"neighbor {ip} update-source {neighbor.update_source}")
+        cfg.append_l2("neighbor {} update-source {}", ip, neighbor.update_source)
 
         if neighbor.bfd is True:
             cfg.append_l2(f"neighbor {ip} bfd")
             bfd_timers = neighbor.bfd_timers
-            if bfd_timers.interval is not None and bfd_timers.min_rx is not None and bfd_timers.multiplier is not None:
-                cfg.append_l2(f"neighbor {ip} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}")
+            cfg.append_l2("neighbor {} bfd interval {} min-rx {} multiplier {}", ip, bfd_timers.interval, bfd_timers.min_rx, bfd_timers.multiplier)
         elif neighbor.bfd is False and neighbor.peer_group is not None:
             cfg.append_l2(f"no neighbor {ip} bfd")
 
-        if neighbor.description is not None:
-            cfg.append_l2(f"neighbor {ip} description {neighbor.description}")
+        cfg.append_l2("neighbor {} description {}", ip, neighbor.description)
 
         if neighbor.allowas_in.enabled is True:
             cli = f"neighbor {ip} allowas-in"
@@ -2340,25 +2184,21 @@ class RouterBgpGenerator(CliGenerator):
         elif neighbor.rib_in_pre_policy_retain.enabled is False:
             cfg.append_l2(f"no neighbor {ip} rib-in pre-policy retain")
 
-        if neighbor.ebgp_multihop is not None:
-            cfg.append_l2(f"neighbor {ip} ebgp-multihop {neighbor.ebgp_multihop}")
+        cfg.append_l2("neighbor {} ebgp-multihop {}", ip, neighbor.ebgp_multihop)
 
         if neighbor.route_reflector_client is True:
             cfg.append_l2(f"neighbor {ip} route-reflector-client")
         elif neighbor.route_reflector_client is False:
             cfg.append_l2(f"no neighbor {ip} route-reflector-client")
 
-        if neighbor.timers is not None:
-            cfg.append_l2(f"neighbor {ip} timers {neighbor.timers}")
-        if neighbor.route_map_in is not None:
-            cfg.append_l2(f"neighbor {ip} route-map {neighbor.route_map_in} in")
+        cfg.append_l2("neighbor {} timers {}", ip, neighbor.timers)
+        cfg.append_l2("neighbor {} route-map {} in", ip, neighbor.route_map_in)
 
         if neighbor.additional_paths.receive is True:
             cfg.append_l2(f"neighbor {ip} additional-paths receive")
         self._render_af_neighbor_additional_paths_send(ip, neighbor.additional_paths)
 
-        if neighbor.route_map_out is not None:
-            cfg.append_l2(f"neighbor {ip} route-map {neighbor.route_map_out} out")
+        cfg.append_l2("neighbor {} route-map {} out", ip, neighbor.route_map_out)
 
         if neighbor.password is not None:
             pw = hide_passwords(neighbor.password, self.data.eos_cli_config_gen_configuration.hide_passwords)
@@ -2388,10 +2228,8 @@ class RouterBgpGenerator(CliGenerator):
                 cli += " warning-only"
             cfg.append_l2(cli)
 
-        if neighbor.peer_tag_in is not None:
-            cfg.append_l2(f"neighbor {ip} peer-tag in {neighbor.peer_tag_in}")
-        if neighbor.peer_tag_out_discard is not None:
-            cfg.append_l2(f"neighbor {ip} peer-tag out discard {neighbor.peer_tag_out_discard}")
+        cfg.append_l2("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
+        cfg.append_l2("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
 
         if neighbor.remove_private_as_ingress.enabled is True:
             cli = f"neighbor {ip} remove-private-as ingress"
@@ -2600,10 +2438,8 @@ class RouterBgpGenerator(CliGenerator):
         cfg = self.cli_config.router_bgp
         cfg.append_l2(self._SEP)
         cfg.append_l2(f"address-family flow-spec {protocol}")
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
+        cfg.append_l3("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l3("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
         for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
             if neighbor.activate is True:
                 cfg.append_l3(f"neighbor {neighbor.ip_address} activate")
@@ -2622,13 +2458,10 @@ class RouterBgpGenerator(CliGenerator):
         elif af.bgp.additional_paths.install_ecmp_primary is True:
             cfg.append_l3("bgp additional-paths install ecmp-primary")
 
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
+        cfg.append_l3("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l3("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
 
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l3("bgp additional-paths receive")
+        cfg.append_l3("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         # bgp additional-paths send (standard EVPN pattern) at L3.
         send = af.bgp.additional_paths.send
@@ -2649,18 +2482,12 @@ class RouterBgpGenerator(CliGenerator):
                 cfg.append_l3(f"neighbor {ip} activate")
             if neighbor.additional_paths.receive is True:
                 cfg.append_l3(f"neighbor {ip} additional-paths receive")
-            if neighbor.route_map_in is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_in} in")
-            if neighbor.route_map_out is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_out} out")
-            if neighbor.rcf_in is not None:
-                cfg.append_l3(f"neighbor {ip} rcf in {neighbor.rcf_in}")
-            if neighbor.rcf_out is not None:
-                cfg.append_l3(f"neighbor {ip} rcf out {neighbor.rcf_out}")
-            if neighbor.prefix_list_in is not None:
-                cfg.append_l3(f"neighbor {ip} prefix-list {neighbor.prefix_list_in} in")
-            if neighbor.prefix_list_out is not None:
-                cfg.append_l3(f"neighbor {ip} prefix-list {neighbor.prefix_list_out} out")
+            cfg.append_l3("neighbor {} route-map {} in", ip, neighbor.route_map_in)
+            cfg.append_l3("neighbor {} route-map {} out", ip, neighbor.route_map_out)
+            cfg.append_l3("neighbor {} rcf in {}", ip, neighbor.rcf_in)
+            cfg.append_l3("neighbor {} rcf out {}", ip, neighbor.rcf_out)
+            cfg.append_l3("neighbor {} prefix-list {} in", ip, neighbor.prefix_list_in)
+            cfg.append_l3("neighbor {} prefix-list {} out", ip, neighbor.prefix_list_out)
             # additional-paths send at L3 (standard EVPN pattern, no prefix_list).
             neighbor_send = neighbor.additional_paths.send
             neighbor_send_limit = neighbor.additional_paths.send_limit
@@ -2683,10 +2510,8 @@ class RouterBgpGenerator(CliGenerator):
                     cfg.append_l3(cli)
                 else:
                     cfg.append_l3(f"no neighbor {ip} next-hop address-family ipv6")
-            if neighbor.peer_tag_in is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag in {neighbor.peer_tag_in}")
-            if neighbor.peer_tag_out_discard is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag out discard {neighbor.peer_tag_out_discard}")
+            cfg.append_l3("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
+            cfg.append_l3("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
 
         for network in natural_sort(af.networks or [], sort_key="prefix"):
             cli = f"network {network.prefix}"
@@ -2845,12 +2670,9 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l2(self._SEP)
         cfg.append_l2("address-family ipv4 multicast")
 
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l3("bgp additional-paths receive")
+        cfg.append_l3("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l3("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
+        cfg.append_l3("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
             ip = neighbor.ip_address
@@ -2858,14 +2680,10 @@ class RouterBgpGenerator(CliGenerator):
                 cfg.append_l3(f"neighbor {ip} activate")
             if neighbor.additional_paths.receive is True:
                 cfg.append_l3(f"neighbor {ip} additional-paths receive")
-            if neighbor.route_map_in is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_in} in")
-            if neighbor.route_map_out is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_out} out")
-            if neighbor.peer_tag_in is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag in {neighbor.peer_tag_in}")
-            if neighbor.peer_tag_out_discard is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag out discard {neighbor.peer_tag_out_discard}")
+            cfg.append_l3("neighbor {} route-map {} in", ip, neighbor.route_map_in)
+            cfg.append_l3("neighbor {} route-map {} out", ip, neighbor.route_map_out)
+            cfg.append_l3("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
+            cfg.append_l3("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
 
         for network in natural_sort(af.networks or [], sort_key="prefix"):
             cli = f"network {network.prefix}"
@@ -2974,12 +2792,9 @@ class RouterBgpGenerator(CliGenerator):
         elif af.bgp.additional_paths.install_ecmp_primary is True:
             cfg.append_l3("bgp additional-paths install ecmp-primary")
 
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l3("bgp additional-paths receive")
+        cfg.append_l3("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l3("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
+        cfg.append_l3("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         # bgp additional-paths send (standard EVPN pattern) at L3.
         send = af.bgp.additional_paths.send
@@ -3000,18 +2815,12 @@ class RouterBgpGenerator(CliGenerator):
                 cfg.append_l3(f"neighbor {ip} activate")
             if neighbor.additional_paths.receive is True:
                 cfg.append_l3(f"neighbor {ip} additional-paths receive")
-            if neighbor.route_map_in is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_in} in")
-            if neighbor.route_map_out is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_out} out")
-            if neighbor.rcf_in is not None:
-                cfg.append_l3(f"neighbor {ip} rcf in {neighbor.rcf_in}")
-            if neighbor.rcf_out is not None:
-                cfg.append_l3(f"neighbor {ip} rcf out {neighbor.rcf_out}")
-            if neighbor.prefix_list_in is not None:
-                cfg.append_l3(f"neighbor {ip} prefix-list {neighbor.prefix_list_in} in")
-            if neighbor.prefix_list_out is not None:
-                cfg.append_l3(f"neighbor {ip} prefix-list {neighbor.prefix_list_out} out")
+            cfg.append_l3("neighbor {} route-map {} in", ip, neighbor.route_map_in)
+            cfg.append_l3("neighbor {} route-map {} out", ip, neighbor.route_map_out)
+            cfg.append_l3("neighbor {} rcf in {}", ip, neighbor.rcf_in)
+            cfg.append_l3("neighbor {} rcf out {}", ip, neighbor.rcf_out)
+            cfg.append_l3("neighbor {} prefix-list {} in", ip, neighbor.prefix_list_in)
+            cfg.append_l3("neighbor {} prefix-list {} out", ip, neighbor.prefix_list_out)
             # additional-paths send per-neighbor (standard EVPN pattern).
             neighbor_send = neighbor.additional_paths.send
             neighbor_send_limit = neighbor.additional_paths.send_limit
@@ -3024,10 +2833,8 @@ class RouterBgpGenerator(CliGenerator):
                     cfg.append_l3(f"neighbor {ip} additional-paths send limit {neighbor_send_limit}")
                 else:
                     cfg.append_l3(f"neighbor {ip} additional-paths send {neighbor_send}")
-            if neighbor.peer_tag_in is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag in {neighbor.peer_tag_in}")
-            if neighbor.peer_tag_out_discard is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag out discard {neighbor.peer_tag_out_discard}")
+            cfg.append_l3("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
+            cfg.append_l3("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
 
         for network in natural_sort(af.networks or [], sort_key="prefix"):
             cli = f"network {network.prefix}"
@@ -3153,12 +2960,9 @@ class RouterBgpGenerator(CliGenerator):
         cfg.append_l2(self._SEP)
         cfg.append_l2("address-family ipv6 multicast")
 
-        if af.bgp.missing_policy.direction_in_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction in action {af.bgp.missing_policy.direction_in_action}")
-        if af.bgp.missing_policy.direction_out_action is not None:
-            cfg.append_l3(f"bgp missing-policy direction out action {af.bgp.missing_policy.direction_out_action}")
-        if af.bgp.additional_paths.receive is True:
-            cfg.append_l3("bgp additional-paths receive")
+        cfg.append_l3("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
+        cfg.append_l3("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
+        cfg.append_l3("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
         for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
             ip = neighbor.ip_address
@@ -3166,14 +2970,10 @@ class RouterBgpGenerator(CliGenerator):
                 cfg.append_l3(f"neighbor {ip} activate")
             if neighbor.additional_paths.receive is True:
                 cfg.append_l3(f"neighbor {ip} additional-paths receive")
-            if neighbor.route_map_in is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_in} in")
-            if neighbor.route_map_out is not None:
-                cfg.append_l3(f"neighbor {ip} route-map {neighbor.route_map_out} out")
-            if neighbor.peer_tag_in is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag in {neighbor.peer_tag_in}")
-            if neighbor.peer_tag_out_discard is not None:
-                cfg.append_l3(f"neighbor {ip} peer-tag out discard {neighbor.peer_tag_out_discard}")
+            cfg.append_l3("neighbor {} route-map {} in", ip, neighbor.route_map_in)
+            cfg.append_l3("neighbor {} route-map {} out", ip, neighbor.route_map_out)
+            cfg.append_l3("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
+            cfg.append_l3("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
 
         for network in natural_sort(af.networks or [], sort_key="prefix"):
             cli = f"network {network.prefix}"
@@ -3273,8 +3073,7 @@ class RouterBgpGenerator(CliGenerator):
         if algo is not None:
             if algo == "preference":
                 pref = vrf.evpn_multicast_gateway_dr_election.preference_value
-                if pref is not None:
-                    cfg.append_l3(f"gateway dr election algorithm preference {pref}")
+                cfg.append_l3("gateway dr election algorithm preference {}", pref)
             else:
                 cfg.append_l3(f"gateway dr election algorithm {algo}")
 
@@ -3288,8 +3087,7 @@ class RouterBgpGenerator(CliGenerator):
         cfg = self.cli_config.router_bgp
         for tracker in natural_sort(bgp.session_trackers or [], sort_key="name"):
             cfg.append_l1(f"session tracker {tracker.name}")
-            if tracker.recovery_delay is not None:
-                cfg.append_l2(f"recovery delay {tracker.recovery_delay} seconds")
+            cfg.append_l2("recovery delay {} seconds", tracker.recovery_delay)
 
     def _render_bgp_eos_cli(self, bgp: Any) -> None:
         """Render top-level 'router bgp' eos_cli block at L1 (J2 lines 3955-3958)."""

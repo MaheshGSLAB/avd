@@ -12,7 +12,7 @@ from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._utils.get import get_v2
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
     from typing import TypeVar
 
     from typing_extensions import Self
@@ -20,12 +20,59 @@ if TYPE_CHECKING:
     T_CliGeneratorSubclass = TypeVar("T_CliGeneratorSubclass", bound="CliGeneratorProtocol")
 
 
+class CliLines(list):
+    """
+    A ``list[str]`` subclass with a conditional format-append method.
+
+    The overridden :meth:`append` accepts an optional sequence of *values*:
+
+    * **No values** — appends *template* verbatim (no-op when falsy, so
+      an empty string returned by :meth:`CliGenerator._cli` is safely ignored).
+    * **With values** — if *any* value is falsy (``None``, ``False``, ``""``),
+      the line is **silently skipped**; otherwise ``template.format(*values)``
+      is appended.
+
+    Usage::
+
+        lines = CliLines()
+        lines.append("bgp asn notation {}", bgp.as_notation)  # skipped when None
+        lines.append("router-id {}", bgp.router_id)  # skipped when None
+        lines.append("update wait-for-convergence", bgp.updates.wait_for_convergence)  # skipped when False/None
+        lines.append("neighbor {} remote-as {}", ip, remote_as)  # skipped when either is falsy
+        lines.append("!")  # always appended
+    """
+
+    def append(self, template: str | None, /, *values: object) -> None:  # type: ignore[override]
+        if values:
+            if any(not v for v in values):
+                return
+            super().append(template.format(*values))  # type: ignore[arg-type]
+        elif template:
+            super().append(template)
+
+
+class _IndentedSection:
+    """Proxy that prepends a fixed indentation prefix to every :meth:`append` call."""
+
+    __slots__ = ("_prefix", "_section")
+
+    def __init__(self, section: CliConfigSection, prefix: str) -> None:
+        self._section = section
+        self._prefix = prefix
+
+    def append(self, line: str | None) -> None:
+        """Append *line* prefixed with the configured indentation."""
+        self._section.append(f"{self._prefix}{line}" if line else None)
+
+
 class CliConfigSection:
     """
     Accumulator for a single named section of CLI configuration.
 
     Multi-line strings are automatically split on newlines. None values are ignored.
-    Use ``append_l1`` … ``append_l4`` to prepend indentation automatically.
+    Use ``append_l1`` … ``append_l4`` to prepend indentation automatically, or call
+    :meth:`at` once per function to get an :class:`_IndentedSection` that applies a
+    fixed indent level to every ``append`` call without repeating the level suffix.
     """
 
     _STEP: str = "   "
@@ -37,6 +84,22 @@ class CliConfigSection:
     def __init__(self) -> None:
         self._lines: list[str] = []
 
+    def at(self, level: int) -> _IndentedSection:
+        """Return a writer that prepends *level* indentation steps to every :meth:`append` call."""
+        return _IndentedSection(self, self._STEP * level)
+
+    def extend_at(self, level: int, lines: Iterable[str] | None) -> None:
+        """
+        Extend with *lines*, prepending *level* indentation steps to each line.
+
+        Accepts any iterable (list, generator, etc.) so callers can pass lazy
+        sequences without materialising an intermediate list first.
+        """
+        if lines is None:
+            return
+        prefix = self._STEP * level
+        self._lines.extend(f"{prefix}{line}" for line in lines)
+
     def append(self, line: str | None) -> None:
         """Append a CLI line or multi-line string."""
         if line:
@@ -45,21 +108,61 @@ class CliConfigSection:
             else:
                 self._lines.append(line)
 
-    def append_l1(self, line: str | None) -> None:
-        """Append *line* with L1 indentation (3 spaces)."""
-        self.append(f"{self._L1}{line}" if line else None)
+    def append_l1(self, template: str | None, /, *values: object) -> None:
+        """
+        Append *template* with L1 indentation (3 spaces).
 
-    def append_l2(self, line: str | None) -> None:
-        """Append *line* with L2 indentation (6 spaces)."""
-        self.append(f"{self._L2}{line}" if line else None)
+        When *values* are given, behaves like :meth:`CliLines.append`: skips the
+        line silently if any value is falsy, otherwise formats and appends.
+        """
+        if values:
+            if any(not v for v in values):
+                return
+            self.append(f"{self._L1}{template.format(*values)}")  # type: ignore[arg-type]
+        elif template:
+            self.append(f"{self._L1}{template}")
 
-    def append_l3(self, line: str | None) -> None:
-        """Append *line* with L3 indentation (9 spaces)."""
-        self.append(f"{self._L3}{line}" if line else None)
+    def append_l2(self, template: str | None, /, *values: object) -> None:
+        """
+        Append *template* with L2 indentation (6 spaces).
 
-    def append_l4(self, line: str | None) -> None:
-        """Append *line* with L4 indentation (12 spaces)."""
-        self.append(f"{self._L4}{line}" if line else None)
+        When *values* are given, behaves like :meth:`CliLines.append`: skips the
+        line silently if any value is falsy, otherwise formats and appends.
+        """
+        if values:
+            if any(not v for v in values):
+                return
+            self.append(f"{self._L2}{template.format(*values)}")  # type: ignore[arg-type]
+        elif template:
+            self.append(f"{self._L2}{template}")
+
+    def append_l3(self, template: str | None, /, *values: object) -> None:
+        """
+        Append *template* with L3 indentation (9 spaces).
+
+        When *values* are given, behaves like :meth:`CliLines.append`: skips the
+        line silently if any value is falsy, otherwise formats and appends.
+        """
+        if values:
+            if any(not v for v in values):
+                return
+            self.append(f"{self._L3}{template.format(*values)}")  # type: ignore[arg-type]
+        elif template:
+            self.append(f"{self._L3}{template}")
+
+    def append_l4(self, template: str | None, /, *values: object) -> None:
+        """
+        Append *template* with L4 indentation (12 spaces).
+
+        When *values* are given, behaves like :meth:`CliLines.append`: skips the
+        line silently if any value is falsy, otherwise formats and appends.
+        """
+        if values:
+            if any(not v for v in values):
+                return
+            self.append(f"{self._L4}{template.format(*values)}")  # type: ignore[arg-type]
+        elif template:
+            self.append(f"{self._L4}{template}")
 
     def extend(self, lines: list[str] | None) -> None:
         """Extend with multiple CLI lines."""
@@ -217,6 +320,23 @@ class CliGenerator(CliGeneratorProtocol):
     _SEP_L1: str = _STEP + "!"  # "   !"
     _SEP_L2: str = _STEP * 2 + "!"  # "      !"
     _SEP_L3: str = _STEP * 3 + "!"  # "         !"
+
+    @staticmethod
+    def _cli(*parts: str | None) -> str:
+        """
+        Build a CLI command by joining non-falsy parts with a single space.
+
+        Use Python's short-circuit ``and`` to express optional segments without
+        explicit ``if`` blocks::
+
+            self._cli(
+                "redistribute isis",
+                r.isis.isis_level,  # included when not None/False
+                r.isis.include_leaked and "include leaked",  # included only when True
+                r.isis.route_map and f"route-map {r.isis.route_map}" or r.isis.rcf and f"rcf {r.isis.rcf}",  # first truthy wins (elif)
+            )
+        """
+        return " ".join(str(p) for p in parts if p)
 
     def __init__(self, structured_config: EosCliConfigGen | dict) -> None:
         """
