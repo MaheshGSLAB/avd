@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from functools import wraps
 from typing import TYPE_CHECKING, Protocol, overload
 
@@ -12,7 +13,8 @@ from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._utils.get import get_v2
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Iterator
+    from contextlib import AbstractContextManager
     from typing import TypeVar
 
     from typing_extensions import Self
@@ -51,42 +53,19 @@ class CliLines(list):
             super().append(template)
 
 
-class _IndentedSection:
-    """Proxy that prepends a fixed indentation prefix to every :meth:`append` call."""
-
-    __slots__ = ("_prefix", "_section")
-
-    def __init__(self, section: CliConfigSection, prefix: str) -> None:
-        self._section = section
-        self._prefix = prefix
-
-    def append(self, line: str | None) -> None:
-        """Append *line* prefixed with the configured indentation."""
-        self._section.append(f"{self._prefix}{line}" if line else None)
-
-
 class CliConfigSection:
     """
     Accumulator for a single named section of CLI configuration.
 
     Multi-line strings are automatically split on newlines. None values are ignored.
-    Use ``append_l1`` … ``append_l4`` to prepend indentation automatically, or call
-    :meth:`at` once per function to get an :class:`_IndentedSection` that applies a
-    fixed indent level to every ``append`` call without repeating the level suffix.
+    Use :meth:`append_at` with the current indent level, or drive indentation
+    automatically via :meth:`CliGenerator._block`.
     """
 
     _STEP: str = "   "
-    _L1: str = _STEP
-    _L2: str = _STEP * 2
-    _L3: str = _STEP * 3
-    _L4: str = _STEP * 4
 
     def __init__(self) -> None:
         self._lines: list[str] = []
-
-    def at(self, level: int) -> _IndentedSection:
-        """Return a writer that prepends *level* indentation steps to every :meth:`append` call."""
-        return _IndentedSection(self, self._STEP * level)
 
     def extend_at(self, level: int, lines: Iterable[str] | None) -> None:
         """
@@ -108,61 +87,22 @@ class CliConfigSection:
             else:
                 self._lines.append(line)
 
-    def append_l1(self, template: str | None, /, *values: object) -> None:
+    def append_at(self, level: int, template: str | None, /, *values: object) -> None:
         """
-        Append *template* with L1 indentation (3 spaces).
+        Append *template* with dynamic *level* indentation steps.
 
-        When *values* are given, behaves like :meth:`CliLines.append`: skips the
-        line silently if any value is falsy, otherwise formats and appends.
+        Equivalent to ``append_l1`` / ``append_l2`` … but the indent level is
+        supplied at call time instead of being baked into the method name.  Use
+        this together with :meth:`CliGenerator._block` so that render methods
+        never need to hard-code an indent level.
         """
+        prefix = self._STEP * level
         if values:
             if any(not v for v in values):
                 return
-            self.append(f"{self._L1}{template.format(*values)}")  # type: ignore[arg-type]
+            self.append(f"{prefix}{template.format(*values)}")  # type: ignore[arg-type]
         elif template:
-            self.append(f"{self._L1}{template}")
-
-    def append_l2(self, template: str | None, /, *values: object) -> None:
-        """
-        Append *template* with L2 indentation (6 spaces).
-
-        When *values* are given, behaves like :meth:`CliLines.append`: skips the
-        line silently if any value is falsy, otherwise formats and appends.
-        """
-        if values:
-            if any(not v for v in values):
-                return
-            self.append(f"{self._L2}{template.format(*values)}")  # type: ignore[arg-type]
-        elif template:
-            self.append(f"{self._L2}{template}")
-
-    def append_l3(self, template: str | None, /, *values: object) -> None:
-        """
-        Append *template* with L3 indentation (9 spaces).
-
-        When *values* are given, behaves like :meth:`CliLines.append`: skips the
-        line silently if any value is falsy, otherwise formats and appends.
-        """
-        if values:
-            if any(not v for v in values):
-                return
-            self.append(f"{self._L3}{template.format(*values)}")  # type: ignore[arg-type]
-        elif template:
-            self.append(f"{self._L3}{template}")
-
-    def append_l4(self, template: str | None, /, *values: object) -> None:
-        """
-        Append *template* with L4 indentation (12 spaces).
-
-        When *values* are given, behaves like :meth:`CliLines.append`: skips the
-        line silently if any value is falsy, otherwise formats and appends.
-        """
-        if values:
-            if any(not v for v in values):
-                return
-            self.append(f"{self._L4}{template.format(*values)}")  # type: ignore[arg-type]
-        elif template:
-            self.append(f"{self._L4}{template}")
+            self.append(f"{prefix}{template}")
 
     def extend(self, lines: list[str] | None) -> None:
         """Extend with multiple CLI lines."""
@@ -312,14 +252,7 @@ class CliGenerator(CliGeneratorProtocol):
     """
 
     _STEP: str = "   "  # single indent step (3 spaces)
-    _SEP: str = "!"  # top-level section separator
-    _L1: str = _STEP  # "   "
-    _L2: str = _STEP * 2  # "      "
-    _L3: str = _STEP * 3  # "         "
-    _L4: str = _STEP * 4  # "            "
-    _SEP_L1: str = _STEP + "!"  # "   !"
-    _SEP_L2: str = _STEP * 2 + "!"  # "      !"
-    _SEP_L3: str = _STEP * 3 + "!"  # "         !"
+    _SEP: str = "!"  # section separator
 
     @staticmethod
     def _cli(*parts: str | None) -> str:
@@ -351,3 +284,67 @@ class CliGenerator(CliGeneratorProtocol):
             self.data = structured_config
 
         self.cli_config = CliConfig()
+        self._indent_level: int = 0
+
+    @property
+    def _section(self) -> CliConfigSection:
+        """
+        The default :class:`CliConfigSection` this generator writes to.
+
+        Subclasses must override this to return the appropriate section from
+        :attr:`cli_config`, e.g. ``return self.cli_config.router_bgp``.
+        """
+        raise NotImplementedError
+
+    def _write(self, template: str | None, /, *values: object) -> None:
+        """Write *template* at the current indent level to :attr:`_section`."""
+        self._section.append_at(self._indent_level, template, *values)
+
+    def _indent(self, header: str | None = None, /, *values: object) -> AbstractContextManager[None]:
+        """
+        Context manager: write optional *header* at the current indent level, then increment the indent level for the body.
+
+        Decrements the indent level on exit.
+
+        Usage::
+
+            with self._indent(f"router bgp {bgp_as}"):
+                self._write("router-id {}", bgp.router_id)  # indented one level in
+
+            with self._indent(f"vrf {vrf.name}"):
+                self._write("rd {}", vrf.rd)
+                with self._indent("address-family ipv4"):
+                    self._write("neighbor {} activate", ip)
+        """
+        return self._block(self._section, header, *values)
+
+    @contextmanager
+    def _block(self, section: CliConfigSection, header: str | None = None, /, *values: object) -> Iterator[None]:  # type: ignore[misc]
+        """
+        Context manager that optionally writes a block header then increments the indent level.
+
+        Usage::
+
+            # Write "router bgp 65000" at level 0, then execute body at level 1.
+            with self._block(cfg, f"router bgp {bgp_as}"):
+                self._render_global_settings(bgp)  # writes at level 1
+
+            # Write "vrf PROD" at level 1, execute body at level 2.
+            with self._block(cfg, f"vrf {vrf.name}"):
+                cfg.append_at(self._indent_level, "rd {}", vrf.rd)
+
+            # No header — just bump the indent level for a group of calls.
+            with self._block(cfg):
+                ...
+
+        The *header* / *values* pair follows the same falsy-skip convention as
+        :meth:`CliConfigSection.append_at`: if any value is falsy, the header line
+        is silently omitted but the indent still increments.
+        """
+        if header is not None:
+            section.append_at(self._indent_level, header, *values)
+        self._indent_level += 1
+        try:
+            yield
+        finally:
+            self._indent_level -= 1
