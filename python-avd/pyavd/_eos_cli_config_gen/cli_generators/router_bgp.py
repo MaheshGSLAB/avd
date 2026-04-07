@@ -50,6 +50,7 @@ class RouterBgpGenerator(CliGenerator):
             self._render_vlans(bgp)
             self._render_vpws(bgp)
             self._render_vlan_aware_bundles(bgp)
+            self._render_route_distinguisher(bgp)
             self._render_address_family_evpn(bgp)
             self._render_address_family_flow_spec_ipv4(bgp)
             self._render_address_family_flow_spec_ipv6(bgp)
@@ -76,6 +77,7 @@ class RouterBgpGenerator(CliGenerator):
         Simple flags are inlined; multi-line concepts delegate to sub-helpers.
         """
         self._write("bgp asn notation {}", bgp.as_notation)
+        self._render_labeled_unicast_rib(bgp)
         self._write("router-id {}", bgp.router_id)
         self._write("update wait-for-convergence", bgp.updates.wait_for_convergence)
         self._write("update wait-install", bgp.updates.wait_install)
@@ -474,6 +476,17 @@ class RouterBgpGenerator(CliGenerator):
                     if bundle.eos_cli.endswith("\n"):
                         self._section._lines.append("")
 
+    def _render_route_distinguisher(self, bgp: EosCliConfigGen.RouterBgp) -> None:
+        """Render 'route-distinguisher' block (J2 lines 809-819)."""
+        assignment_auto = bgp.route_distinguisher.assignment_auto
+        if not assignment_auto:
+            return
+        self._write(self._SEP)
+        with self._indent("route-distinguisher"):
+            self._write("assignment auto range {} {}", assignment_auto.range.start, assignment_auto.range.end)
+            for af in natural_sort(assignment_auto.address_families or []):
+                self._write(f"assignment auto address-family {af}")
+
     def _render_address_family_evpn(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family evpn' block (J2 lines 793-1018)."""
         af = bgp.address_family_evpn
@@ -593,6 +606,8 @@ class RouterBgpGenerator(CliGenerator):
             for network in natural_sort(af.networks or [], sort_key="prefix"):
                 if network.route_map is not None:
                     self._write(f"network {network.prefix} route-map {network.route_map}")
+                elif network.rcf is not None:
+                    self._write(f"network {network.prefix} rcf {network.rcf}")
                 else:
                     self._write(f"network {network.prefix}")
 
@@ -602,6 +617,22 @@ class RouterBgpGenerator(CliGenerator):
                 self._write("no bgp redistribute-internal")
 
             self._render_af_ipv4_redistribute(af.redistribute)
+
+    def _render_labeled_unicast_rib(self, bgp: EosCliConfigGen.RouterBgp) -> None:
+        """Render 'bgp labeled-unicast rib [ip [route-map X]] [tunnel [route-map Y]]' (J2 lines 13-28)."""
+        rib = bgp.bgp.labeled_unicast.rib
+        if rib.ip.enabled is not True and rib.tunnel.enabled is not True:
+            return
+        cmd = "bgp labeled-unicast rib"
+        if rib.ip.enabled is True:
+            cmd += " ip"
+            if rib.ip.route_map is not None:
+                cmd += f" route-map {rib.ip.route_map}"
+        if rib.tunnel.enabled is True:
+            cmd += " tunnel"
+            if rib.tunnel.route_map is not None:
+                cmd += f" route-map {rib.tunnel.route_map}"
+        self._write(cmd)
 
     def _render_bgp_default_flags(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'bgp default ipv4-unicast' and 'bgp default ipv4-unicast transport ipv6' flags."""
@@ -1266,6 +1297,8 @@ class RouterBgpGenerator(CliGenerator):
                 cli = f"network {network.prefix}"
                 if network.route_map is not None:
                     cli += f" route-map {network.route_map}"
+                elif network.rcf is not None:
+                    cli += f" rcf {network.rcf}"
                 self._write(cli)
 
             for next_hop in af.next_hops or []:
@@ -1526,6 +1559,8 @@ class RouterBgpGenerator(CliGenerator):
                 cli = f"network {network.prefix}"
                 if network.route_map is not None:
                     cli += f" route-map {network.route_map}"
+                elif network.rcf is not None:
+                    cli += f" rcf {network.rcf}"
                 self._write(cli)
 
             if af.bgp.redistribute_internal is True:
@@ -1557,6 +1592,15 @@ class RouterBgpGenerator(CliGenerator):
         self._write("neighbor {} prefix-list {} in", entity_id, entity.prefix_list_in)
 
         self._write("neighbor {} prefix-list {} out", entity_id, entity.prefix_list_out)
+
+        default_originate = getattr(entity, "default_originate", None)
+        if default_originate:
+            do_cli = f"neighbor {entity_id} default-originate"
+            if default_originate.route_map is not None:
+                do_cli += f" route-map {default_originate.route_map}"
+            if default_originate.always is True:
+                do_cli += " always"
+            self._write(do_cli)
 
         # additional_paths send: section-level prefix_list is appended when set.
         send = entity.additional_paths.send
@@ -1983,6 +2027,7 @@ class RouterBgpGenerator(CliGenerator):
         self._write(self._SEP)
         with self._indent(f"vrf {vrf.name}"):
             self._write("rd {}", vrf.rd)
+            self._write("rd evpn domain {} {}", vrf.rd_evpn_domain.domain, vrf.rd_evpn_domain.rd)
 
             for export in natural_sort(vrf.default_route_exports or [], sort_key="address_family"):
                 cli = f"default-route export {export.address_family}"
@@ -2005,6 +2050,11 @@ class RouterBgpGenerator(CliGenerator):
                             self._write(f"route-target import {af.address_family} rcf {af.rcf}")
                     self._write("route-target import {} route-map {}", af.address_family, af.route_map)
 
+            for rt in natural_sort([r for r in vrf.route_targets.import_evpn_domains or [] if r.domain == "all"], sort_key="route_target"):
+                self._write(f"route-target import evpn domain {rt.domain} {rt.route_target}")
+            for rt in natural_sort([r for r in vrf.route_targets.import_evpn_domains or [] if r.domain == "remote"], sort_key="route_target"):
+                self._write(f"route-target import evpn domain {rt.domain} {rt.route_target}")
+
             for af in vrf.route_targets.export or []:
                 for rt in af.route_targets or []:
                     self._write(f"route-target export {af.address_family} {rt}")
@@ -2015,6 +2065,11 @@ class RouterBgpGenerator(CliGenerator):
                         else:
                             self._write(f"route-target export {af.address_family} rcf {af.rcf}")
                     self._write("route-target export {} route-map {}", af.address_family, af.route_map)
+
+            for rt in natural_sort([r for r in vrf.route_targets.export_evpn_domains or [] if r.domain == "all"], sort_key="route_target"):
+                self._write(f"route-target export evpn domain {rt.domain} {rt.route_target}")
+            for rt in natural_sort([r for r in vrf.route_targets.export_evpn_domains or [] if r.domain == "remote"], sort_key="route_target"):
+                self._write(f"route-target export evpn domain {rt.domain} {rt.route_target}")
 
             self._write("router-id {}", vrf.router_id)
             self._write("update wait-for-convergence", vrf.updates.wait_for_convergence)
@@ -2443,6 +2498,8 @@ class RouterBgpGenerator(CliGenerator):
                 cli = f"network {network.prefix}"
                 if network.route_map is not None:
                     cli += f" route-map {network.route_map}"
+                elif network.rcf is not None:
+                    cli += f" rcf {network.rcf}"
                 self._write(cli)
 
             if af.bgp.redistribute_internal is True:
@@ -2758,6 +2815,8 @@ class RouterBgpGenerator(CliGenerator):
                 cli = f"network {network.prefix}"
                 if network.route_map is not None:
                     cli += f" route-map {network.route_map}"
+                elif network.rcf is not None:
+                    cli += f" rcf {network.rcf}"
                 self._write(cli)
 
             if af.bgp.redistribute_internal is True:
