@@ -420,7 +420,10 @@ class RouterBgpGenerator(CliGenerator):
                     self._write(f"no redistribute {r}")
                 if vlan.eos_cli is not None:
                     self._write("!")
-                    self._write(vlan.eos_cli)
+                    for line in vlan.eos_cli.splitlines():
+                        self._write(line)
+                    if vlan.eos_cli.endswith("\n"):
+                        self._section._lines.append("")
 
     def _render_vpws(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render VPWS BGP service entries sorted by name (J2 lines 722-752)."""
@@ -466,7 +469,10 @@ class RouterBgpGenerator(CliGenerator):
                 self._write("vlan {}", bundle.vlan)
                 if bundle.eos_cli is not None:
                     self._write("!")
-                    self._write(bundle.eos_cli)
+                    for line in bundle.eos_cli.splitlines():
+                        self._write(line)
+                    if bundle.eos_cli.endswith("\n"):
+                        self._section._lines.append("")
 
     def _render_address_family_evpn(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'address-family evpn' block (J2 lines 793-1018)."""
@@ -1181,7 +1187,8 @@ class RouterBgpGenerator(CliGenerator):
                 cli += f" rcf {r.static.rcf}"
             self._write(cli)
 
-    def _build_missing_policy_cli(self, prefix: str, missing_policy: Any) -> list[str]:
+    # TODO: fix the double space
+    def _build_missing_policy_cli(self, prefix: str, missing_policy: Any, double_space_before_include: bool = False) -> list[str]:
         """
         Build 'missing-policy' CLI lines for directions in and out.
 
@@ -1190,9 +1197,11 @@ class RouterBgpGenerator(CliGenerator):
         line at the correct indentation level.
 
         Args:
-            prefix:          Command prefix, e.g. ``"bgp missing-policy"`` or
-                             ``"neighbor X missing-policy"``.
-            missing_policy:  AvdModel with ``direction_in`` / ``direction_out`` fields.
+            prefix:                    Command prefix, e.g. ``"bgp missing-policy"`` or
+                                       ``"neighbor X missing-policy"``.
+            missing_policy:            AvdModel with ``direction_in`` / ``direction_out`` fields.
+            double_space_before_include: When True, inserts two spaces before ``include``
+                                       instead of one (required for ipv4 labeled-unicast neighbors).
         """
         lines: list[str] = []
         for direction in ["in", "out"]:
@@ -1201,7 +1210,7 @@ class RouterBgpGenerator(CliGenerator):
                 continue
             cli = prefix
             if policy.include_community_list is True or policy.include_prefix_list is True or policy.include_sub_route_map is True:
-                cli += " include"
+                cli += "  include" if double_space_before_include else " include"
                 if policy.include_community_list is True:
                     cli += " community-list"
                 if policy.include_prefix_list is True:
@@ -1327,7 +1336,7 @@ class RouterBgpGenerator(CliGenerator):
             self._write(cli)
 
         if entity.missing_policy:
-            for line in self._build_missing_policy_cli(f"neighbor {entity_id} missing-policy", entity.missing_policy):
+            for line in self._build_missing_policy_cli(f"neighbor {entity_id} missing-policy", entity.missing_policy, double_space_before_include=True):
                 self._write(line)
 
         self._write("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
@@ -2216,6 +2225,8 @@ class RouterBgpGenerator(CliGenerator):
             self._write(self._SEP)
             for line in vrf.eos_cli.splitlines():
                 self._write(line)
+            if vrf.eos_cli.endswith("\n"):
+                self._section._lines.append("")
 
     def _render_vrf_redistribute(self, r: Any) -> None:
         """Render VRF-level redistribute commands at L2 (J2 lines 2982-3144)."""
