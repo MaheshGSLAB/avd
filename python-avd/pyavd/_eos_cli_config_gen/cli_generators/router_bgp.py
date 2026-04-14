@@ -38,7 +38,6 @@ class RouterBgpGenerator(CliGenerator):
         if (bgp_as := get_v2(bgp, "as")) is None:
             return
 
-        self._section.append(self._SEP)
         with self._indent(f"router bgp {bgp_as}"):
             self._render_global_settings(bgp)
             self._render_peer_groups(bgp)
@@ -400,7 +399,6 @@ class RouterBgpGenerator(CliGenerator):
     def _render_vlans(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render VLAN-based L2VPN entries sorted by id (J2 lines 681-721)."""
         for vlan in natural_sort(bgp.vlans or [], sort_key="id"):
-            self._write("!")
             with self._indent(f"vlan {vlan.id}"):
                 self._write("rd {}", vlan.rd)
                 self._write("rd evpn domain {} {}", vlan.rd_evpn_domain.domain, vlan.rd_evpn_domain.rd)
@@ -421,7 +419,7 @@ class RouterBgpGenerator(CliGenerator):
                 for r in natural_sort(vlan.no_redistribute_routes or []):
                     self._write(f"no redistribute {r}")
                 if vlan.eos_cli is not None:
-                    self._write("!")
+                    self._write(self._SEP)
                     for line in vlan.eos_cli.splitlines():
                         self._write(line)
                     if vlan.eos_cli.endswith("\n"):
@@ -430,7 +428,6 @@ class RouterBgpGenerator(CliGenerator):
     def _render_vpws(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render VPWS BGP service entries sorted by name (J2 lines 722-752)."""
         for svc in natural_sort(bgp.vpws or [], sort_key="name"):
-            self._write("!")
             if svc.name is None:
                 continue
             with self._indent(f"vpws {svc.name}"):
@@ -441,14 +438,12 @@ class RouterBgpGenerator(CliGenerator):
                 self._write("mtu {}", svc.mtu)
                 for pw in natural_sort(svc.pseudowires or [], sort_key="name"):
                     if pw.name is not None and pw.id_local is not None and pw.id_remote is not None:
-                        self._write("!")
                         with self._indent(f"pseudowire {pw.name}"):
                             self._write(f"evpn vpws id local {pw.id_local} remote {pw.id_remote}")
 
     def _render_vlan_aware_bundles(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render vlan-aware-bundle entries sorted by name (J2 lines 753-792)."""
         for bundle in natural_sort(bgp.vlan_aware_bundles or [], sort_key="name"):
-            self._write("!")
             with self._indent(f"vlan-aware-bundle {bundle.name}"):
                 self._write("rd {}", bundle.rd)
                 self._write("rd evpn domain {} {}", bundle.rd_evpn_domain.domain, bundle.rd_evpn_domain.rd)
@@ -470,7 +465,7 @@ class RouterBgpGenerator(CliGenerator):
                     self._write(f"no redistribute {r}")
                 self._write("vlan {}", bundle.vlan)
                 if bundle.eos_cli is not None:
-                    self._write("!")
+                    self._write(self._SEP)
                     for line in bundle.eos_cli.splitlines():
                         self._write(line)
                     if bundle.eos_cli.endswith("\n"):
@@ -481,7 +476,6 @@ class RouterBgpGenerator(CliGenerator):
         assignment_auto = bgp.route_distinguisher.assignment_auto
         if not assignment_auto:
             return
-        self._write(self._SEP)
         with self._indent("route-distinguisher"):
             self._write("assignment auto range {} {}", assignment_auto.range.start, assignment_auto.range.end)
             for af in natural_sort(assignment_auto.address_families or []):
@@ -492,7 +486,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_evpn
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family evpn"):
             self._write("route export ethernet-segment ip mass-withdraw", af.route.export_ethernet_segment_ip_mass_withdraw)
             self._write("route import ethernet-segment ip mass-withdraw", af.route.import_ethernet_segment_ip_mass_withdraw)
@@ -554,7 +547,6 @@ class RouterBgpGenerator(CliGenerator):
             self._write("route import overlay-index gateway", af.route.import_overlay_index_gateway)
 
             for segment in natural_sort(af.evpn_ethernet_segment or [], sort_key="domain"):
-                self._write("!")
                 with self._indent(f"evpn ethernet-segment domain {segment.domain}"):
                     self._write("identifier {}", segment.identifier)
                     self._write("route-target import {}", segment.route_target_import)
@@ -571,7 +563,6 @@ class RouterBgpGenerator(CliGenerator):
         """Shared renderer for 'address-family flow-spec {ipv4|ipv6}' blocks."""
         if not af:
             return
-        self._write(self._SEP)
         with self._indent(f"address-family flow-spec {ip_version}"):
             self._write("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
             self._write("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
@@ -589,7 +580,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_ipv4
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv4"):
             if af.bgp.additional_paths.install is True:
                 self._write("bgp additional-paths install")
@@ -1257,7 +1247,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_ipv4_labeled_unicast
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv4 labeled-unicast"):
             self._write("update wait-for-convergence", af.update_wait_for_convergence)
 
@@ -1387,7 +1376,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_ipv4_multicast
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv4 multicast"):
             self._write("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
@@ -1506,7 +1494,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_ipv4_sr_te
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv4 sr-te"):
             for pg in natural_sort(af.peer_groups or [], sort_key="name"):
                 self._render_af_sr_te_entity(pg.name, pg)
@@ -1534,7 +1521,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_ipv6
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv6"):
             if af.bgp.additional_paths.install is True:
                 self._write("bgp additional-paths install")
@@ -1730,7 +1716,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_ipv6_multicast
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv6 multicast"):
             # bgp missing-policy uses flat direction_{in,out}_action fields (not nested).
             self._write("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
@@ -1847,7 +1832,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_ipv6_sr_te
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv6 sr-te"):
             for pg in natural_sort(af.peer_groups or [], sort_key="name"):
                 self._render_af_sr_te_entity(pg.name, pg)
@@ -1860,7 +1844,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_link_state
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family link-state"):
             # bgp missing-policy uses flat direction_{in,out}_action fields.
             self._write("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
@@ -1898,7 +1881,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_path_selection
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family path-selection"):
             self._write("bgp additional-paths receive", af.bgp.additional_paths.receive)
 
@@ -1939,7 +1921,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_rtc
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family rt-membership"):
             for pg in natural_sort(af.peer_groups or [], sort_key="name"):
                 if pg.activate is True:
@@ -1962,7 +1943,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_vpn_ipv4
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family vpn-ipv4"):
             for pg in natural_sort(af.peer_groups or [], sort_key="name"):
                 self._render_af_vpn_entity(pg.name, pg)
@@ -1982,7 +1962,6 @@ class RouterBgpGenerator(CliGenerator):
         af = bgp.address_family_vpn_ipv6
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family vpn-ipv6"):
             for pg in natural_sort(af.peer_groups or [], sort_key="name"):
                 self._render_af_vpn_entity(pg.name, pg)
@@ -2024,7 +2003,6 @@ class RouterBgpGenerator(CliGenerator):
 
     def _render_vrf(self, vrf: Any) -> None:
         """Render a single VRF block."""
-        self._write(self._SEP)
         with self._indent(f"vrf {vrf.name}"):
             self._write("rd {}", vrf.rd)
             self._write("rd evpn domain {} {}", vrf.rd_evpn_domain.domain, vrf.rd_evpn_domain.rd)
@@ -2419,7 +2397,6 @@ class RouterBgpGenerator(CliGenerator):
         """Render VRF 'address-family flow-spec {ipv4|ipv6}' block at L2/L3."""
         if not af:
             return
-        self._write(self._SEP)
         with self._indent(f"address-family flow-spec {protocol}"):
             self._write("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
             self._write("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
@@ -2432,7 +2409,6 @@ class RouterBgpGenerator(CliGenerator):
         af = vrf.address_family_ipv4
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv4"):
             if af.bgp.additional_paths.install is True:
                 self._write("bgp additional-paths install")
@@ -2647,7 +2623,6 @@ class RouterBgpGenerator(CliGenerator):
         af = vrf.address_family_ipv4_multicast
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv4 multicast"):
             self._write("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
             self._write("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
@@ -2760,7 +2735,6 @@ class RouterBgpGenerator(CliGenerator):
         af = vrf.address_family_ipv6
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv6"):
             if af.bgp.additional_paths.install is True:
                 self._write("bgp additional-paths install")
@@ -2931,7 +2905,6 @@ class RouterBgpGenerator(CliGenerator):
         af = vrf.address_family_ipv6_multicast
         if not af:
             return
-        self._write(self._SEP)
         with self._indent("address-family ipv6 multicast"):
             self._write("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
             self._write("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
@@ -3037,7 +3010,7 @@ class RouterBgpGenerator(CliGenerator):
         """Render VRF 'evpn multicast' block at L2/L3/L4 (J2 lines 3924-3942)."""
         if vrf.evpn_multicast is not True:
             return
-        with self._indent("evpn multicast"):
+        with self._indent("evpn multicast", sep=False):
             algo = vrf.evpn_multicast_gateway_dr_election.algorithm
             if algo is not None:
                 if algo == "preference":
@@ -3048,13 +3021,13 @@ class RouterBgpGenerator(CliGenerator):
 
             af_ipv4 = vrf.evpn_multicast_address_family.ipv4
             if af_ipv4 and af_ipv4.transit is True:
-                with self._indent("address-family ipv4"):
+                with self._indent("address-family ipv4", sep=False):
                     self._write("transit")
 
     def _render_session_trackers(self, bgp: Any) -> None:
         """Render 'session tracker' blocks at L1/L2 (J2 lines 3948-3954)."""
         for tracker in natural_sort(bgp.session_trackers or [], sort_key="name"):
-            with self._indent(f"session tracker {tracker.name}"):
+            with self._indent(f"session tracker {tracker.name}", sep=False):
                 self._write("recovery delay {} seconds", tracker.recovery_delay)
 
     def _render_bgp_eos_cli(self, bgp: Any) -> None:

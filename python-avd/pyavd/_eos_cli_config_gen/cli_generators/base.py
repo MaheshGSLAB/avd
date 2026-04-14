@@ -300,33 +300,41 @@ class CliGenerator(CliGeneratorProtocol):
         """Write *template* at the current indent level to :attr:`_section`."""
         self._section.append_at(self._indent_level, template, *values)
 
-    def _indent(self, header: str | None = None, /, *values: object) -> AbstractContextManager[None]:
+    def _indent(self, header: str | None = None, /, *values: object, sep: bool = True) -> AbstractContextManager[None]:
         """
         Context manager: write optional *header* at the current indent level, then increment the indent level for the body.
 
         Decrements the indent level on exit.
 
+        When *sep* is ``True``, a ``!`` separator is written at the current indent level before *header*.
+        This replaces the two-line pattern ``self._write("!"); with self._indent(...)`` with a single
+        ``with self._indent(..., sep=True):`` call.
+
         Usage::
 
-            with self._indent(f"router bgp {bgp_as}"):
+            with self._indent(f"router bgp {bgp_as}", sep=True):
                 self._write("router-id {}", bgp.router_id)  # indented one level in
 
             with self._indent(f"vrf {vrf.name}"):
                 self._write("rd {}", vrf.rd)
-                with self._indent("address-family ipv4"):
+                with self._indent("address-family ipv4", sep=True):
                     self._write("neighbor {} activate", ip)
         """
-        return self._block(self._section, header, *values)
+        return self._block(self._section, header, *values, sep=sep)
 
     @contextmanager
-    def _block(self, section: CliConfigSection, header: str | None = None, /, *values: object) -> Iterator[None]:  # type: ignore[misc]
+    def _block(self, section: CliConfigSection, header: str | None = None, /, *values: object, sep: bool = True) -> Iterator[None]:  # type: ignore[misc]
         """
         Context manager that optionally writes a block header then increments the indent level.
 
+        When *sep* is ``True``, a ``!`` separator is written at the current indent level before
+        *header*. This is the same separator written by ``self._write("!")``, but co-located with
+        the block opening so callers need only one line instead of two.
+
         Usage::
 
-            # Write "router bgp 65000" at level 0, then execute body at level 1.
-            with self._block(cfg, f"router bgp {bgp_as}"):
+            # Write "!" then "router bgp 65000" at level 0, execute body at level 1.
+            with self._block(cfg, f"router bgp {bgp_as}", sep=True):
                 self._render_global_settings(bgp)  # writes at level 1
 
             # Write "vrf PROD" at level 1, execute body at level 2.
@@ -341,6 +349,8 @@ class CliGenerator(CliGeneratorProtocol):
         :meth:`CliConfigSection.append_at`: if any value is falsy, the header line
         is silently omitted but the indent still increments.
         """
+        if sep:
+            section.append_at(self._indent_level, self._SEP)
         if header is not None:
             section.append_at(self._indent_level, header, *values)
         self._indent_level += 1
