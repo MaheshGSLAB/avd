@@ -14,10 +14,12 @@ from __future__ import annotations
 
 from .boot import BootGenerator
 from .config_comment import ConfigCommentGenerator
+from .ethernet_interfaces import EthernetInterfacesGenerator
 from .router_bgp import RouterBgpGenerator
 
 __all__ = [  # noqa: RUF022
     "ConfigCommentGenerator",
     "BootGenerator",
+    "EthernetInterfacesGenerator",
     "RouterBgpGenerator",
 ]

@@ -227,7 +227,8 @@ __PYTHON_GENERATOR__BootGenerator__
 {# DPS Interfaces #}
 {% include 'eos/dps-interfaces.j2' %}
 {# Ethernet Interfaces #}
-{% include 'eos/ethernet-interfaces.j2' %}
+{# config comment - rendered by Python #}
+__PYTHON_GENERATOR__EthernetInterfacesGenerator__
 {# Loopback Interfaces #}
 {% include 'eos/loopback-interfaces.j2' %}
 {# Management Interfaces #}

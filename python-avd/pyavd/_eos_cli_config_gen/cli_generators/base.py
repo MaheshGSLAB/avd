@@ -134,6 +134,7 @@ class CliConfig:
         # Sections are declared in EOS config output order.
         self.config_comment = CliConfigSection()
         self.boot = CliConfigSection()
+        self.ethernet_interfaces = CliConfigSection()
         self.router_bgp = CliConfigSection()
 
     def get_config(self) -> str:
