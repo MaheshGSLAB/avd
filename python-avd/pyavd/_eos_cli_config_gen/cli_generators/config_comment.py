@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from .base import CliGenerator, cli_config_contributor
+from .base import CliGenerator, CliModel, cli_config_contributor
 
 
 class ConfigCommentGenerator(CliGenerator):
@@ -15,12 +15,17 @@ class ConfigCommentGenerator(CliGenerator):
     Renders the config comment section that appears at the beginning of the configuration.
     """
 
+    @property
+    def _model(self) -> CliModel:
+        """Config comment section."""
+        return self.cli_config.config_comment
+
     @cli_config_contributor
     def config_comment(self) -> None:
         """Render config comment CLI configuration using self.cli_config."""
         if not self.data.config_comment:
             return
 
-        self.cli_config.config_comment.append("!")
+        self._add("!")
         for comment_line in self.data.config_comment.split("\n"):
-            self.cli_config.config_comment.append(f"!{comment_line}")
+            self._add(f"!{comment_line}")

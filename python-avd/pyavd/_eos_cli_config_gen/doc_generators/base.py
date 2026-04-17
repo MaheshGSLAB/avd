@@ -22,7 +22,7 @@ class DocSection:
     """
     Accumulator for a single named section of markdown documentation.
 
-    Mirrors :class:`CliConfigSection` but emits GitHub-flavoured markdown
+    Mirrors :class:`CliModel` but emits GitHub-flavoured markdown
     instead of EOS CLI syntax.
     """
 
@@ -104,9 +104,9 @@ def doc_contributor(func: Callable[[T_DocGeneratorSubclass], None]) -> Callable[
     """
     Mark a method as a documentation contributor called during :meth:`DocGeneratorProtocol.render`.
 
-    Methods should write to ``self.doc_config`` via ``self._section`` instead of returning strings.
+    Methods should write to ``self.doc_config`` via ``self._model`` instead of returning strings.
 
-    Mirrors :func:`cli_config_contributor`.
+    Mirrors :func:`cli_contributor`.
     """
     func._is_doc_contributor = True  # pyright: ignore [reportFunctionMemberAccess]
     return func
@@ -173,7 +173,7 @@ class DocGenerator(DocGeneratorProtocol):
         self.doc_config = DocConfig()
 
     @property
-    def _section(self) -> DocSection:
+    def _model(self) -> DocSection:
         """
         The :class:`DocSection` this generator writes to.
 
@@ -191,7 +191,7 @@ class DocGenerator(DocGeneratorProtocol):
 
         Usage::
 
-            self._default(neighbor.remote_as, inherited_remote_as)          # → first non-None, else "-"
+            self._default(neighbor.remote_as, inherited_remote_as)  # → first non-None, else "-"
             self._default(neighbor.vrf, inherited_vrf, fallback="default")  # → first non-None, else "default"
         """
         for v in values:

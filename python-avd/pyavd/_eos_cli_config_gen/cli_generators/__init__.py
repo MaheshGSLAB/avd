@@ -5,7 +5,7 @@
 CLI configuration generators for EOS CLI Config Gen.
 
 This package contains Python-based CLI configuration generators that replace Jinja2 templates.
-Each generator is a class that inherits from CliGenerator and uses @cli_config_contributor
+Each generator is a class that inherits from CliGenerator and uses @cli_contributor
 decorator to mark methods that generate CLI configuration snippets.
 
 """

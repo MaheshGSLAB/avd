@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pyavd.j2filters import hide_passwords
 
-from .base import CliGenerator, cli_config_contributor
+from .base import CliGenerator, CliModel, cli_config_contributor
 
 
 class BootGenerator(CliGenerator):
@@ -16,6 +16,11 @@ class BootGenerator(CliGenerator):
 
     Migrated from j2templates/eos/boot.j2
     """
+
+    @property
+    def _model(self) -> CliModel:
+        """Boot config section."""
+        return self.cli_config.boot
 
     @cli_config_contributor
     def boot(self) -> None:
@@ -34,5 +39,5 @@ class BootGenerator(CliGenerator):
         hash_algorithm = "5" if secret.hash_algorithm == "md5" else secret.hash_algorithm
         key = hide_passwords(secret.key, self.data.eos_cli_config_gen_configuration.hide_passwords)
 
-        self.cli_config.boot.append(self._SEP)
-        self.cli_config.boot.append(f"boot secret {hash_algorithm} {key}")
+        with self._block(f"boot secret {hash_algorithm} {key}"):
+            pass

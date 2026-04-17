@@ -23,7 +23,7 @@ class RouterBgpDocGenerator(DocGenerator):
     """
 
     @property
-    def _section(self) -> DocSection:
+    def _model(self) -> DocSection:
         return self.doc_config.router_bgp
 
     @doc_contributor
@@ -33,7 +33,7 @@ class RouterBgpDocGenerator(DocGenerator):
         if bgp is None:
             return
 
-        self._section.heading(3, "Router BGP")
+        self._model.heading(3, "Router BGP")
         self._render_bgp_neighbors(bgp)
 
     # ------------------------------------------------------------------
@@ -53,7 +53,7 @@ class RouterBgpDocGenerator(DocGenerator):
         if not has_default_neighbors and not has_vrf_neighbors:
             return
 
-        self._section.heading(4, "BGP Neighbors")
+        self._model.heading(4, "BGP Neighbors")
 
         headers = [
             "Neighbor",
@@ -84,7 +84,7 @@ class RouterBgpDocGenerator(DocGenerator):
                 inherited = self._peer_group_inherited(neighbor.peer_group, bgp, include_ttl=False)
                 rows.append(self._neighbor_row(neighbor, inherited, vrf_name=vrf.name, include_ttl=False))
 
-        self._section.table(headers, rows)
+        self._model.table(headers, rows)
 
     def _peer_group_inherited(
         self,
@@ -126,9 +126,7 @@ class RouterBgpDocGenerator(DocGenerator):
         if pg.bfd is True:
             inherited["bfd"] = tag
             if pg.bfd_timers.interval is not None and pg.bfd_timers.min_rx is not None and pg.bfd_timers.multiplier is not None:
-                inherited["bfd_timers"] = (
-                    f"interval: {pg.bfd_timers.interval}, min_rx: {pg.bfd_timers.min_rx}, multiplier: {pg.bfd_timers.multiplier}"
-                )
+                inherited["bfd_timers"] = f"interval: {pg.bfd_timers.interval}, min_rx: {pg.bfd_timers.min_rx}, multiplier: {pg.bfd_timers.multiplier}"
         if pg.shutdown is True:
             inherited["shutdown"] = tag
         if pg.rib_in_pre_policy_retain.enabled is True:

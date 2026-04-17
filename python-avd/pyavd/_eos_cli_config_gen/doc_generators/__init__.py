@@ -13,6 +13,6 @@ from __future__ import annotations
 
 from .router_bgp import RouterBgpDocGenerator
 
-__all__ = [  # noqa: RUF022
+__all__ = [
     "RouterBgpDocGenerator",
 ]
