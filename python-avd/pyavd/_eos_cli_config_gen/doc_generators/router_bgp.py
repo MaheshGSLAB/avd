@@ -94,10 +94,9 @@ class RouterBgpDocGenerator(DocGenerator):
         include_ttl: bool,
     ) -> dict[str, str]:
         """
-        Look up *peer_group_name* in *bgp.peer_groups* and collect the fields
-        that would be inherited by a neighbor belonging to that peer group.
+        Look up *peer_group_name* in *bgp.peer_groups* and return inherited fields.
 
-        Returns a dict keyed by field name.  Each value is either the human-readable
+        Returns a dict keyed by field name. Each value is either the human-readable
         "Inherited from peer group <name>" tag or a pre-formatted string (bfd_timers).
 
         *include_ttl* is True for default-VRF neighbors (where TTL Max Hops can be

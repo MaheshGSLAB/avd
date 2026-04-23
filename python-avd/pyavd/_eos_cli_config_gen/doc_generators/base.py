@@ -30,7 +30,7 @@ class DocSection:
         self._lines: list[str] = []
 
     def heading(self, level: int, text: str) -> None:
-        """Add a markdown heading at *level* (1–6)."""
+        """Add a markdown heading at *level* (1-6)."""
         self._lines.append(f"\n{'#' * level} {text}")
 
     def text(self, content: str) -> None:

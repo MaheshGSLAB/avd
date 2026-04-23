@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from functools import wraps
 from typing import TYPE_CHECKING, Protocol, overload
 
@@ -13,8 +12,7 @@ from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._utils.get import get_v2
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
-    from contextlib import AbstractContextManager
+    from collections.abc import Callable
     from typing import TypeVar
 
     from typing_extensions import Self
@@ -27,39 +25,15 @@ class CliModel:
     Accumulator for a single named section of CLI configuration.
 
     Multi-line strings are automatically split on newlines. None values are ignored.
-    Use :meth:`append_at` with the current indent level, or drive indentation
-    automatically via :meth:`CliGenerator._block_into`.
+    Lines are appended via :meth:`extend` from :class:`CliSection` render results.
     """
-
-    _INDENT: str = "   "
 
     def __init__(self) -> None:
         self._lines: list[str] = []
 
-    def append(self, line: str | None) -> None:
-        """Append a CLI line or multi-line string."""
-        if line:
-            if "\n" in line:
-                self._lines.extend(line.split("\n"))
-            else:
-                self._lines.append(line)
-
-    def append_at(self, level: int, template: str | None, /, *values: object) -> None:
-        """
-        Append *template* with dynamic *level* indentation steps.
-
-        Equivalent to ``append_l1`` / ``append_l2`` … but the indent level is
-        supplied at call time instead of being baked into the method name.  Use
-        this together with :meth:`CliGenerator._block_into` so that render methods
-        never need to hard-code an indent level.
-        """
-        prefix = self._INDENT * level
-        if values:
-            if any(not v for v in values):
-                return
-            self.append(f"{prefix}{template.format(*values)}")  # type: ignore[arg-type]
-        elif template:
-            self.append(f"{prefix}{template}")
+    def extend(self, lines: list[str]) -> None:
+        """Extend from a CliSection render result."""
+        self._lines.extend(lines)
 
     def get_config(self) -> str:
         """Return accumulated lines joined with newlines."""
@@ -92,10 +66,89 @@ class CliConfig:
         return "\n".join(section.get_config() for section in self.__dict__.values() if isinstance(section, CliModel) and section)
 
     def __bool__(self) -> bool:
-        return any(isinstance(v, CliModel) and bool(v) for v in self.__dict__.values())
+        return any(isinstance(section, CliModel) and bool(section) for section in self.__dict__.values())
 
     def __str__(self) -> str:
         return self.get_config()
+
+
+class CliSection:
+    """
+    Base class for self-contained CLI config sections.
+
+    Each subclass renders one named block (e.g. ``vrf PROD``, ``address-family ipv4``)
+    into a list of strings via :meth:`render`. The caller can compose sections by
+    calling :meth:`_sub` inside :meth:`_generate`, which renders a child section at
+    the next indent level and appends its lines.
+
+    By default (:attr:`separator` is ``True``) a ``!`` line is prepended when the
+    section produces any output — identical to EOS behaviour where each top-level or
+    sub-block gets a ``!`` separator only when it exists. Set ``separator = False``
+    for sections that must not emit a ``!`` prefix.
+
+    Usage::
+
+        class RouterBgpVrf(CliSection):
+            def __init__(self, vrf: ...) -> None:
+                self.vrf = vrf
+
+            def _generate(self) -> None:
+                self._header(f"vrf {self.vrf.name}")
+                self._add("rd {}", self.vrf.rd)
+                self._sub(RouterBgpVrfAddressFamilyIpv4(self.vrf))
+
+
+        # caller inside RouterBgpGenerator:
+        for vrf in vrfs:
+            self._model.extend(RouterBgpVrf(vrf).render(indent=1))
+    """
+
+    separator: bool = True
+    _INDENT_STR: str = "   "
+
+    def render(self, indent: int = 0) -> list[str]:
+        """
+        Execute :meth:`_generate` and return lines, optionally prefixed with ``!``.
+
+        Args:
+            indent: The indent level at which this section's header is written.
+                    Body lines are written at ``indent + 1``; sub-sections start
+                    at ``indent + 1`` (their own headers) with bodies at ``indent + 2``.
+        """
+        self._output_lines: list[str] = []
+        self._indent = indent
+        self._generate()
+        result = self._output_lines
+        if result and self.separator:
+            return [self._INDENT_STR * indent + "!", *result]
+        return result
+
+    def _generate(self) -> None:
+        """Override to build output using :meth:`_header`, :meth:`_add`, :meth:`_sub`."""
+        raise NotImplementedError
+
+    def _header(self, text: str) -> None:
+        """Write the section header line at :attr:`_indent`."""
+        self._output_lines.append(f"{self._INDENT_STR * self._indent}{text}")
+
+    def _add(self, template: str | None, /, *values: object) -> None:
+        """
+        Write a body line at ``_indent + 1``.
+
+        Skips silently if *template* is falsy or if any positional *value* is falsy.
+        """
+        prefix = self._INDENT_STR * (self._indent + 1)
+        if values:
+            if any(not v for v in values):
+                return
+            if template:
+                self._output_lines.append(f"{prefix}{template.format(*values)}")
+        elif template:
+            self._output_lines.append(f"{prefix}{template}")
+
+    def _sub(self, section: CliSection) -> None:
+        """Render *section* at ``_indent + 1`` and extend :attr:`_out`."""
+        self._output_lines.extend(section.render(self._indent + 1))
 
 
 # Overload when assigned with args.
@@ -127,22 +180,22 @@ def cli_config_contributor(
     TODO: Store the functions in a class variable on CliGeneratorProtocol instead of modifying the func.
     """
 
-    def decorator(fnc: Callable[[T_CliGeneratorSubclass], None]) -> Callable[[T_CliGeneratorSubclass], None]:
-        fnc._is_cli_config_contributor = True  # pyright: ignore [reportFunctionMemberAccess]
+    def decorator(contributor: Callable[[T_CliGeneratorSubclass], None]) -> Callable[[T_CliGeneratorSubclass], None]:
+        contributor._is_cli_config_contributor = True  # pyright: ignore [reportFunctionMemberAccess]
 
         if toggle_and_value is None:
-            return fnc
+            return contributor
 
         toggle, toggle_value = toggle_and_value
 
-        @wraps(fnc)
-        def wrapped_func(self: T_CliGeneratorSubclass) -> None:
+        @wraps(contributor)
+        def wrapped_contributor(self: T_CliGeneratorSubclass) -> None:
             if get_v2(self.data, toggle, default=None) == toggle_value:
-                return fnc(self)
+                return contributor(self)
 
             return None
 
-        return wrapped_func
+        return wrapped_contributor
 
     if func is not None:
         return decorator(func)
@@ -188,105 +241,14 @@ class CliGeneratorProtocol(Protocol):
         return dir(cls)
 
 
-class CliWriter:
-    """
-    Mixin that provides CLI writing primitives for generator classes.
-
-    Tracks the current indent level and writes CLI lines into a :class:`CliModel`
-    via :meth:`_add` and :meth:`_block`. Subclasses must supply :attr:`_model`
-    (the target section) and set ``self._block_level = 0`` in ``__init__``.
-    """
-
-    _block_level: int
-    _EXCLAMATION: str = "!"  # written before each block header when exclamation=True
-
-    @property
-    def _model(self) -> CliModel:
-        """
-        The :class:`CliModel` this writer targets.
-
-        Subclasses must override to return the appropriate section from
-        ``self.cli_config``, e.g. ``return self.cli_config.router_bgp``.
-        """
-        raise NotImplementedError
-
-    def _add(self, template: str | None, /, *values: object) -> None:
-        """Add a single CLI line at the current indent level into :attr:`_model`."""
-        self._model.append_at(self._block_level, template, *values)
-
-    def _block(self, header: str | None = None, /, *values: object, exclamation: bool = True) -> AbstractContextManager[None]:
-        """
-        Context manager: open a CLI block in :attr:`_model`.
-
-        Writes an optional ``!`` separator (when *exclamation* is ``True``), writes
-        *header* at the current indent level, then increments the level for the body.
-        Decrements on exit.
-
-        Usage::
-
-            with self._block(f"router bgp {bgp_as}"):
-                self._add("router-id {}", bgp.router_id)
-
-            with self._block(f"vrf {vrf.name}"):
-                self._add("rd {}", vrf.rd)
-                with self._block("address-family ipv4"):
-                    self._add("neighbor {} activate", ip)
-
-            with self._block("encapsulation vlan", exclamation=False):
-                self._add("client dot1q {} network dot1q {}", c_vlan, n_vlan)
-        """
-        return self._block_into(self._model, header, *values, exclamation=exclamation)
-
-    @contextmanager
-    def _block_into(self, model: CliModel, header: str | None = None, /, *values: object, exclamation: bool = True) -> Iterator[None]:  # type: ignore[misc]
-        """
-        Context manager: open a CLI block writing into an explicit *model*.
-
-        Identical to :meth:`_block` but targets *model* instead of :attr:`_model`.
-        Used internally by :meth:`_block`; call directly only when writing to a
-        section other than the default.
-
-        The *header* / *values* pair follows the same falsy-skip convention as
-        :meth:`CliModel.append_at`: if any value is falsy the header line is
-        silently omitted but the indent still increments.
-        """
-        if exclamation:
-            model.append_at(self._block_level, self._EXCLAMATION)
-        if header is not None:
-            model.append_at(self._block_level, header, *values)
-        self._block_level += 1
-        try:
-            yield
-        finally:
-            self._block_level -= 1
-
-
-class CliGenerator(CliWriter, CliGeneratorProtocol):
+class CliGenerator(CliGeneratorProtocol):
     """
     Base class for CLI configuration generators.
 
-    Combines :class:`CliWriter` (writing primitives) with :class:`CliGeneratorProtocol`
-    (render loop). Subclasses define methods decorated with ``@cli_config_contributor`` that
-    call :meth:`_add` / :meth:`_block` to build config, then expose it via
-    :meth:`render`.
+    Subclasses define methods decorated with ``@cli_config_contributor`` that call
+    ``self._model.extend(SomeSection(...).render(indent=N))`` to build config, then
+    expose the result via :meth:`render`.
     """
-
-    @staticmethod
-    def _cli(*parts: str | None) -> str:
-        """
-        Build a CLI command by joining non-falsy parts with a single space.
-
-        Use Python's short-circuit ``and`` to express optional segments without
-        explicit ``if`` blocks::
-
-            self._cli(
-                "redistribute isis",
-                r.isis.isis_level,  # included when not None/False
-                r.isis.include_leaked and "include leaked",  # included only when True
-                r.isis.route_map and f"route-map {r.isis.route_map}" or r.isis.rcf and f"rcf {r.isis.rcf}",  # first truthy wins (elif)
-            )
-        """
-        return " ".join(str(p) for p in parts if p)
 
     def __init__(self, structured_config: EosCliConfigGen | dict) -> None:
         """
@@ -301,4 +263,3 @@ class CliGenerator(CliWriter, CliGeneratorProtocol):
             self.data = structured_config
 
         self.cli_config = CliConfig()
-        self._block_level = 0

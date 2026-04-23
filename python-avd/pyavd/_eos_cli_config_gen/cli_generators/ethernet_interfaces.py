@@ -5,14 +5,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, ClassVar
 
 from pyavd.j2filters import hide_passwords, natural_sort, range_expand
 
-from .base import CliGenerator, CliModel, cli_config_contributor
+from .base import CliGenerator, CliModel, CliSection, cli_config_contributor
 
-if TYPE_CHECKING:
-    from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
+# ---------------------------------------------------------------------------
+# CliSection subclasses
+# ---------------------------------------------------------------------------
 
 
 class EthernetInterfacesGenerator(CliGenerator):
@@ -20,12 +21,30 @@ class EthernetInterfacesGenerator(CliGenerator):
     Generator for ethernet interfaces CLI configuration.
 
     Single contributor method `ethernet_interfaces` iterates over sorted interfaces
-    and delegates each interface block to `_render_ethernet_interface`. Each helper
-    maps to a recognisable block or group of related commands in the CLI output,
-    following the same order as ethernet-interfaces.j2.
+    and delegates each interface block to an `EthernetInterface` CliSection, following
+    the same order as ethernet-interfaces.j2.
     """
 
-    _POE_CLASS_MAP: dict[int, str] = {
+    @property
+    def _model(self) -> CliModel:
+        """Ethernet interfaces config section."""
+        return self.cli_config.ethernet_interfaces
+
+    @cli_config_contributor
+    def ethernet_interfaces(self) -> None:
+        """Render all ethernet interface blocks sorted by name (J2 line 8)."""
+        for intf in natural_sort(self.data.ethernet_interfaces or [], sort_key="name"):
+            self._model.extend(EthernetInterface(intf, self.data).render(indent=0))
+
+
+class EthernetInterface(CliSection):
+    """
+    Render a single 'interface <name>' block and all its sub-sections.
+
+    separator=True means a '!' line is prepended when any output is produced.
+    """
+
+    _POE_CLASS_MAP: ClassVar[dict[int, str]] = {
         0: "15.40",
         1: "4.00",
         2: "7.00",
@@ -37,241 +56,235 @@ class EthernetInterfacesGenerator(CliGenerator):
         8: "90.00",
     }
 
-    @property
-    def _model(self) -> CliModel:
-        """Ethernet interfaces config section."""
-        return self.cli_config.ethernet_interfaces
+    def __init__(self, intf: Any, data: Any) -> None:
+        self._intf = intf
+        self._data = data
 
-    @cli_config_contributor
-    def ethernet_interfaces(self) -> None:
-        """Render all ethernet interface blocks sorted by name (J2 line 8)."""
-        for intf in natural_sort(self.data.ethernet_interfaces or [], sort_key="name"):
-            self._render_ethernet_interface(intf)
+    def _generate(self) -> None:
+        intf = self._intf
+        self._header(f"interface {intf.name}")
 
-    def _render_ethernet_interface(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
-        """Render a single 'interface <name>' block in EOS output order."""
-        with self._block(f"interface {intf.name}"):
-            # Comment lines (J2 11-15)
-            if intf.comment:
-                for line in intf.comment.splitlines():
-                    self._add(f"!! {line}")
+        # Comment lines (J2 11-15)
+        if intf.comment:
+            for line in intf.comment.splitlines():
+                self._add(f"!! {line}")
 
-            self._add("profile {}", intf.profile)
-            self._add("description {}", intf.description)
+        self._add("profile {}", intf.profile)
+        self._add("description {}", intf.description)
 
-            # shutdown / no shutdown (J2 22-26)
-            if intf.shutdown is True:
-                self._add("shutdown")
-            elif intf.shutdown is False:
-                self._add("no shutdown")
+        # shutdown / no shutdown (J2 22-26)
+        if intf.shutdown is True:
+            self._add("shutdown")
+        elif intf.shutdown is False:
+            self._add("no shutdown")
 
-            self._add("load-interval {}", intf.load_interval)
-            self._add("mtu {}", intf.mtu)
+        self._add("load-interval {}", intf.load_interval)
+        self._add("mtu {}", intf.mtu)
 
-            # logging event link-status (J2 33-37)
-            if intf.logging.event.link_status is True:
-                self._add("logging event link-status")
-            elif intf.logging.event.link_status is False:
-                self._add("no logging event link-status")
+        # logging event link-status (J2 33-37)
+        if intf.logging.event.link_status is True:
+            self._add("logging event link-status")
+        elif intf.logging.event.link_status is False:
+            self._add("no logging event link-status")
 
-            self._add("traffic-policy input {}", intf.traffic_policy.input)
-            self._add("traffic-policy output {}", intf.traffic_policy.output)
-            self._add("bgp session tracker {}", intf.bgp.session_tracker)
-            self._add("l2-protocol forwarding profile {}", intf.l2_protocol.forwarding_profile)
-            self._add("flowcontrol receive {}", intf.flowcontrol.received)
-            self._add("l2 mtu {}", intf.l2_mtu)
-            self._add("l2 mru {}", intf.l2_mru)
+        self._add("traffic-policy input {}", intf.traffic_policy.input)
+        self._add("traffic-policy output {}", intf.traffic_policy.output)
+        self._add("bgp session tracker {}", intf.bgp.session_tracker)
+        self._add("l2-protocol forwarding profile {}", intf.l2_protocol.forwarding_profile)
+        self._add("flowcontrol receive {}", intf.flowcontrol.received)
+        self._add("l2 mtu {}", intf.l2_mtu)
+        self._add("l2 mru {}", intf.l2_mru)
 
-            # logging event congestion-drops (J2 59-63)
-            if intf.logging.event.congestion_drops is True:
-                self._add("logging event congestion-drops")
-            elif intf.logging.event.congestion_drops is False:
-                self._add("no logging event congestion-drops")
+        # logging event congestion-drops (J2 59-63)
+        if intf.logging.event.congestion_drops is True:
+            self._add("logging event congestion-drops")
+        elif intf.logging.event.congestion_drops is False:
+            self._add("no logging event congestion-drops")
 
-            self._add("speed {}", intf.speed)
-            self._render_error_correction_encoding(intf)
-            self._render_switchport(intf)
-            self._render_encapsulation_dot1q(intf)
-            self._add("vlan id {}", intf.vlan_id)
-            self._render_encapsulation_vlan(intf)
-            self._add("switchport source-interface {}", intf.switchport.source_interface)
-            self._render_vlan_translations(intf)
-            self._add("l2-protocol encapsulation dot1q vlan {}", intf.l2_protocol.encapsulation_dot1q_vlan)
-            self._add("mac timestamp {}", intf.mac_timestamp)
-            self._render_address_locking(intf)
-            self._render_evpn_ethernet_segment(intf)
-            self._add("flow tracker hardware {}", intf.flow_tracker.hardware)
-            self._add("flow tracker sampled {}", intf.flow_tracker.sampled)
+        self._add("speed {}", intf.speed)
+        self._render_error_correction_encoding(intf)
+        self._render_switchport(intf)
+        self._render_encapsulation_dot1q(intf)
+        self._add("vlan id {}", intf.vlan_id)
+        self._sub(EthernetInterfaceEncapsulationVlan(intf))
+        self._add("switchport source-interface {}", intf.switchport.source_interface)
+        self._render_vlan_translations(intf)
+        self._add("l2-protocol encapsulation dot1q vlan {}", intf.l2_protocol.encapsulation_dot1q_vlan)
+        self._add("mac timestamp {}", intf.mac_timestamp)
+        self._sub(EthernetInterfaceAddressLocking(intf))
+        self._sub(EthernetInterfaceEvpnEthernetSegment(intf))
+        self._add("flow tracker hardware {}", intf.flow_tracker.hardware)
+        self._add("flow tracker sampled {}", intf.flow_tracker.sampled)
 
-            # snmp trap link-change (J2 308-312)
-            if intf.snmp_trap_link_change is False:
-                self._add("no snmp trap link-change")
-            elif intf.snmp_trap_link_change is True:
-                self._add("snmp trap link-change")
+        # snmp trap link-change (J2 308-312)
+        if intf.snmp_trap_link_change is False:
+            self._add("no snmp trap link-change")
+        elif intf.snmp_trap_link_change is True:
+            self._add("snmp trap link-change")
 
-            self._add("vrf {}", intf.vrf)
-            self._render_ip_address(intf)
+        self._add("vrf {}", intf.vrf)
+        self._render_ip_address(intf)
 
-            if intf.ip_proxy_arp is True:
-                self._add("ip proxy-arp")
-            if intf.arp_gratuitous_accept is True:
-                self._add("arp gratuitous accept")
-            if intf.ip_address == "dhcp" and intf.dhcp_client_accept_default_route is True:
-                self._add("dhcp client accept default-route")
+        if intf.ip_proxy_arp is True:
+            self._add("ip proxy-arp")
+        if intf.arp_gratuitous_accept is True:
+            self._add("arp gratuitous accept")
+        if intf.ip_address == "dhcp" and intf.dhcp_client_accept_default_route is True:
+            self._add("dhcp client accept default-route")
 
-            self._add("ip verify unicast source reachable-via {}", intf.ip_verify_unicast_source_reachable_via)
-            self._render_ipv6_nd_cache(intf)
-            self._render_bfd_interface(intf)
-            self._render_ip_helpers(intf)
-            self._render_ipv6_dhcp_relay(intf)
+        self._add("ip verify unicast source reachable-via {}", intf.ip_verify_unicast_source_reachable_via)
+        self._render_ipv6_nd_cache(intf)
+        self._render_bfd_interface(intf)
+        self._render_ip_helpers(intf)
+        self._render_ipv6_dhcp_relay(intf)
 
-            if intf.dhcp_server_ipv4 is True:
-                self._add("dhcp server ipv4")
-            if intf.dhcp_server_ipv6 is True:
-                self._add("dhcp server ipv6")
+        if intf.dhcp_server_ipv4 is True:
+            self._add("dhcp server ipv4")
+        if intf.dhcp_server_ipv6 is True:
+            self._add("dhcp server ipv6")
 
-            self._render_ip_igmp_host_proxy(intf)
-            self._render_ipv6(intf)
-            self._render_tcp_mss_ceiling(intf)
-            self._render_channel_group(intf)
+        self._render_ip_igmp_host_proxy(intf)
+        self._render_ipv6(intf)
+        self._render_tcp_mss_ceiling(intf)
+        self._render_channel_group(intf)
 
-            self._add("ip access-group {} in", intf.access_group_in)
-            self._add("ip access-group {} out", intf.access_group_out)
-            self._add("ipv6 access-group {} in", intf.ipv6_access_group_in)
-            self._add("ipv6 access-group {} out", intf.ipv6_access_group_out)
-            self._add("mac access-group {} in", intf.mac_access_group_in)
-            self._add("mac access-group {} out", intf.mac_access_group_out)
+        self._add("ip access-group {} in", intf.access_group_in)
+        self._add("ip access-group {} out", intf.access_group_out)
+        self._add("ipv6 access-group {} in", intf.ipv6_access_group_in)
+        self._add("ipv6 access-group {} out", intf.ipv6_access_group_out)
+        self._add("mac access-group {} in", intf.mac_access_group_in)
+        self._add("mac access-group {} out", intf.mac_access_group_out)
 
-            self._render_mpls_ldp(intf)
+        self._render_mpls_ldp(intf)
 
-            # lldp (J2 514-522)
-            if intf.lldp.transmit is False:
-                self._add("no lldp transmit")
-            if intf.lldp.receive is False:
-                self._add("no lldp receive")
-            self._add("lldp tlv transmit ztp vlan {}", intf.lldp.ztp_vlan)
+        # lldp (J2 514-522)
+        if intf.lldp.transmit is False:
+            self._add("no lldp transmit")
+        if intf.lldp.receive is False:
+            self._add("no lldp receive")
+        self._add("lldp tlv transmit ztp vlan {}", intf.lldp.ztp_vlan)
 
-            # loop protection (J2 523-527)
-            if intf.loop_protection is False:
-                self._add("no loop-protection")
-            elif intf.loop_protection is True:
-                self._add("loop-protection")
+        # loop protection (J2 523-527)
+        if intf.loop_protection is False:
+            self._add("no loop-protection")
+        elif intf.loop_protection is True:
+            self._add("loop-protection")
 
-            self._add("mac security profile {}", intf.mac_security.profile)
-            self._render_multicast(intf)
+        self._add("mac security profile {}", intf.mac_security.profile)
+        self._render_multicast(intf)
 
-            # mpls ip (J2 549-553)
-            if intf.mpls.ip is True:
-                self._add("mpls ip")
-            elif intf.mpls.ip is False:
-                self._add("no mpls ip")
+        # mpls ip (J2 549-553)
+        if intf.mpls.ip is True:
+            self._add("mpls ip")
+        elif intf.mpls.ip is False:
+            self._add("no mpls ip")
 
-            self._render_ip_nat(intf)
+        self._render_ip_nat(intf)
 
-            # ntp serve (J2 561-567)
-            if intf.ntp_serve is True:
-                self._add("ntp serve")
-            elif intf.ntp_serve is False:
-                self._add("no ntp serve")
+        # ntp serve (J2 561-567)
+        if intf.ntp_serve is True:
+            self._add("ntp serve")
+        elif intf.ntp_serve is False:
+            self._add("no ntp serve")
 
-            self._render_ospf(intf)
-            self._add("service-policy type pbr input {}", intf.service_policy.pbr.input)
-            self._render_pim(intf)
-            self._render_poe(intf)
-            self._render_port_security(intf)
-            self._render_ptp(intf)
-            self._add("service-policy type qos input {}", intf.service_policy.qos.input)
-            self._add("service-profile {}", intf.service_profile)
-            self._render_qos(intf)
-            self._add("shape rate {}", intf.shape.rate)
-            self._render_priority_flow_control(intf)
-            self._render_tx_queues(intf)
-            self._render_uc_tx_queues(intf)
-            self._render_sflow(intf)
-            self._render_isis(intf)
-            self._render_storm_control(intf)
+        self._render_ospf(intf)
+        self._add("service-policy type pbr input {}", intf.service_policy.pbr.input)
+        self._render_pim(intf)
+        self._render_poe(intf)
+        self._render_port_security(intf)
+        self._render_ptp(intf)
+        self._add("service-policy type qos input {}", intf.service_policy.qos.input)
+        self._add("service-profile {}", intf.service_profile)
+        self._render_qos(intf)
+        self._add("shape rate {}", intf.shape.rate)
+        self._render_priority_flow_control(intf)
+        self._render_tx_queues(intf)
+        self._render_uc_tx_queues(intf)
+        self._render_sflow(intf)
+        self._render_isis(intf)
+        self._render_storm_control(intf)
 
-            # logging event storm-control discards (J2 901-905)
-            if intf.logging.event.storm_control_discards is True:
-                self._add("logging event storm-control discards")
-            elif intf.logging.event.storm_control_discards is False:
-                self._add("no logging event storm-control discards")
+        # logging event storm-control discards (J2 901-905)
+        if intf.logging.event.storm_control_discards is True:
+            self._add("logging event storm-control discards")
+        elif intf.logging.event.storm_control_discards is False:
+            self._add("no logging event storm-control discards")
 
-            self._render_spanning_tree(intf)
-            self._render_backup_link(intf)
-            self._render_sync_e(intf)
-            self._render_tap_tool(intf)
-            self._render_traffic_engineering(intf)
-            self._render_link_tracking(intf)
+        self._render_spanning_tree(intf)
+        self._render_backup_link(intf)
+        self._sub(EthernetInterfaceSyncE(intf))
+        self._render_tap_tool(intf)
+        self._render_traffic_engineering(intf)
+        self._render_link_tracking(intf)
 
-            if intf.vmtracer is True:
-                self._add("vmtracer vmware-esx")
+        if intf.vmtracer is True:
+            self._add("vmtracer vmware-esx")
 
-            self._render_vrrp(intf)
-            self._render_transceiver(intf)
-            self._render_dot1x(intf)
+        self._render_vrrp(intf)
+        self._render_transceiver(intf)
+        self._render_dot1x(intf)
 
-            # monitor link-flap profiles (J2 1351-1353)
-            if intf.monitor_link_flap_profiles:
-                profiles = " ".join(natural_sort(intf.monitor_link_flap_profiles, ignore_case=False))
-                self._add(f"monitor link-flap profiles {profiles}")
+        # monitor link-flap profiles (J2 1351-1353)
+        if intf.monitor_link_flap_profiles:
+            profiles = " ".join(natural_sort(intf.monitor_link_flap_profiles, ignore_case=False))
+            self._add(f"monitor link-flap profiles {profiles}")
 
-            # eos_cli (J2 1354-1356)
-            if intf.eos_cli:
-                for line in intf.eos_cli.splitlines():
-                    self._add(line)
-                self._model._lines.append("")
+        # eos_cli (J2 1354-1356)
+        if intf.eos_cli:
+            for line in intf.eos_cli.splitlines():
+                self._add(line)
+            self._output_lines.append("")
 
     # ---------------------------------------------------------------------------
-    # Helper methods in J2 template order
+    # Helper methods (flat — no _block usage) in J2 template order
     # ---------------------------------------------------------------------------
 
-    def _render_error_correction_encoding(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_error_correction_encoding(self, intf: Any) -> None:
         """Render error-correction encoding configuration (J2 67-80)."""
-        ece = intf.error_correction_encoding
-        if ece.enabled is False:
+        error_correction_encoding = intf.error_correction_encoding
+        if error_correction_encoding.enabled is False:
             self._add("no error-correction encoding")
         else:
-            if ece.fire_code is True:
+            if error_correction_encoding.fire_code is True:
                 self._add("error-correction encoding fire-code")
-            elif ece.fire_code is False:
+            elif error_correction_encoding.fire_code is False:
                 self._add("no error-correction encoding fire-code")
-            if ece.reed_solomon is True:
+            if error_correction_encoding.reed_solomon is True:
                 self._add("error-correction encoding reed-solomon")
-            elif ece.reed_solomon is False:
+            elif error_correction_encoding.reed_solomon is False:
                 self._add("no error-correction encoding reed-solomon")
 
-    def _render_switchport(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_switchport(self, intf: Any) -> None:
         """Render switchport configuration (J2 81-129)."""
-        sp = intf.switchport
-        if sp.trunk.private_vlan_secondary is True:
+        switchport = intf.switchport
+        if switchport.trunk.private_vlan_secondary is True:
             self._add("switchport trunk private-vlan secondary")
-        self._add("switchport pvlan mapping {}", sp.pvlan_mapping)
-        self._add("switchport access vlan {}", sp.access_vlan)
-        if sp.trunk.native_vlan_tag is True:
+        self._add("switchport pvlan mapping {}", switchport.pvlan_mapping)
+        self._add("switchport access vlan {}", switchport.access_vlan)
+        if switchport.trunk.native_vlan_tag is True:
             self._add("switchport trunk native vlan tag")
-        elif sp.trunk.native_vlan:
-            self._add("switchport trunk native vlan {}", sp.trunk.native_vlan)
-        self._add("switchport phone vlan {}", sp.phone.vlan)
-        self._add("switchport phone trunk {}", sp.phone.trunk)
-        if sp.vlan_translations.in_required is True:
+        elif switchport.trunk.native_vlan:
+            self._add("switchport trunk native vlan {}", switchport.trunk.native_vlan)
+        self._add("switchport phone vlan {}", switchport.phone.vlan)
+        self._add("switchport phone trunk {}", switchport.phone.trunk)
+        if switchport.vlan_translations.in_required is True:
             self._add("switchport vlan translation in required")
-        if sp.vlan_translations.out_required is True:
+        if switchport.vlan_translations.out_required is True:
             self._add("switchport vlan translation out required")
-        self._add("switchport dot1q vlan tag {}", sp.dot1q.vlan_tag)
-        self._add("switchport trunk allowed vlan {}", sp.trunk.allowed_vlan)
-        self._add("switchport mode {}", sp.mode)
-        self._add("switchport dot1q ethertype {}", sp.dot1q.ethertype)
-        if sp.vlan_forwarding_accept_all is True:
+        self._add("switchport dot1q vlan tag {}", switchport.dot1q.vlan_tag)
+        self._add("switchport trunk allowed vlan {}", switchport.trunk.allowed_vlan)
+        self._add("switchport mode {}", switchport.mode)
+        self._add("switchport dot1q ethertype {}", switchport.dot1q.ethertype)
+        if switchport.vlan_forwarding_accept_all is True:
             self._add("switchport vlan forwarding accept all")
-        for trunk_group in natural_sort(sp.trunk.groups or [], ignore_case=False):
+        for trunk_group in natural_sort(switchport.trunk.groups or [], ignore_case=False):
             self._add(f"switchport trunk group {trunk_group}")
-        if sp.enabled is True:
+        if switchport.enabled is True:
             self._add("switchport")
-        elif sp.enabled is False:
+        elif switchport.enabled is False:
             self._add("no switchport")
 
-    def _render_encapsulation_dot1q(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_encapsulation_dot1q(self, intf: Any) -> None:
         """Render encapsulation dot1q configuration (J2 130-136)."""
         if intf.encapsulation_dot1q.vlan is None:
             return
@@ -280,62 +293,12 @@ class EthernetInterfacesGenerator(CliGenerator):
             cli += f" inner {intf.encapsulation_dot1q.inner_vlan}"
         self._add(cli)
 
-    def _render_encapsulation_vlan(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
-        """Render encapsulation vlan configuration (J2 140-182)."""
-        ev = intf.encapsulation_vlan
-        if ev.client.encapsulation is None or intf.encapsulation_dot1q.vlan:
-            return
-
-        client_encapsulation = ev.client.encapsulation
-        network_flag = False
-        encapsulation_cli: str | None = None
-
-        if client_encapsulation in ("dot1q", "dot1ad"):
-            if ev.client.vlan:
-                encapsulation_cli = f"client {client_encapsulation} {ev.client.vlan}"
-            elif ev.client.outer_vlan and ev.client.inner_vlan:
-                if ev.client.inner_encapsulation:
-                    encapsulation_cli = (
-                        f"client {client_encapsulation} outer {ev.client.outer_vlan} inner {ev.client.inner_encapsulation} {ev.client.inner_vlan}"
-                    )
-                else:
-                    encapsulation_cli = f"client {client_encapsulation} outer {ev.client.outer_vlan} inner {ev.client.inner_vlan}"
-                # Check network encapsulation 'client inner'
-                if (ev.network.encapsulation or None) == "client inner":
-                    network_flag = True
-                    encapsulation_cli += f" network {ev.network.encapsulation}"
-        elif client_encapsulation in ("untagged", "unmatched"):
-            encapsulation_cli = f"client {client_encapsulation}"
-
-        if encapsulation_cli is None:
-            return
-
-        if client_encapsulation in ("dot1q", "dot1ad", "untagged") and ev.network.encapsulation and not network_flag:
-            network_encapsulation = ev.network.encapsulation
-            if network_encapsulation in ("dot1q", "dot1ad"):
-                if ev.network.vlan:
-                    encapsulation_cli += f" network {network_encapsulation} {ev.network.vlan}"
-                elif ev.network.outer_vlan and ev.network.inner_vlan:
-                    if ev.network.inner_encapsulation:
-                        encapsulation_cli += (
-                            f" network {network_encapsulation} outer {ev.network.outer_vlan} inner {ev.network.inner_encapsulation} {ev.network.inner_vlan}"
-                        )
-                    else:
-                        encapsulation_cli += f" network {network_encapsulation} outer {ev.network.outer_vlan} inner {ev.network.inner_vlan}"
-            elif network_encapsulation == "untagged" and client_encapsulation == "untagged":
-                encapsulation_cli += " network untagged"
-            elif network_encapsulation == "client" and client_encapsulation != "untagged":
-                encapsulation_cli += " network client"
-
-        with self._block("encapsulation vlan", exclamation=False):
-            self._add(encapsulation_cli)
-
-    def _render_vlan_translations(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_vlan_translations(self, intf: Any) -> None:
         """Render VLAN translation configuration (J2 186-225)."""
-        sp = intf.switchport
+        switchport = intf.switchport
 
         # direction_both — sorted by 'from' field (J2 186-198)
-        for vt in natural_sort(sp.vlan_translations.direction_both or [], sort_key="field_from"):
+        for vt in natural_sort(switchport.vlan_translations.direction_both or [], sort_key="field_from"):
             cli = f"switchport vlan translation {vt.field_from}"
             if vt.dot1q_tunnel is True:
                 cli += " dot1q-tunnel"
@@ -347,7 +310,7 @@ class EthernetInterfacesGenerator(CliGenerator):
             self._add(cli)
 
         # direction_in (J2 199-210)
-        for vt in sp.vlan_translations.direction_in or []:
+        for vt in switchport.vlan_translations.direction_in or []:
             cli = f"switchport vlan translation in {vt.field_from}"
             if vt.dot1q_tunnel is True:
                 cli += " dot1q-tunnel"
@@ -357,7 +320,7 @@ class EthernetInterfacesGenerator(CliGenerator):
             self._add(cli)
 
         # direction_out (J2 211-225)
-        for vt in sp.vlan_translations.direction_out or []:
+        for vt in switchport.vlan_translations.direction_out or []:
             cli: str | None = None
             if vt.dot1q_tunnel_to:
                 cli = f"switchport vlan translation out {vt.field_from} dot1q-tunnel {vt.dot1q_tunnel_to}"
@@ -368,63 +331,7 @@ class EthernetInterfacesGenerator(CliGenerator):
             if cli:
                 self._add(cli)
 
-    def _render_address_locking(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
-        """Render address locking configuration (J2 232-259)."""
-        al = intf.address_locking
-        if al.address_family.ipv4 is not None or al.address_family.ipv6 is not None or al.ipv4_enforcement_disabled is True:
-            with self._block("address locking"):
-                if al.address_family.ipv4 is True:
-                    self._add("address-family ipv4")
-                if al.address_family.ipv6 is True:
-                    self._add("address-family ipv6")
-                if al.address_family.ipv4 is False:
-                    self._add("address-family ipv4 disabled")
-                if al.address_family.ipv6 is False:
-                    self._add("address-family ipv6 disabled")
-                if al.ipv4_enforcement_disabled is True:
-                    self._add("locked-address ipv4 enforcement disabled")
-        elif al.ipv4 is True or al.ipv6 is True:
-            cli = "address locking"
-            if al.ipv4 is True:
-                cli += " ipv4"
-            if al.ipv6 is True:
-                cli += " ipv6"
-            self._add(cli)
-
-    def _render_evpn_ethernet_segment(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
-        """Render EVPN ethernet-segment configuration (J2 260-301)."""
-        ees = intf.evpn_ethernet_segment
-        if not ees:
-            return
-
-        with self._block("evpn ethernet-segment"):
-            self._add("identifier {}", ees.identifier)
-            self._add("redundancy {}", ees.redundancy)
-
-            dfe = ees.designated_forwarder_election
-            if dfe:
-                if dfe.algorithm == "modulus":
-                    self._add("designated-forwarder election algorithm modulus")
-                elif dfe.algorithm == "preference" and dfe.preference_value:
-                    cli = f"designated-forwarder election algorithm preference {dfe.preference_value}"
-                    if dfe.dont_preempt is True:
-                        cli += " dont-preempt"
-                    self._add(cli)
-                if dfe.hold_time:
-                    cli = f"designated-forwarder election hold-time {dfe.hold_time}"
-                    if dfe.subsequent_hold_time:
-                        cli += f" subsequent-hold-time {dfe.subsequent_hold_time}"
-                    self._add(cli)
-                if dfe.candidate_reachability_required is True:
-                    self._add("designated-forwarder election candidate reachability required")
-                elif dfe.candidate_reachability_required is False:
-                    self._add("no designated-forwarder election candidate reachability required")
-
-            self._add("mpls tunnel flood filter time {}", ees.mpls.tunnel_flood_filter_time)
-            self._add("mpls shared index {}", ees.mpls.shared_index)
-            self._add("route-target import {}", ees.route_target)
-
-    def _render_ip_address(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ip_address(self, intf: Any) -> None:
         """Render IP address configuration (J2 316-321)."""
         if intf.ip_address is None:
             return
@@ -432,7 +339,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         for ip_secondary in natural_sort(intf.ip_address_secondaries or []):
             self._add(f"ip address {ip_secondary} secondary")
 
-    def _render_ipv6_nd_cache(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ipv6_nd_cache(self, intf: Any) -> None:
         """Render IPv6 ND cache configuration (J2 334-344)."""
         cache = intf.ipv6_nd.cache
         self._add("ipv6 nd cache expire {}", cache.expire)
@@ -440,7 +347,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         if cache.refresh_always is True:
             self._add("ipv6 nd cache refresh always")
 
-    def _render_bfd_interface(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_bfd_interface(self, intf: Any) -> None:
         """Render BFD configuration (J2 345-354)."""
         bfd = intf.bfd
         if bfd.interval and bfd.min_rx and bfd.multiplier:
@@ -450,7 +357,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         elif bfd.echo is False:
             self._add("no bfd echo")
 
-    def _render_ip_helpers(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ip_helpers(self, intf: Any) -> None:
         """Render IP helper-address configuration (J2 355-364)."""
         for helper in natural_sort(intf.ip_helpers or [], sort_key="ip_helper"):
             cli = f"ip helper-address {helper.ip_helper}"
@@ -460,7 +367,7 @@ class EthernetInterfacesGenerator(CliGenerator):
                 cli += f" source-interface {helper.source_interface}"
             self._add(cli)
 
-    def _render_ipv6_dhcp_relay(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ipv6_dhcp_relay(self, intf: Any) -> None:
         """Render IPv6 DHCP relay destination configuration (J2 365-383)."""
         destinations = intf.ipv6_dhcp_relay_destinations
         if not destinations:
@@ -485,7 +392,7 @@ class EthernetInterfacesGenerator(CliGenerator):
                 cli += f" link-address {dest.link_address}"
             self._add(cli)
 
-    def _render_ip_igmp_host_proxy(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ip_igmp_host_proxy(self, intf: Any) -> None:
         """Render IP IGMP host-proxy configuration (J2 390-418)."""
         proxy = intf.ip_igmp_host_proxy
         if proxy.enabled is not True:
@@ -511,7 +418,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         if proxy.version:
             self._add(f"{host_proxy_cli} version {proxy.version}")
 
-    def _render_ipv6(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ipv6(self, intf: Any) -> None:
         """Render IPv6 address and ND configuration (J2 419-462)."""
         if intf.ipv6_enable is True:
             self._add("ipv6 enable")
@@ -528,20 +435,20 @@ class EthernetInterfacesGenerator(CliGenerator):
         if intf.ipv6_address_link_local:
             self._add(f"ipv6 address {intf.ipv6_address_link_local} link-local")
 
-        nd = intf.ipv6_nd
-        if nd.ra.rx_accept.default_route is True:
+        ipv6_nd = intf.ipv6_nd
+        if ipv6_nd.ra.rx_accept.default_route is True:
             self._add("ipv6 nd ra rx accept default-route")
-        if nd.ra.rx_accept.route_preference is True:
+        if ipv6_nd.ra.rx_accept.route_preference is True:
             self._add("ipv6 nd ra rx accept route-preference")
-        if nd.ra.disabled is True or intf.ipv6_nd_ra_disabled is True:
+        if ipv6_nd.ra.disabled is True or intf.ipv6_nd_ra_disabled is True:
             self._add("ipv6 nd ra disabled")
-        if nd.managed_config_flag is True or intf.ipv6_nd_managed_config_flag is True:
+        if ipv6_nd.managed_config_flag is True or intf.ipv6_nd_managed_config_flag is True:
             self._add("ipv6 nd managed-config-flag")
-        if nd.other_config_flag is True:
+        if ipv6_nd.other_config_flag is True:
             self._add("ipv6 nd other-config-flag")
 
-        # ipv6 nd prefixes — nd.prefixes with fallback to intf.ipv6_nd_prefixes (J2 449-462)
-        prefixes = nd.prefixes or intf.ipv6_nd_prefixes
+        # ipv6 nd prefixes — ipv6_nd.prefixes with fallback to intf.ipv6_nd_prefixes (J2 449-462)
+        prefixes = ipv6_nd.prefixes or intf.ipv6_nd_prefixes
         for prefix in natural_sort(prefixes or [], sort_key="ipv6_prefix"):
             cli = f"ipv6 nd prefix {prefix.ipv6_prefix}"
             if prefix.valid_lifetime:
@@ -552,31 +459,31 @@ class EthernetInterfacesGenerator(CliGenerator):
                 cli += " no-autoconfig"
             self._add(cli)
 
-    def _render_tcp_mss_ceiling(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_tcp_mss_ceiling(self, intf: Any) -> None:
         """Render TCP MSS ceiling configuration (J2 463-475)."""
-        tmc = intf.tcp_mss_ceiling
-        if tmc.ipv4 is None and tmc.ipv6 is None:
+        tcp_mss_ceiling = intf.tcp_mss_ceiling
+        if tcp_mss_ceiling.ipv4 is None and tcp_mss_ceiling.ipv6 is None:
             return
         cli = "tcp mss ceiling"
-        if tmc.ipv4:
-            cli += f" ipv4 {tmc.ipv4}"
-        if tmc.ipv6:
-            cli += f" ipv6 {tmc.ipv6}"
-        if tmc.direction:
-            cli += f" {tmc.direction}"
+        if tcp_mss_ceiling.ipv4:
+            cli += f" ipv4 {tcp_mss_ceiling.ipv4}"
+        if tcp_mss_ceiling.ipv6:
+            cli += f" ipv6 {tcp_mss_ceiling.ipv6}"
+        if tcp_mss_ceiling.direction:
+            cli += f" {tcp_mss_ceiling.direction}"
         self._add(cli)
 
-    def _render_channel_group(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_channel_group(self, intf: Any) -> None:
         """Render channel-group and LACP configuration (J2 476-487)."""
-        cg = intf.channel_group
-        if cg.id is None or cg.mode is None:
+        channel_group = intf.channel_group
+        if channel_group.id is None or channel_group.mode is None:
             return
-        self._add(f"channel-group {cg.id} mode {cg.mode}")
+        self._add(f"channel-group {channel_group.id} mode {channel_group.mode}")
         self._add("lacp timer {}", intf.lacp_timer.mode)
         self._add("lacp timer multiplier {}", intf.lacp_timer.multiplier)
         self._add("lacp port-priority {}", intf.lacp_port_priority)
 
-    def _render_mpls_ldp(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_mpls_ldp(self, intf: Any) -> None:
         """Render MPLS LDP configuration (J2 506-512)."""
         if intf.mpls.ldp.igp_sync is True:
             self._add("mpls ldp igp sync")
@@ -585,24 +492,24 @@ class EthernetInterfacesGenerator(CliGenerator):
         elif intf.mpls.ldp.interface is False:
             self._add("no mpls ldp interface")
 
-    def _render_multicast(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_multicast(self, intf: Any) -> None:
         """Render multicast boundary and static configuration (J2 531-547)."""
-        mc = intf.multicast
-        if mc is None:
+        multicast = intf.multicast
+        if multicast is None:
             return
-        for boundary in mc.ipv4.boundaries or []:
+        for boundary in multicast.ipv4.boundaries or []:
             cli = f"multicast ipv4 boundary {boundary.boundary}"
             if boundary.out is True:
                 cli += " out"
             self._add(cli)
-        for boundary in mc.ipv6.boundaries or []:
+        for boundary in multicast.ipv6.boundaries or []:
             self._add(f"multicast ipv6 boundary {boundary.boundary} out")
-        if mc.ipv4.static is True:
+        if multicast.ipv4.static is True:
             self._add("multicast ipv4 static")
-        if mc.ipv6.static is True:
+        if multicast.ipv6.static is True:
             self._add("multicast ipv6 static")
 
-    def _render_ip_nat(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ip_nat(self, intf: Any) -> None:
         """Render IP NAT configuration (J2 554-560, interface-ip-nat.j2)."""
         ip_nat = intf.ip_nat
         if ip_nat is None:
@@ -706,7 +613,7 @@ class EthernetInterfacesGenerator(CliGenerator):
 
         self._add("ip nat service-profile {}", ip_nat.service_profile)
 
-    def _render_ospf(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ospf(self, intf: Any) -> None:
         """Render OSPF configuration (J2 568-589)."""
         self._add("ip ospf cost {}", intf.ospf_cost)
         if intf.ospf_network_point_to_point is True:
@@ -717,16 +624,16 @@ class EthernetInterfacesGenerator(CliGenerator):
             self._add("ip ospf authentication message-digest")
         if intf.ospf_authentication_key:
             key_type = intf.ospf_authentication_key_type or "7"
-            key = hide_passwords(intf.ospf_authentication_key, self.data.eos_cli_config_gen_configuration.hide_passwords)
+            key = hide_passwords(intf.ospf_authentication_key, self._data.eos_cli_config_gen_configuration.hide_passwords)
             self._add(f"ip ospf authentication-key {key_type} {key}")
         self._add("ip ospf area {}", intf.ospf_area)
         for key in natural_sort(intf.ospf_message_digest_keys or [], sort_key="id"):
             if key.hash_algorithm and key.key:
                 key_type = key.key_type or "7"
-                masked_key = hide_passwords(key.key, self.data.eos_cli_config_gen_configuration.hide_passwords)
+                masked_key = hide_passwords(key.key, self._data.eos_cli_config_gen_configuration.hide_passwords)
                 self._add(f"ip ospf message-digest-key {key.id} {key.hash_algorithm} {key_type} {masked_key}")
 
-    def _render_pim(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_pim(self, intf: Any) -> None:
         """Render PIM IPv4 configuration (J2 593-616)."""
         pim = intf.pim.ipv4
         if pim.sparse_mode is True:
@@ -742,7 +649,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         if pim.bfd is True:
             self._add("pim ipv4 bfd")
 
-    def _render_poe(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_poe(self, intf: Any) -> None:
         """Render Power over Ethernet configuration (J2 617-652)."""
         poe = intf.poe
         self._add("poe priority {}", poe.priority)
@@ -770,40 +677,41 @@ class EthernetInterfacesGenerator(CliGenerator):
         if poe.legacy_detect is True:
             self._add("poe legacy detect")
 
-    def _render_port_security(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_port_security(self, intf: Any) -> None:
         """Render switchport port-security configuration (J2 653-687)."""
-        ps = intf.switchport.port_security
-        if ps is None:
+        port_security = intf.switchport.port_security
+        if port_security is None:
             return
 
-        if ps.enabled is True or ps.violation.mode == "shutdown":
+        if port_security.enabled is True or port_security.violation.mode == "shutdown":
             self._add("switchport port-security")
-        elif ps.violation.mode == "protect":
-            if ps.violation.protect_log is True:
+        elif port_security.violation.mode == "protect":
+            if port_security.violation.protect_log is True:
                 self._add("switchport port-security violation protect log")
             else:
                 self._add("switchport port-security violation protect")
 
-        if ps.mac_address_maximum.disabled is True:
+        if port_security.mac_address_maximum.disabled is True:
             self._add("switchport port-security mac-address maximum disabled")
-        elif ps.mac_address_maximum.disabled is False:
+        elif port_security.mac_address_maximum.disabled is False:
             self._add("no switchport port-security mac-address maximum disabled")
-        elif ps.mac_address_maximum.limit:
-            self._add(f"switchport port-security mac-address maximum {ps.mac_address_maximum.limit}")
+        elif port_security.mac_address_maximum.limit:
+            self._add(f"switchport port-security mac-address maximum {port_security.mac_address_maximum.limit}")
 
-        if ps.violation.mode != "protect":
-            sorted_vlans_cli: list[str] = []
-            for vlan in ps.vlans or []:
-                for vlan_id in range_expand(vlan.range):
-                    sorted_vlans_cli.append(f"switchport port-security vlan {vlan_id} mac-address maximum {vlan.mac_address_maximum}")
+        if port_security.violation.mode != "protect":
+            sorted_vlans_cli: list[str] = [
+                f"switchport port-security vlan {vlan_id} mac-address maximum {vlan.mac_address_maximum}"
+                for vlan in port_security.vlans or []
+                for vlan_id in range_expand(vlan.range)
+            ]
             for vlan_cli in natural_sort(sorted_vlans_cli):
                 self._add(vlan_cli)
             self._add(
                 "switchport port-security vlan default mac-address maximum {}",
-                ps.vlan_default_mac_address_maximum,
+                port_security.vlan_default_mac_address_maximum,
             )
 
-    def _render_ptp(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_ptp(self, intf: Any) -> None:
         """Render PTP configuration (J2 688-717)."""
         ptp = intf.ptp
         if ptp.enable is True:
@@ -818,7 +726,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         self._add("ptp transport {}", ptp.transport)
         self._add("ptp vlan {}", ptp.vlan)
 
-    def _render_qos(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_qos(self, intf: Any) -> None:
         """Render QoS trust and marking configuration (J2 724-735)."""
         if intf.qos.trust == "disabled":
             self._add("no qos trust")
@@ -827,7 +735,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         self._add("qos cos {}", intf.qos.cos)
         self._add("qos dscp {}", intf.qos.dscp)
 
-    def _render_priority_flow_control(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_priority_flow_control(self, intf: Any) -> None:
         """Render priority flow control configuration (J2 740-751)."""
         if intf.priority_flow_control.enabled is True:
             self._add("priority-flow-control on")
@@ -839,7 +747,7 @@ class EthernetInterfacesGenerator(CliGenerator):
             elif priority_block.no_drop is False:
                 self._add(f"priority-flow-control priority {priority_block.priority} drop")
 
-    def _render_tx_queues(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_tx_queues(self, intf: Any) -> None:
         """
         Render tx-queue configuration (J2 752-754, ethernet-interface-tx-queues.j2).
 
@@ -848,23 +756,9 @@ class EthernetInterfacesGenerator(CliGenerator):
         not part of this schema context and are intentionally omitted.
         """
         for tx_queue in natural_sort(intf.tx_queues or [], sort_key="id"):
-            with self._block(f"tx-queue {tx_queue.id}"):
-                if tx_queue.scheduler_profile_responsive is True:
-                    self._add("scheduler profile responsive")
-                if tx_queue.random_detect:
-                    rd = tx_queue.random_detect
-                    if rd.ecn.threshold:
-                        thresh = rd.ecn.threshold
-                        ecn_cmd = f"random-detect ecn minimum-threshold {thresh.min} {thresh.units} maximum-threshold {thresh.max} {thresh.units}"
-                        if thresh.max_probability:
-                            ecn_cmd += f" max-mark-probability {thresh.max_probability}"
-                        if thresh.weight:
-                            ecn_cmd += f" weight {thresh.weight}"
-                        self._add(ecn_cmd)
-                    if rd.ecn.count is True:
-                        self._add("random-detect ecn count")
+            self._sub(EthernetInterfaceTxQueue(tx_queue))
 
-    def _render_uc_tx_queues(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_uc_tx_queues(self, intf: Any) -> None:
         """
         Render uc-tx-queue configuration (J2 755-757, ethernet-interface-uc-tx-queues.j2).
 
@@ -873,21 +767,9 @@ class EthernetInterfacesGenerator(CliGenerator):
         not part of this schema context and are intentionally omitted.
         """
         for uc_tx_queue in natural_sort(intf.uc_tx_queues or [], sort_key="id"):
-            with self._block(f"uc-tx-queue {uc_tx_queue.id}"):
-                if uc_tx_queue.random_detect:
-                    rd = uc_tx_queue.random_detect
-                    if rd.ecn.threshold:
-                        thresh = rd.ecn.threshold
-                        ecn_cmd = f"random-detect ecn minimum-threshold {thresh.min} {thresh.units} maximum-threshold {thresh.max} {thresh.units}"
-                        if thresh.max_probability:
-                            ecn_cmd += f" max-mark-probability {thresh.max_probability}"
-                        if thresh.weight:
-                            ecn_cmd += f" weight {thresh.weight}"
-                        self._add(ecn_cmd)
-                    if rd.ecn.count is True:
-                        self._add("random-detect ecn count")
+            self._sub(EthernetInterfaceUcTxQueue(uc_tx_queue))
 
-    def _render_sflow(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_sflow(self, intf: Any) -> None:
         """Render sflow configuration (J2 758-774)."""
         sflow = intf.sflow
         if sflow is None:
@@ -905,7 +787,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         elif sflow.egress.unmodified_enable is False:
             self._add("no sflow egress unmodified enable")
 
-    def _render_isis(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_isis(self, intf: Any) -> None:
         """Render IS-IS configuration (J2 775-884)."""
         self._add("isis enable {}", intf.isis_enable)
         if intf.isis_bfd is True:
@@ -929,7 +811,7 @@ class EthernetInterfacesGenerator(CliGenerator):
         self._render_isis_authentication_key_ids(isis_auth)
         self._render_isis_authentication_keys(isis_auth)
 
-    def _render_isis_authentication_mode(self, isis_auth: EosCliConfigGen.EthernetInterfacesItem.IsisAuthentication) -> None:
+    def _render_isis_authentication_mode(self, isis_auth: Any) -> None:
         """Render IS-IS authentication mode lines (J2 799-846)."""
         both = isis_auth.both
         valid_modes = ("md5", "text")
@@ -941,9 +823,7 @@ class EthernetInterfacesGenerator(CliGenerator):
                 return True
             if mode == "sha" and getattr(getattr(mode_obj, "sha", None), "key_id", None) is not None:
                 return True
-            if mode == "shared-secret" and getattr(mode_obj, "shared_secret", None) is not None:
-                return True
-            return False
+            return mode == "shared-secret" and getattr(mode_obj, "shared_secret", None) is not None
 
         def _build_mode_cli(mode_obj: object, prefix: str, suffix: str = "") -> str | None:
             mode = getattr(mode_obj, "mode", None)
@@ -953,8 +833,8 @@ class EthernetInterfacesGenerator(CliGenerator):
             if mode == "sha":
                 cli += f" key-id {mode_obj.sha.key_id}"  # type: ignore[union-attr]
             elif mode == "shared-secret":
-                ss = mode_obj.shared_secret  # type: ignore[union-attr]
-                cli += f" profile {ss.profile} algorithm {ss.algorithm}"
+                shared_secret = mode_obj.shared_secret  # type: ignore[union-attr]
+                cli += f" profile {shared_secret.profile} algorithm {shared_secret.algorithm}"
             if getattr(mode_obj, "rx_disabled", None) is True:
                 cli += " rx-disabled"
             return cli + suffix
@@ -968,7 +848,7 @@ class EthernetInterfacesGenerator(CliGenerator):
             if cli := _build_mode_cli(isis_auth.level_2, "isis authentication mode", " level-2"):
                 self._add(cli)
 
-    def _render_isis_authentication_key_ids(self, isis_auth: EosCliConfigGen.EthernetInterfacesItem.IsisAuthentication) -> None:
+    def _render_isis_authentication_key_ids(self, isis_auth: Any) -> None:
         """Render IS-IS authentication key-id lines (J2 847-873)."""
         both_key_ids: list = []
 
@@ -977,13 +857,13 @@ class EthernetInterfacesGenerator(CliGenerator):
                 key_cli = (
                     f"isis authentication key-id {auth_key.id} algorithm {auth_key.algorithm}"  # type: ignore[union-attr]
                     f" rfc-5310 key {auth_key.key_type} "  # type: ignore[union-attr]
-                    f"{hide_passwords(auth_key.key, self.data.eos_cli_config_gen_configuration.hide_passwords)}"  # type: ignore[union-attr]
+                    f"{hide_passwords(auth_key.key, self._data.eos_cli_config_gen_configuration.hide_passwords)}"  # type: ignore[union-attr]
                 )
             else:
                 key_cli = (
                     f"isis authentication key-id {auth_key.id} algorithm {auth_key.algorithm}"  # type: ignore[union-attr]
                     f" key {auth_key.key_type} "  # type: ignore[union-attr]
-                    f"{hide_passwords(auth_key.key, self.data.eos_cli_config_gen_configuration.hide_passwords)}"  # type: ignore[union-attr]
+                    f"{hide_passwords(auth_key.key, self._data.eos_cli_config_gen_configuration.hide_passwords)}"  # type: ignore[union-attr]
                 )
             self._add(key_cli + suffix)
 
@@ -999,38 +879,38 @@ class EthernetInterfacesGenerator(CliGenerator):
             if auth_key.id not in both_key_ids:
                 _add_key_id(auth_key, " level-2")
 
-    def _render_isis_authentication_keys(self, isis_auth: EosCliConfigGen.EthernetInterfacesItem.IsisAuthentication) -> None:
+    def _render_isis_authentication_keys(self, isis_auth: Any) -> None:
         """Render IS-IS authentication key lines (J2 874-883)."""
         both = isis_auth.both
-        hide_pw = self.data.eos_cli_config_gen_configuration.hide_passwords
+        hide_passwords_enabled = self._data.eos_cli_config_gen_configuration.hide_passwords
         if both.key_type and both.key:
-            self._add(f"isis authentication key {both.key_type} {hide_passwords(both.key, hide_pw)}")
+            self._add(f"isis authentication key {both.key_type} {hide_passwords(both.key, hide_passwords_enabled)}")
         else:
-            lvl1 = isis_auth.level_1
-            if lvl1.key_type and lvl1.key:
-                self._add(f"isis authentication key {lvl1.key_type} {hide_passwords(lvl1.key, hide_pw)} level-1")
-            lvl2 = isis_auth.level_2
-            if lvl2.key_type and lvl2.key:
-                self._add(f"isis authentication key {lvl2.key_type} {hide_passwords(lvl2.key, hide_pw)} level-2")
+            level_1 = isis_auth.level_1
+            if level_1.key_type and level_1.key:
+                self._add(f"isis authentication key {level_1.key_type} {hide_passwords(level_1.key, hide_passwords_enabled)} level-1")
+            level_2 = isis_auth.level_2
+            if level_2.key_type and level_2.key:
+                self._add(f"isis authentication key {level_2.key_type} {hide_passwords(level_2.key, hide_passwords_enabled)} level-2")
 
-    def _render_storm_control(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_storm_control(self, intf: Any) -> None:
         """Render storm-control configuration (J2 885-900)."""
-        sc = intf.storm_control
+        storm_control = intf.storm_control
         for section_name in natural_sort(["broadcast", "multicast", "unknown_unicast"]):
-            section = getattr(sc, section_name)
+            section = getattr(storm_control, section_name)
             if section.level:
                 section_cli = section_name.replace("_", "-")
                 if section.unit == "pps":
                     self._add(f"storm-control {section_cli} level pps {section.level}")
                 else:
                     self._add(f"storm-control {section_cli} level {section.level}")
-        if sc.all.level:
-            if sc.all.unit == "pps":
-                self._add(f"storm-control all level pps {sc.all.level}")
+        if storm_control.all.level:
+            if storm_control.all.unit == "pps":
+                self._add(f"storm-control all level pps {storm_control.all.level}")
             else:
-                self._add(f"storm-control all level {sc.all.level}")
+                self._add(f"storm-control all level {storm_control.all.level}")
 
-    def _render_spanning_tree(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_spanning_tree(self, intf: Any) -> None:
         """Render spanning-tree configuration (J2 906-942)."""
         if intf.spanning_tree_portfast == "edge":
             self._add("spanning-tree portfast")
@@ -1071,53 +951,46 @@ class EthernetInterfacesGenerator(CliGenerator):
         elif intf.logging.event.spanning_tree is False:
             self._add("no logging event spanning-tree")
 
-    def _render_backup_link(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_backup_link(self, intf: Any) -> None:
         """Render switchport backup-link configuration (J2 948-969)."""
-        sp = intf.switchport
-        if sp.backup_link.interface is None:
+        switchport = intf.switchport
+        if switchport.backup_link.interface is None:
             return
-        cli = f"switchport backup-link {sp.backup_link.interface}"
-        if sp.backup_link.prefer_vlan:
-            cli += f" prefer vlan {sp.backup_link.prefer_vlan}"
+        cli = f"switchport backup-link {switchport.backup_link.interface}"
+        if switchport.backup_link.prefer_vlan:
+            cli += f" prefer vlan {switchport.backup_link.prefer_vlan}"
         self._add(cli)
-        self._add("switchport backup preemption-delay {}", sp.backup.preemption_delay)
-        self._add("switchport backup mac-move-burst {}", sp.backup.mac_move_burst)
-        self._add("switchport backup mac-move-burst-interval {}", sp.backup.mac_move_burst_interval)
-        self._add("switchport backup initial-mac-move-delay {}", sp.backup.initial_mac_move_delay)
-        self._add("switchport backup dest-macaddr {}", sp.backup.dest_macaddr)
+        self._add("switchport backup preemption-delay {}", switchport.backup.preemption_delay)
+        self._add("switchport backup mac-move-burst {}", switchport.backup.mac_move_burst)
+        self._add("switchport backup mac-move-burst-interval {}", switchport.backup.mac_move_burst_interval)
+        self._add("switchport backup initial-mac-move-delay {}", switchport.backup.initial_mac_move_delay)
+        self._add("switchport backup dest-macaddr {}", switchport.backup.dest_macaddr)
 
-    def _render_sync_e(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
-        """Render Synchronous Ethernet configuration (J2 970-976)."""
-        if intf.sync_e.enable is not True:
-            return
-        with self._block("sync-e"):
-            self._add("priority {}", intf.sync_e.priority)
-
-    def _render_tap_tool(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_tap_tool(self, intf: Any) -> None:
         """Render switchport tap/tool configuration (J2 977-1086)."""
-        sp = intf.switchport
-        if sp.tap is None and sp.tool is None:
+        switchport = intf.switchport
+        if switchport.tap is None and switchport.tool is None:
             return
 
         # tap settings
-        self._add("switchport tap native vlan {}", sp.tap.native_vlan)
+        self._add("switchport tap native vlan {}", switchport.tap.native_vlan)
 
-        if sp.tap.identity.id:
-            cli = f"switchport tap identity {sp.tap.identity.id}"
-            if sp.tap.identity.inner_vlan:
-                cli += f" inner {sp.tap.identity.inner_vlan}"
+        if switchport.tap.identity.id:
+            cli = f"switchport tap identity {switchport.tap.identity.id}"
+            if switchport.tap.identity.inner_vlan:
+                cli += f" inner {switchport.tap.identity.inner_vlan}"
             self._add(cli)
 
-        if sp.tap.mac_address.destination:
-            cli = f"switchport tap mac-address dest {sp.tap.mac_address.destination}"
-            if sp.tap.mac_address.source:
-                cli += f" src {sp.tap.mac_address.source}"
+        if switchport.tap.mac_address.destination:
+            cli = f"switchport tap mac-address dest {switchport.tap.mac_address.destination}"
+            if switchport.tap.mac_address.source:
+                cli += f" src {switchport.tap.mac_address.source}"
             self._add(cli)
 
-        if sp.tap.encapsulation.vxlan_strip is True and sp.tap.mpls_pop_all is not True:
+        if switchport.tap.encapsulation.vxlan_strip is True and switchport.tap.mpls_pop_all is not True:
             self._add("switchport tap encapsulation vxlan strip")
 
-        for protocol in natural_sort(sp.tap.encapsulation.gre.protocols or [], sort_key="protocol"):
+        for protocol in natural_sort(switchport.tap.encapsulation.gre.protocols or [], sort_key="protocol"):
             if protocol.strip is True:
                 cli = f"switchport tap encapsulation gre protocol {protocol.protocol}"
                 if protocol.feature_header_length:
@@ -1127,10 +1000,10 @@ class EthernetInterfacesGenerator(CliGenerator):
                     cli += " re-encapsulation ethernet"
                 self._add(cli)
 
-        if sp.tap.encapsulation.gre.strip is True:
+        if switchport.tap.encapsulation.gre.strip is True:
             self._add("switchport tap encapsulation gre strip")
 
-        for destination in natural_sort(sp.tap.encapsulation.gre.destinations or [], sort_key="destination"):
+        for destination in natural_sort(switchport.tap.encapsulation.gre.destinations or [], sort_key="destination"):
             tap_enc_cli = f"switchport tap encapsulation gre destination {destination.destination}"
             if destination.source:
                 tap_enc_cli += f" source {destination.source}"
@@ -1146,68 +1019,68 @@ class EthernetInterfacesGenerator(CliGenerator):
             if destination.strip is True:
                 self._add(f"{tap_enc_cli} strip")
 
-        if sp.tap.mpls_pop_all is True:
+        if switchport.tap.mpls_pop_all is True:
             self._add("switchport tap mpls pop all")
 
         # tool settings
-        if sp.tool.mpls_pop_all is True:
+        if switchport.tool.mpls_pop_all is True:
             self._add("switchport tool mpls pop all")
-        if sp.tool.encapsulation.vn_tag_strip is True:
+        if switchport.tool.encapsulation.vn_tag_strip is True:
             self._add("switchport tool encapsulation vn-tag strip")
-        if sp.tool.encapsulation.dot1br_strip is True:
+        if switchport.tool.encapsulation.dot1br_strip is True:
             self._add("switchport tool encapsulation dot1br strip")
 
-        self._add("switchport tap allowed vlan {}", sp.tap.allowed_vlan)
-        self._add("switchport tool allowed vlan {}", sp.tool.allowed_vlan)
+        self._add("switchport tap allowed vlan {}", switchport.tap.allowed_vlan)
+        self._add("switchport tool allowed vlan {}", switchport.tool.allowed_vlan)
 
-        self._add("switchport tool identity {}", sp.tool.identity.tag)
-        if sp.tool.identity.dot1q_dzgre_source:
-            self._add(f"switchport tool identity dot1q source dzgre {sp.tool.identity.dot1q_dzgre_source}")
-        elif sp.tool.identity.qinq_dzgre_source:
-            self._add(f"switchport tool identity qinq source dzgre {sp.tool.identity.qinq_dzgre_source}")
+        self._add("switchport tool identity {}", switchport.tool.identity.tag)
+        if switchport.tool.identity.dot1q_dzgre_source:
+            self._add(f"switchport tool identity dot1q source dzgre {switchport.tool.identity.dot1q_dzgre_source}")
+        elif switchport.tool.identity.qinq_dzgre_source:
+            self._add(f"switchport tool identity qinq source dzgre {switchport.tool.identity.qinq_dzgre_source}")
 
-        if sp.tap.truncation.enabled is True:
+        if switchport.tap.truncation.enabled is True:
             cli = "switchport tap truncation"
-            if sp.tap.truncation.size:
-                cli += f" {sp.tap.truncation.size}"
+            if switchport.tap.truncation.size:
+                cli += f" {switchport.tap.truncation.size}"
             self._add(cli)
 
-        if sp.tap.default.groups:
-            groups = " group ".join(natural_sort(sp.tap.default.groups, ignore_case=False))
+        if switchport.tap.default.groups:
+            groups = " group ".join(natural_sort(switchport.tap.default.groups, ignore_case=False))
             self._add(f"switchport tap default group {groups}")
 
-        if sp.tap.default.nexthop_groups:
-            nxhop_groups = " ".join(natural_sort(sp.tap.default.nexthop_groups, ignore_case=False))
+        if switchport.tap.default.nexthop_groups:
+            nxhop_groups = " ".join(natural_sort(switchport.tap.default.nexthop_groups, ignore_case=False))
             self._add(f"switchport tap default nexthop-group {nxhop_groups}")
 
-        for interface in natural_sort(sp.tap.default.interfaces or []):
+        for interface in natural_sort(switchport.tap.default.interfaces or []):
             self._add(f"switchport tap default interface {interface}")
 
-        if sp.tool.groups:
-            tool_groups = " ".join(natural_sort(sp.tool.groups, ignore_case=False))
+        if switchport.tool.groups:
+            tool_groups = " ".join(natural_sort(switchport.tool.groups, ignore_case=False))
             self._add(f"switchport tool group set {tool_groups}")
 
-        self._add("switchport tool dot1q remove outer {}", sp.tool.dot1q_remove_outer_vlan_tag)
+        self._add("switchport tool dot1q remove outer {}", switchport.tool.dot1q_remove_outer_vlan_tag)
 
-    def _render_traffic_engineering(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_traffic_engineering(self, intf: Any) -> None:
         """Render traffic-engineering configuration (J2 1087-1106)."""
-        te = intf.traffic_engineering
-        if te.enabled is True:
+        traffic_engineering = intf.traffic_engineering
+        if traffic_engineering.enabled is True:
             self._add("traffic-engineering")
-        if te.bandwidth:
-            self._add(f"traffic-engineering bandwidth {te.bandwidth.number} {te.bandwidth.unit}")
-        if te.administrative_groups:
-            self._add(f"traffic-engineering administrative-group {','.join(te.administrative_groups)}")
-        for srlg in natural_sort(te.srlgs or [], ignore_case=False):
+        if traffic_engineering.bandwidth:
+            self._add(f"traffic-engineering bandwidth {traffic_engineering.bandwidth.number} {traffic_engineering.bandwidth.unit}")
+        if traffic_engineering.administrative_groups:
+            self._add(f"traffic-engineering administrative-group {','.join(traffic_engineering.administrative_groups)}")
+        for srlg in natural_sort(traffic_engineering.srlgs or [], ignore_case=False):
             self._add(f"traffic-engineering srlg {srlg}")
-        self._add("traffic-engineering metric {}", te.metric)
-        if te.min_delay_static:
-            self._add(f"traffic-engineering min-delay static {te.min_delay_static.number} {te.min_delay_static.unit}")
-        elif te.min_delay_dynamic.twamp_light_fallback:
-            fallback = te.min_delay_dynamic.twamp_light_fallback
+        self._add("traffic-engineering metric {}", traffic_engineering.metric)
+        if traffic_engineering.min_delay_static:
+            self._add(f"traffic-engineering min-delay static {traffic_engineering.min_delay_static.number} {traffic_engineering.min_delay_static.unit}")
+        elif traffic_engineering.min_delay_dynamic.twamp_light_fallback:
+            fallback = traffic_engineering.min_delay_dynamic.twamp_light_fallback
             self._add(f"traffic-engineering min-delay dynamic twamp-light fallback {fallback.number} {fallback.unit}")
 
-    def _render_link_tracking(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_link_tracking(self, intf: Any) -> None:
         """Render link tracking group configuration (J2 1107-1114)."""
         for group in intf.link_tracking_groups or []:
             self._add(f"link tracking group {group.name} {group.direction}")
@@ -1215,81 +1088,81 @@ class EthernetInterfacesGenerator(CliGenerator):
             for group_name in intf.link_tracking.groups:
                 self._add(f"link tracking group {group_name} {intf.link_tracking.direction}")
 
-    def _render_vrrp(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_vrrp(self, intf: Any) -> None:
         """Render VRRP configuration (J2 1118-1178)."""
-        hide_pw = self.data.eos_cli_config_gen_configuration.hide_passwords
+        hide_passwords_enabled = self._data.eos_cli_config_gen_configuration.hide_passwords
         for vrid in natural_sort(intf.vrrp_ids or [], sort_key="id"):
-            vid = vrid.id
-            self._add("vrrp {} priority-level {}", vid, vrid.priority_level)
-            self._add("vrrp {} advertisement interval {}", vid, vrid.advertisement.interval)
+            vrrp_id = vrid.id
+            self._add("vrrp {} priority-level {}", vrrp_id, vrid.priority_level)
+            self._add("vrrp {} advertisement interval {}", vrrp_id, vrid.advertisement.interval)
 
             if vrid.preempt.enabled is True and (vrid.preempt.delay.minimum or vrid.preempt.delay.reload):
-                delay_cli = f"vrrp {vid} preempt delay"
+                delay_cli = f"vrrp {vrrp_id} preempt delay"
                 if vrid.preempt.delay.minimum:
                     delay_cli += f" minimum {vrid.preempt.delay.minimum}"
                 if vrid.preempt.delay.reload:
                     delay_cli += f" reload {vrid.preempt.delay.reload}"
                 self._add(delay_cli)
             elif vrid.preempt.enabled is False:
-                self._add(f"no vrrp {vid} preempt")
+                self._add(f"no vrrp {vrrp_id} preempt")
 
-            self._add("vrrp {} timers delay reload {}", vid, vrid.timers.delay.reload)
+            self._add("vrrp {} timers delay reload {}", vrrp_id, vrid.timers.delay.reload)
 
             if vrid.peer_authentication:
-                pa = vrid.peer_authentication
-                peer_auth_cli = f"vrrp {vid} peer authentication"
-                if pa.mode == "ietf-md5":
+                peer_authentication = vrid.peer_authentication
+                peer_auth_cli = f"vrrp {vrrp_id} peer authentication"
+                if peer_authentication.mode == "ietf-md5":
                     peer_auth_cli += " ietf-md5 key-string"
                 else:
                     peer_auth_cli += " text"
-                if pa.key_type:
-                    peer_auth_cli += f" {pa.key_type}"
-                peer_auth_cli += f" {hide_passwords(pa.key, hide_pw)}"
+                if peer_authentication.key_type:
+                    peer_auth_cli += f" {peer_authentication.key_type}"
+                peer_auth_cli += f" {hide_passwords(peer_authentication.key, hide_passwords_enabled)}"
                 self._add(peer_auth_cli)
 
-            self._add("vrrp {} ipv4 {}", vid, vrid.ipv4.address)
+            self._add("vrrp {} ipv4 {}", vrrp_id, vrid.ipv4.address)
             for secondary_ip in natural_sort(vrid.ipv4.secondary_addresses or []):
-                self._add(f"vrrp {vid} ipv4 {secondary_ip} secondary")
-            self._add("vrrp {} ipv4 version {}", vid, vrid.ipv4.version)
+                self._add(f"vrrp {vrrp_id} ipv4 {secondary_ip} secondary")
+            self._add("vrrp {} ipv4 version {}", vrrp_id, vrid.ipv4.version)
 
             for ipv6_address in natural_sort(vrid.ipv6.addresses or []):
-                self._add(f"vrrp {vid} ipv6 {ipv6_address}")
+                self._add(f"vrrp {vrrp_id} ipv6 {ipv6_address}")
 
             for tracked_obj in natural_sort(vrid.tracked_object or [], sort_key="name", ignore_case=False):
                 if tracked_obj.name:
-                    tracked_cli = f"vrrp {vid} tracked-object {tracked_obj.name}"
+                    tracked_cli = f"vrrp {vrrp_id} tracked-object {tracked_obj.name}"
                     if tracked_obj.decrement:
                         tracked_cli += f" decrement {tracked_obj.decrement}"
                     elif tracked_obj.shutdown is True:
                         tracked_cli += " shutdown"
                     self._add(tracked_cli)
 
-    def _render_transceiver(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_transceiver(self, intf: Any) -> None:
         """Render transceiver configuration (J2 1179-1207)."""
-        tr = intf.transceiver
-        self._add("transceiver media override {}", tr.media.override)
-        if tr.power.ignore is True:
+        transceiver = intf.transceiver
+        self._add("transceiver media override {}", transceiver.media.override)
+        if transceiver.power.ignore is True:
             self._add("transceiver power ignore")
-        self._add("transceiver application override {}", tr.application_override)
+        self._add("transceiver application override {}", transceiver.application_override)
 
-        for app_override in tr.application_override_lanes or []:
+        for app_override in transceiver.application_override_lanes or []:
             cli = f"transceiver application override {app_override.override} lanes start {app_override.first_lane}"
             if app_override.last_lane:
                 cli += f" end {app_override.last_lane}"
             self._add(cli)
 
-        if tr.frequency:
-            cli = f"transceiver frequency {float(tr.frequency):.3f}"
-            if tr.frequency_unit:
-                cli += f" {tr.frequency_unit}"
+        if transceiver.frequency:
+            cli = f"transceiver frequency {float(transceiver.frequency):.3f}"
+            if transceiver.frequency_unit:
+                cli += f" {transceiver.frequency_unit}"
             self._add(cli)
 
-        if tr.transmitter.signal_power:
-            self._add(f"transceiver transmitter signal-power {float(tr.transmitter.signal_power):.2f}")
-        if tr.transmitter.disabled is True:
+        if transceiver.transmitter.signal_power:
+            self._add(f"transceiver transmitter signal-power {float(transceiver.transmitter.signal_power):.2f}")
+        if transceiver.transmitter.disabled is True:
             self._add("transceiver transmitter disabled")
 
-    def _render_dot1x(self, intf: EosCliConfigGen.EthernetInterfacesItem) -> None:
+    def _render_dot1x(self, intf: Any) -> None:
         """Render 802.1x configuration (J2 1208-1350)."""
         dot1x = intf.dot1x
         if dot1x is None:
@@ -1371,7 +1244,7 @@ class EthernetInterfacesGenerator(CliGenerator):
                 mba_cli += f" timeout {dot1x.eapol.authentication_failure_fallback_mba.timeout}"
             self._add(mba_cli)
 
-    def _render_dot1x_aaa_unresponsive(self, dot1x: EosCliConfigGen.EthernetInterfacesItem.Dot1x) -> None:
+    def _render_dot1x_aaa_unresponsive(self, dot1x: Any) -> None:
         """
         Render dot1x aaa unresponsive action and phone-action lines (J2 1222-1274).
 
@@ -1424,3 +1297,195 @@ class EthernetInterfacesGenerator(CliGenerator):
 
         if unresponsive.eap_response:
             self._add(f"{aaa_config} eap response {unresponsive.eap_response}")
+
+
+class EthernetInterfaceEncapsulationVlan(CliSection):
+    """Render encapsulation vlan sub-block (J2 140-182). No separator (exclamation=False)."""
+
+    separator = False
+
+    def __init__(self, intf: Any) -> None:
+        self._intf = intf
+
+    def _generate(self) -> None:
+        intf = self._intf
+        encapsulation_vlan = intf.encapsulation_vlan
+        if encapsulation_vlan.client.encapsulation is None or intf.encapsulation_dot1q.vlan:
+            return
+
+        client_encapsulation = encapsulation_vlan.client.encapsulation
+        network_flag = False
+        encapsulation_cli: str | None = None
+
+        if client_encapsulation in ("dot1q", "dot1ad"):
+            if encapsulation_vlan.client.vlan:
+                encapsulation_cli = f"client {client_encapsulation} {encapsulation_vlan.client.vlan}"
+            elif encapsulation_vlan.client.outer_vlan and encapsulation_vlan.client.inner_vlan:
+                if encapsulation_vlan.client.inner_encapsulation:
+                    encapsulation_cli = (
+                        f"client {client_encapsulation} outer {encapsulation_vlan.client.outer_vlan} inner {encapsulation_vlan.client.inner_encapsulation} {encapsulation_vlan.client.inner_vlan}"
+                    )
+                else:
+                    encapsulation_cli = f"client {client_encapsulation} outer {encapsulation_vlan.client.outer_vlan} inner {encapsulation_vlan.client.inner_vlan}"
+                # Check network encapsulation 'client inner'
+                if (encapsulation_vlan.network.encapsulation or None) == "client inner":
+                    network_flag = True
+                    encapsulation_cli += f" network {encapsulation_vlan.network.encapsulation}"
+        elif client_encapsulation in ("untagged", "unmatched"):
+            encapsulation_cli = f"client {client_encapsulation}"
+
+        if encapsulation_cli is None:
+            return
+
+        if client_encapsulation in ("dot1q", "dot1ad", "untagged") and encapsulation_vlan.network.encapsulation and not network_flag:
+            network_encapsulation = encapsulation_vlan.network.encapsulation
+            if network_encapsulation in ("dot1q", "dot1ad"):
+                if encapsulation_vlan.network.vlan:
+                    encapsulation_cli += f" network {network_encapsulation} {encapsulation_vlan.network.vlan}"
+                elif encapsulation_vlan.network.outer_vlan and encapsulation_vlan.network.inner_vlan:
+                    if encapsulation_vlan.network.inner_encapsulation:
+                        encapsulation_cli += (
+                            f" network {network_encapsulation} outer {encapsulation_vlan.network.outer_vlan} inner {encapsulation_vlan.network.inner_encapsulation} {encapsulation_vlan.network.inner_vlan}"
+                        )
+                    else:
+                        encapsulation_cli += f" network {network_encapsulation} outer {encapsulation_vlan.network.outer_vlan} inner {encapsulation_vlan.network.inner_vlan}"
+            elif network_encapsulation == "untagged" and client_encapsulation == "untagged":
+                encapsulation_cli += " network untagged"
+            elif network_encapsulation == "client" and client_encapsulation != "untagged":
+                encapsulation_cli += " network client"
+
+        self._header("encapsulation vlan")
+        self._add(encapsulation_cli)
+
+
+class EthernetInterfaceAddressLocking(CliSection):
+    """Render address locking sub-block (J2 232-259)."""
+
+    separator = False
+
+    def __init__(self, intf: Any) -> None:
+        self._intf = intf
+
+    def _generate(self) -> None:
+        address_locking = self._intf.address_locking
+        if address_locking.address_family.ipv4 is not None or address_locking.address_family.ipv6 is not None or address_locking.ipv4_enforcement_disabled is True:
+            self._header("!")
+            self._header("address locking")
+            if address_locking.address_family.ipv4 is True:
+                self._add("address-family ipv4")
+            if address_locking.address_family.ipv6 is True:
+                self._add("address-family ipv6")
+            if address_locking.address_family.ipv4 is False:
+                self._add("address-family ipv4 disabled")
+            if address_locking.address_family.ipv6 is False:
+                self._add("address-family ipv6 disabled")
+            if address_locking.ipv4_enforcement_disabled is True:
+                self._add("locked-address ipv4 enforcement disabled")
+        elif address_locking.ipv4 is True or address_locking.ipv6 is True:
+            cli = "address locking"
+            if address_locking.ipv4 is True:
+                cli += " ipv4"
+            if address_locking.ipv6 is True:
+                cli += " ipv6"
+            self._header(cli)
+
+
+class EthernetInterfaceEvpnEthernetSegment(CliSection):
+    """Render EVPN ethernet-segment sub-block (J2 260-301). separator=True."""
+
+    def __init__(self, intf: Any) -> None:
+        self._intf = intf
+
+    def _generate(self) -> None:
+        evpn_ethernet_segment = self._intf.evpn_ethernet_segment
+        if not evpn_ethernet_segment:
+            return
+
+        self._header("evpn ethernet-segment")
+        self._add("identifier {}", evpn_ethernet_segment.identifier)
+        self._add("redundancy {}", evpn_ethernet_segment.redundancy)
+
+        designated_forwarder_election = evpn_ethernet_segment.designated_forwarder_election
+        if designated_forwarder_election:
+            if designated_forwarder_election.algorithm == "modulus":
+                self._add("designated-forwarder election algorithm modulus")
+            elif designated_forwarder_election.algorithm == "preference" and designated_forwarder_election.preference_value:
+                cli = f"designated-forwarder election algorithm preference {designated_forwarder_election.preference_value}"
+                if designated_forwarder_election.dont_preempt is True:
+                    cli += " dont-preempt"
+                self._add(cli)
+            if designated_forwarder_election.hold_time:
+                cli = f"designated-forwarder election hold-time {designated_forwarder_election.hold_time}"
+                if designated_forwarder_election.subsequent_hold_time:
+                    cli += f" subsequent-hold-time {designated_forwarder_election.subsequent_hold_time}"
+                self._add(cli)
+            if designated_forwarder_election.candidate_reachability_required is True:
+                self._add("designated-forwarder election candidate reachability required")
+            elif designated_forwarder_election.candidate_reachability_required is False:
+                self._add("no designated-forwarder election candidate reachability required")
+
+        self._add("mpls tunnel flood filter time {}", evpn_ethernet_segment.mpls.tunnel_flood_filter_time)
+        self._add("mpls shared index {}", evpn_ethernet_segment.mpls.shared_index)
+        self._add("route-target import {}", evpn_ethernet_segment.route_target)
+
+
+class EthernetInterfaceTxQueue(CliSection):
+    """Render a single tx-queue sub-block (J2 752-754). separator=True."""
+
+    def __init__(self, tx_queue: Any) -> None:
+        self._tx_queue = tx_queue
+
+    def _generate(self) -> None:
+        tx_queue = self._tx_queue
+        self._header(f"tx-queue {tx_queue.id}")
+        if tx_queue.scheduler_profile_responsive is True:
+            self._add("scheduler profile responsive")
+        if tx_queue.random_detect:
+            random_detect = tx_queue.random_detect
+            if random_detect.ecn.threshold:
+                thresh = random_detect.ecn.threshold
+                ecn_cmd = f"random-detect ecn minimum-threshold {thresh.min} {thresh.units} maximum-threshold {thresh.max} {thresh.units}"
+                if thresh.max_probability:
+                    ecn_cmd += f" max-mark-probability {thresh.max_probability}"
+                if thresh.weight:
+                    ecn_cmd += f" weight {thresh.weight}"
+                self._add(ecn_cmd)
+            if random_detect.ecn.count is True:
+                self._add("random-detect ecn count")
+
+
+class EthernetInterfaceUcTxQueue(CliSection):
+    """Render a single uc-tx-queue sub-block (J2 755-757). separator=True."""
+
+    def __init__(self, uc_tx_queue: Any) -> None:
+        self._uc_tx_queue = uc_tx_queue
+
+    def _generate(self) -> None:
+        uc_tx_queue = self._uc_tx_queue
+        self._header(f"uc-tx-queue {uc_tx_queue.id}")
+        if uc_tx_queue.random_detect:
+            random_detect = uc_tx_queue.random_detect
+            if random_detect.ecn.threshold:
+                thresh = random_detect.ecn.threshold
+                ecn_cmd = f"random-detect ecn minimum-threshold {thresh.min} {thresh.units} maximum-threshold {thresh.max} {thresh.units}"
+                if thresh.max_probability:
+                    ecn_cmd += f" max-mark-probability {thresh.max_probability}"
+                if thresh.weight:
+                    ecn_cmd += f" weight {thresh.weight}"
+                self._add(ecn_cmd)
+            if random_detect.ecn.count is True:
+                self._add("random-detect ecn count")
+
+
+class EthernetInterfaceSyncE(CliSection):
+    """Render sync-e sub-block (J2 970-976). separator=True."""
+
+    def __init__(self, intf: Any) -> None:
+        self._intf = intf
+
+    def _generate(self) -> None:
+        intf = self._intf
+        if intf.sync_e.enable is not True:
+            return
+        self._header("sync-e")
+        self._add("priority {}", intf.sync_e.priority)

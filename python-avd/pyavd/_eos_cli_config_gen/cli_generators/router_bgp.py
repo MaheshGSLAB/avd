@@ -11,7 +11,7 @@ from pyavd._utils import Undefined
 from pyavd._utils.get import get_v2
 from pyavd.j2filters import hide_passwords, natural_sort
 
-from .base import CliGenerator, CliModel, cli_config_contributor
+from .base import CliGenerator, CliModel, CliSection, cli_config_contributor
 
 if TYPE_CHECKING:
     from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
@@ -21,8 +21,7 @@ class RouterBgpGenerator(CliGenerator):
     """
     Generator for router BGP CLI configuration.
 
-    Single contributor method `router_bgp` orchestrates section helpers in EOS
-    output order. Each helper maps to one recognisable block in the CLI output.
+    Single contributor method `router_bgp` delegates entirely to RouterBgpBlock.
     """
 
     @property
@@ -33,43 +32,72 @@ class RouterBgpGenerator(CliGenerator):
     @cli_config_contributor
     def router_bgp(self) -> None:
         """Render the full 'router bgp' block in EOS output order."""
-        bgp = self.data.router_bgp
-        # `as` is a Python reserved word.
-        if (bgp_as := get_v2(bgp, "as")) is None:
+        self._model.extend(RouterBgpBlock(self.data.router_bgp, self.data).render(indent=0))
+
+
+class RouterBgpBlock(CliSection):
+    """Renders the full 'router bgp X' block."""
+
+    def __init__(self, bgp: Any, data: Any) -> None:
+        self.bgp = bgp
+        self.data = data
+
+    def _generate(self) -> None:
+        bgp = self.bgp
+        bgp_as = get_v2(bgp, "as")
+        if bgp_as is None:
             return
+        self._header(f"router bgp {bgp_as}")
+        self._render_global_settings(bgp)
+        self._render_peer_groups(bgp)
+        self._render_neighbors(bgp)
+        self._render_redistribute_internal(bgp)
+        self._render_aggregate_addresses(bgp)
+        self._render_redistribute(bgp)
+        self._render_neighbor_interfaces(bgp)
 
-        with self._block(f"router bgp {bgp_as}"):
-            self._render_global_settings(bgp)
-            self._render_peer_groups(bgp)
-            self._render_neighbors(bgp)
-            self._render_redistribute_internal(bgp)
-            self._render_aggregate_addresses(bgp)
-            self._render_redistribute(bgp)
-            self._render_neighbor_interfaces(bgp)
-            self._render_vlans(bgp)
-            self._render_vpws(bgp)
-            self._render_vlan_aware_bundles(bgp)
-            self._render_route_distinguisher(bgp)
-            self._render_address_family_evpn(bgp)
-            self._render_address_family_flow_spec_ipv4(bgp)
-            self._render_address_family_flow_spec_ipv6(bgp)
-            self._render_address_family_ipv4(bgp)
-            self._render_address_family_ipv4_labeled_unicast(bgp)
-            self._render_address_family_ipv4_multicast(bgp)
-            self._render_address_family_ipv4_sr_te(bgp)
-            self._render_address_family_ipv6(bgp)
-            self._render_address_family_ipv6_multicast(bgp)
-            self._render_address_family_ipv6_sr_te(bgp)
-            self._render_address_family_link_state(bgp)
-            self._render_address_family_path_selection(bgp)
-            self._render_address_family_rtc(bgp)
-            self._render_address_family_vpn_ipv4(bgp)
-            self._render_address_family_vpn_ipv6(bgp)
-            self._render_vrfs(bgp)
-            self._render_session_trackers(bgp)
-            self._render_bgp_eos_cli(bgp)
+        for vlan in natural_sort(bgp.vlans or [], sort_key="id"):
+            self._sub(RouterBgpVlan(vlan))
 
-    def _render_global_settings(self, bgp: EosCliConfigGen.RouterBgp) -> None:
+        for svc in natural_sort(bgp.vpws or [], sort_key="name"):
+            self._sub(RouterBgpVpwsService(svc))
+
+        for bundle in natural_sort(bgp.vlan_aware_bundles or [], sort_key="name"):
+            self._sub(RouterBgpVlanAwareBundle(bundle))
+
+        self._sub(RouterBgpRouteDistinguisher(bgp))
+        self._sub(RouterBgpAddressFamilyEvpn(bgp))
+        self._sub(RouterBgpAddressFamilyFlowSpec(bgp.address_family_flow_spec_ipv4, "ipv4"))
+        self._sub(RouterBgpAddressFamilyFlowSpec(bgp.address_family_flow_spec_ipv6, "ipv6"))
+        self._sub(RouterBgpAddressFamilyIpv4(bgp))
+        self._sub(RouterBgpAddressFamilyIpv4LabeledUnicast(bgp))
+        self._sub(RouterBgpAddressFamilyIpv4Multicast(bgp))
+        self._sub(RouterBgpAddressFamilyIpv4SrTe(bgp))
+        self._sub(RouterBgpAddressFamilyIpv6(bgp))
+        self._sub(RouterBgpAddressFamilyIpv6Multicast(bgp))
+        self._sub(RouterBgpAddressFamilyIpv6SrTe(bgp))
+        self._sub(RouterBgpAddressFamilyLinkState(bgp))
+        self._sub(RouterBgpAddressFamilyPathSelection(bgp))
+        self._sub(RouterBgpAddressFamilyRtc(bgp))
+        self._sub(RouterBgpAddressFamilyVpnIpv4(bgp))
+        self._sub(RouterBgpAddressFamilyVpnIpv6(bgp))
+
+        for vrf in natural_sort(bgp.vrfs or [], sort_key="name"):
+            self._sub(RouterBgpVrf(vrf, self.data))
+
+        for tracker in natural_sort(bgp.session_trackers or [], sort_key="name"):
+            self._sub(RouterBgpSessionTracker(tracker))
+
+        self._render_bgp_eos_cli(bgp)
+
+    def _render_bgp_eos_cli(self, bgp: Any) -> None:
+        if bgp.eos_cli is None:
+            return
+        self._add("!")
+        for line in bgp.eos_cli.splitlines():
+            self._add(line)
+
+    def _render_global_settings(self, bgp: Any) -> None:
         """
         Render global BGP settings in EOS output order (J2 lines 10-134).
 
@@ -175,59 +203,59 @@ class RouterBgpGenerator(CliGenerator):
         - 'no neighbor X route-reflector-client' is valid
         - shared-secret is rendered before password key (J2 ordering)
         """
-        ip = neighbor.ip_address
+        neighbor_ip_address = neighbor.ip_address
 
-        self._add("neighbor {} peer group {}", ip, neighbor.peer_group)
-        self._add("neighbor {} remote-as {}", ip, neighbor.remote_as)
+        self._add("neighbor {} peer group {}", neighbor_ip_address, neighbor.peer_group)
+        self._add("neighbor {} remote-as {}", neighbor_ip_address, neighbor.remote_as)
         if neighbor.shutdown is True:
-            self._add(f"neighbor {ip} shutdown")
+            self._add(f"neighbor {neighbor_ip_address} shutdown")
 
-        self._render_next_hop(ip, neighbor.next_hop_self, neighbor.next_hop_peer)
-        self._render_remove_private_as(ip, neighbor.remove_private_as)
-        self._render_as_path(ip, neighbor.as_path)
+        self._render_next_hop(neighbor_ip_address, neighbor.next_hop_self, neighbor.next_hop_peer)
+        self._render_remove_private_as(neighbor_ip_address, neighbor.remove_private_as)
+        self._render_as_path(neighbor_ip_address, neighbor.as_path)
 
-        self._add("neighbor {} local-as {} no-prepend replace-as", ip, neighbor.local_as)
-        self._add("neighbor {} weight {}", ip, neighbor.weight)
+        self._add("neighbor {} local-as {} no-prepend replace-as", neighbor_ip_address, neighbor.local_as)
+        self._add("neighbor {} weight {}", neighbor_ip_address, neighbor.weight)
         if neighbor.passive is True:
-            self._add(f"neighbor {ip} passive")
-        self._add("neighbor {} update-source {}", ip, neighbor.update_source)
+            self._add(f"neighbor {neighbor_ip_address} passive")
+        self._add("neighbor {} update-source {}", neighbor_ip_address, neighbor.update_source)
 
         # Neighbors can disable bfd inherited from a peer-group; peer-groups cannot.
-        self._render_bfd(ip, neighbor.bfd, neighbor.bfd_timers, allow_negation=neighbor.peer_group is not None)
+        self._render_bfd(neighbor_ip_address, neighbor.bfd, neighbor.bfd_timers, allow_negation=neighbor.peer_group is not None)
 
-        self._add("neighbor {} description {}", ip, neighbor.description)
+        self._add("neighbor {} description {}", neighbor_ip_address, neighbor.description)
 
-        self._render_allowas_in(ip, neighbor.allowas_in)
-        self._render_rib_in_pre_policy_retain(ip, neighbor.rib_in_pre_policy_retain)
+        self._render_allowas_in(neighbor_ip_address, neighbor.allowas_in)
+        self._render_rib_in_pre_policy_retain(neighbor_ip_address, neighbor.rib_in_pre_policy_retain)
 
-        self._add("neighbor {} ebgp-multihop {}", ip, neighbor.ebgp_multihop)
-        self._add("neighbor {} ttl maximum-hops {}", ip, neighbor.ttl_maximum_hops)
+        self._add("neighbor {} ebgp-multihop {}", neighbor_ip_address, neighbor.ebgp_multihop)
+        self._add("neighbor {} ttl maximum-hops {}", neighbor_ip_address, neighbor.ttl_maximum_hops)
 
         # Neighbors support negation for route-reflector-client; peer-groups do not.
         if neighbor.route_reflector_client is True:
-            self._add(f"neighbor {ip} route-reflector-client")
+            self._add(f"neighbor {neighbor_ip_address} route-reflector-client")
         elif neighbor.route_reflector_client is False:
-            self._add(f"no neighbor {ip} route-reflector-client")
+            self._add(f"no neighbor {neighbor_ip_address} route-reflector-client")
 
-        self._add("neighbor {} session tracker {}", ip, neighbor.session_tracker)
-        self._add("neighbor {} timers {}", ip, neighbor.timers)
+        self._add("neighbor {} session tracker {}", neighbor_ip_address, neighbor.session_tracker)
+        self._add("neighbor {} timers {}", neighbor_ip_address, neighbor.timers)
 
-        self._render_route_maps(ip, neighbor.route_map_in, neighbor.route_map_out)
+        self._render_route_maps(neighbor_ip_address, neighbor.route_map_in, neighbor.route_map_out)
 
         # shared-secret before password key for neighbors (J2 ordering)
-        self._render_shared_secret(ip, neighbor.shared_secret)
-        self._render_password_key(ip, neighbor.password, neighbor.password_type)
+        self._render_shared_secret(neighbor_ip_address, neighbor.shared_secret)
+        self._render_password_key(neighbor_ip_address, neighbor.password, neighbor.password_type)
 
-        self._render_default_originate(ip, neighbor.default_originate)
-        self._render_send_community(ip, neighbor.send_community)
-        self._render_maximum_routes(ip, neighbor.maximum_routes, neighbor.maximum_routes_warning_limit, neighbor.maximum_routes_warning_only)
+        self._render_default_originate(neighbor_ip_address, neighbor.default_originate)
+        self._render_send_community(neighbor_ip_address, neighbor.send_community)
+        self._render_maximum_routes(neighbor_ip_address, neighbor.maximum_routes, neighbor.maximum_routes_warning_limit, neighbor.maximum_routes_warning_only)
 
         if neighbor.missing_policy is not None:
-            self._render_missing_policy(ip, neighbor.missing_policy)
+            self._render_missing_policy(neighbor_ip_address, neighbor.missing_policy)
 
-        self._render_peer_tags(ip, neighbor.peer_tag_in, neighbor.peer_tag_out_discard)
-        self._render_link_bandwidth(ip, neighbor.link_bandwidth)
-        self._render_remove_private_as_ingress(ip, neighbor.remove_private_as_ingress)
+        self._render_peer_tags(neighbor_ip_address, neighbor.peer_tag_in, neighbor.peer_tag_out_discard)
+        self._render_link_bandwidth(neighbor_ip_address, neighbor.link_bandwidth)
+        self._render_remove_private_as_ingress(neighbor_ip_address, neighbor.remove_private_as_ingress)
 
     def _render_redistribute_internal(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'bgp redistribute-internal' or its negation (J2 lines 484-488)."""
@@ -396,232 +424,20 @@ class RouterBgpGenerator(CliGenerator):
             elif ni.peer_group is not None and ni.peer_filter is not None:
                 self._add(f"neighbor interface {ni.name} peer-group {ni.peer_group} peer-filter {ni.peer_filter}")
 
-    def _render_vlans(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render VLAN-based L2VPN entries sorted by id (J2 lines 681-721)."""
-        for vlan in natural_sort(bgp.vlans or [], sort_key="id"):
-            with self._block(f"vlan {vlan.id}"):
-                self._add("rd {}", vlan.rd)
-                self._add("rd evpn domain {} {}", vlan.rd_evpn_domain.domain, vlan.rd_evpn_domain.rd)
-                for rt in natural_sort(vlan.route_targets.both or []):
-                    self._add(f"route-target both {rt}")
-                for rt in natural_sort(vlan.route_targets.field_import or []):
-                    self._add(f"route-target import {rt}")
-                for rt in natural_sort(vlan.route_targets.export or []):
-                    self._add(f"route-target export {rt}")
-                for rt in natural_sort(vlan.route_targets.import_evpn_domains or [], sort_key="domain"):
-                    self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
-                for rt in natural_sort(vlan.route_targets.export_evpn_domains or [], sort_key="domain"):
-                    self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
-                for rt in natural_sort(vlan.route_targets.import_export_evpn_domains or [], sort_key="domain"):
-                    self._add(f"route-target import export evpn domain {rt.domain} {rt.route_target}")
-                for r in natural_sort(vlan.redistribute_routes or []):
-                    self._add(f"redistribute {r}")
-                for r in natural_sort(vlan.no_redistribute_routes or []):
-                    self._add(f"no redistribute {r}")
-                if vlan.eos_cli is not None:
-                    self._add(self._EXCLAMATION)
-                    for line in vlan.eos_cli.splitlines():
-                        self._add(line)
-                    if vlan.eos_cli.endswith("\n"):
-                        self._model._lines.append("")
-
-    def _render_vpws(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render VPWS BGP service entries sorted by name (J2 lines 722-752)."""
-        for svc in natural_sort(bgp.vpws or [], sort_key="name"):
-            if svc.name is None:
-                continue
-            with self._block(f"vpws {svc.name}"):
-                self._add("rd {}", svc.rd)
-                self._add("route-target import export evpn {}", svc.route_targets.import_export)
-                self._add("mpls control-word", svc.mpls_control_word)
-                self._add("label flow", svc.label_flow)
-                self._add("mtu {}", svc.mtu)
-                for pw in natural_sort(svc.pseudowires or [], sort_key="name"):
-                    if pw.name is not None and pw.id_local is not None and pw.id_remote is not None:
-                        with self._block(f"pseudowire {pw.name}"):
-                            self._add(f"evpn vpws id local {pw.id_local} remote {pw.id_remote}")
-
-    def _render_vlan_aware_bundles(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render vlan-aware-bundle entries sorted by name (J2 lines 753-792)."""
-        for bundle in natural_sort(bgp.vlan_aware_bundles or [], sort_key="name"):
-            with self._block(f"vlan-aware-bundle {bundle.name}"):
-                self._add("rd {}", bundle.rd)
-                self._add("rd evpn domain {} {}", bundle.rd_evpn_domain.domain, bundle.rd_evpn_domain.rd)
-                for rt in natural_sort(bundle.route_targets.both or []):
-                    self._add(f"route-target both {rt}")
-                for rt in natural_sort(bundle.route_targets.field_import or []):
-                    self._add(f"route-target import {rt}")
-                for rt in natural_sort(bundle.route_targets.export or []):
-                    self._add(f"route-target export {rt}")
-                for rt in natural_sort(bundle.route_targets.import_evpn_domains or [], sort_key="domain"):
-                    self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
-                for rt in natural_sort(bundle.route_targets.export_evpn_domains or [], sort_key="domain"):
-                    self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
-                for rt in natural_sort(bundle.route_targets.import_export_evpn_domains or [], sort_key="domain"):
-                    self._add(f"route-target import export evpn domain {rt.domain} {rt.route_target}")
-                for r in natural_sort(bundle.redistribute_routes or []):
-                    self._add(f"redistribute {r}")
-                for r in natural_sort(bundle.no_redistribute_routes or []):
-                    self._add(f"no redistribute {r}")
-                self._add("vlan {}", bundle.vlan)
-                if bundle.eos_cli is not None:
-                    self._add(self._EXCLAMATION)
-                    for line in bundle.eos_cli.splitlines():
-                        self._add(line)
-                    if bundle.eos_cli.endswith("\n"):
-                        self._model._lines.append("")
-
-    def _render_route_distinguisher(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'route-distinguisher' block (J2 lines 809-819)."""
-        assignment_auto = bgp.route_distinguisher.assignment_auto
-        if not assignment_auto:
-            return
-        with self._block("route-distinguisher"):
-            self._add("assignment auto range {} {}", assignment_auto.range.start, assignment_auto.range.end)
-            for af in natural_sort(assignment_auto.address_families or []):
-                self._add(f"assignment auto address-family {af}")
-
-    def _render_address_family_evpn(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family evpn' block (J2 lines 793-1018)."""
-        af = bgp.address_family_evpn
-        if not af:
-            return
-        with self._block("address-family evpn"):
-            self._add("route export ethernet-segment ip mass-withdraw", af.route.export_ethernet_segment_ip_mass_withdraw)
-            self._add("route import ethernet-segment ip mass-withdraw", af.route.import_ethernet_segment_ip_mass_withdraw)
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
-            self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
-            self._add("bgp next-hop-unchanged", af.next_hop_unchanged)
-            if af.neighbor_default.encapsulation is not None:
-                enc_cli = f"neighbor default encapsulation {af.neighbor_default.encapsulation}"
-                if af.neighbor_default.encapsulation == "mpls" and af.neighbor_default.next_hop_self_source_interface is not None:
-                    enc_cli += f" next-hop-self source-interface {af.neighbor_default.next_hop_self_source_interface}"
-                self._add(enc_cli)
-
-            rib_tokens: list[str] = []
-            for rib in af.next_hop_mpls_resolution_ribs or []:
-                if rib.rib_type == "tunnel-rib-colored":
-                    rib_tokens.append("tunnel-rib colored system-colored-tunnel-rib")
-                elif rib.rib_type == "tunnel-rib" and rib.rib_name is not None:
-                    rib_tokens.append(f"tunnel-rib {rib.rib_name}")
-                elif rib.rib_type is not None:
-                    rib_tokens.append(rib.rib_type)
-            if rib_tokens:
-                self._add(f"next-hop mpls resolution ribs {' '.join(rib_tokens)}")
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_evpn_peer_group(pg)
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_evpn_neighbor(neighbor)
-
-            self._add("domain identifier {}", af.domain_identifier)
-            self._add("domain identifier {} remote", af.domain_identifier_remote)
-            self._add("next-hop resolution disabled", af.next_hop.resolution_disabled)
-            if af.route.import_match_failure_action == "discard":
-                self._add("route import match-failure action discard")
-            if af.neighbor_default.next_hop_self_received_evpn_routes.enable is True:
-                nhs_cli = "neighbor default next-hop-self received-evpn-routes route-type ip-prefix"
-                if af.neighbor_default.next_hop_self_received_evpn_routes.inter_domain is True:
-                    nhs_cli += " inter-domain"
-                self._add(nhs_cli)
-
-            if af.evpn_hostflap_detection.enabled is False:
-                self._add("no host-flap detection")
-            elif af.evpn_hostflap_detection.enabled is True:
-                hfd_suffix = ""
-                if af.evpn_hostflap_detection.window is not None:
-                    hfd_suffix += f" window {af.evpn_hostflap_detection.window}"
-                if af.evpn_hostflap_detection.threshold is not None:
-                    hfd_suffix += f" threshold {af.evpn_hostflap_detection.threshold}"
-                if af.evpn_hostflap_detection.expiry_timeout is not None:
-                    hfd_suffix += f" expiry timeout {af.evpn_hostflap_detection.expiry_timeout} seconds"
-                if hfd_suffix:
-                    self._add(f"host-flap detection{hfd_suffix}")
-
-            if af.layer_2_fec_in_place_update.enabled is True:
-                l2_cli = "layer-2 fec in-place update"
-                if af.layer_2_fec_in_place_update.timeout is not None:
-                    l2_cli += f" timeout {af.layer_2_fec_in_place_update.timeout} seconds"
-                self._add(l2_cli)
-
-            self._add("route import overlay-index gateway", af.route.import_overlay_index_gateway)
-
-            for segment in natural_sort(af.evpn_ethernet_segment or [], sort_key="domain"):
-                with self._block(f"evpn ethernet-segment domain {segment.domain}"):
-                    self._add("identifier {}", segment.identifier)
-                    self._add("route-target import {}", segment.route_target_import)
-
-    def _render_address_family_flow_spec_ipv4(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family flow-spec ipv4' block (J2 lines 1019-1041)."""
-        self._render_address_family_flow_spec(bgp.address_family_flow_spec_ipv4, "ipv4")
-
-    def _render_address_family_flow_spec_ipv6(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family flow-spec ipv6' block (J2 lines 1042-1064)."""
-        self._render_address_family_flow_spec(bgp.address_family_flow_spec_ipv6, "ipv6")
-
-    def _render_address_family_flow_spec(self, af: Any, ip_version: str) -> None:
-        """Shared renderer for 'address-family flow-spec {ipv4|ipv6}' blocks."""
-        if not af:
-            return
-        with self._block(f"address-family flow-spec {ip_version}"):
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                if pg.activate is True:
-                    self._add(f"neighbor {pg.name} activate")
-                elif pg.activate is False:
-                    self._add(f"no neighbor {pg.name} activate")
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                if neighbor.activate is True:
-                    self._add(f"neighbor {neighbor.ip_address} activate")
-
-    def _render_address_family_ipv4(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family ipv4' block (J2 lines 1065-1413)."""
-        af = bgp.address_family_ipv4
-        if not af:
-            return
-        with self._block("address-family ipv4"):
-            if af.bgp.additional_paths.install is True:
-                self._add("bgp additional-paths install")
-            elif af.bgp.additional_paths.install_ecmp_primary is True:
-                self._add("bgp additional-paths install ecmp-primary")
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
-            self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_ipv4_peer_group(pg)
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_ipv4_neighbor(neighbor)
-
-            for network in natural_sort(af.networks or [], sort_key="prefix"):
-                if network.route_map is not None:
-                    self._add(f"network {network.prefix} route-map {network.route_map}")
-                elif network.rcf is not None:
-                    self._add(f"network {network.prefix} rcf {network.rcf}")
-                else:
-                    self._add(f"network {network.prefix}")
-
-            if af.bgp.redistribute_internal is True:
-                self._add("bgp redistribute-internal")
-            elif af.bgp.redistribute_internal is False:
-                self._add("no bgp redistribute-internal")
-
-            self._render_af_ipv4_redistribute(af.redistribute)
-
     def _render_labeled_unicast_rib(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'bgp labeled-unicast rib [ip [route-map X]] [tunnel [route-map Y]]' (J2 lines 13-28)."""
-        rib = bgp.bgp.labeled_unicast.rib
-        if rib.ip.enabled is not True and rib.tunnel.enabled is not True:
+        labeled_unicast_rib = bgp.bgp.labeled_unicast.rib
+        if labeled_unicast_rib.ip.enabled is not True and labeled_unicast_rib.tunnel.enabled is not True:
             return
         cmd = "bgp labeled-unicast rib"
-        if rib.ip.enabled is True:
+        if labeled_unicast_rib.ip.enabled is True:
             cmd += " ip"
-            if rib.ip.route_map is not None:
-                cmd += f" route-map {rib.ip.route_map}"
-        if rib.tunnel.enabled is True:
+            if labeled_unicast_rib.ip.route_map is not None:
+                cmd += f" route-map {labeled_unicast_rib.ip.route_map}"
+        if labeled_unicast_rib.tunnel.enabled is True:
             cmd += " tunnel"
-            if rib.tunnel.route_map is not None:
-                cmd += f" route-map {rib.tunnel.route_map}"
+            if labeled_unicast_rib.tunnel.route_map is not None:
+                cmd += f" route-map {labeled_unicast_rib.tunnel.route_map}"
         self._add(cmd)
 
     def _render_bgp_default_flags(self, bgp: EosCliConfigGen.RouterBgp) -> None:
@@ -638,16 +454,16 @@ class RouterBgpGenerator(CliGenerator):
 
     def _render_timers(self, bgp: EosCliConfigGen.RouterBgp) -> None:
         """Render 'timers bgp keepalive hold [min-hold-time X] [send-failure hold-time Y]'."""
-        t = bgp.timers
-        if t.keepalive_time is None and t.hold_time is None and t.min_hold_time is None and t.send_failure_hold_time is None:
+        timers = bgp.timers
+        if timers.keepalive_time is None and timers.hold_time is None and timers.min_hold_time is None and timers.send_failure_hold_time is None:
             return
         cmd = "timers bgp"
-        if t.keepalive_time is not None and t.hold_time is not None:
-            cmd += f" {t.keepalive_time} {t.hold_time}"
-        if t.min_hold_time is not None:
-            cmd += f" min-hold-time {t.min_hold_time}"
-        if t.send_failure_hold_time is not None:
-            cmd += f" send-failure hold-time {t.send_failure_hold_time}"
+        if timers.keepalive_time is not None and timers.hold_time is not None:
+            cmd += f" {timers.keepalive_time} {timers.hold_time}"
+        if timers.min_hold_time is not None:
+            cmd += f" min-hold-time {timers.min_hold_time}"
+        if timers.send_failure_hold_time is not None:
+            cmd += f" send-failure hold-time {timers.send_failure_hold_time}"
         self._add(cmd)
 
     def _render_distance(self, bgp: EosCliConfigGen.RouterBgp) -> None:
@@ -781,8 +597,8 @@ class RouterBgpGenerator(CliGenerator):
         if password is None:
             return
         pw_type = password_type if password_type is not None else "7"
-        pw = hide_passwords(password, self.data.eos_cli_config_gen_configuration.hide_passwords)
-        self._add(f"neighbor {entity_id} password {pw_type} {pw}")
+        hashed_password = hide_passwords(password, self.data.eos_cli_config_gen_configuration.hide_passwords)
+        self._add(f"neighbor {entity_id} password {pw_type} {hashed_password}")
 
     def _render_shared_secret(self, entity_id: str, shared_secret: Any) -> None:
         """Render 'neighbor X password shared-secret profile P algorithm A'."""
@@ -899,1318 +715,104 @@ class RouterBgpGenerator(CliGenerator):
             cmd += f" default {link_bandwidth.default}"
         self._add(cmd)
 
-    def _render_af_bgp_additional_paths_send(self, additional_paths: Any) -> None:
-        """Render 'bgp additional-paths send ...' at L2 for an address-family block."""
-        send = additional_paths.send
-        send_limit = additional_paths.send_limit
-        if send is None:
-            return
-        if send == "disabled":
-            self._add("no bgp additional-paths send")
-        elif send == "ecmp" and send_limit is not None:
-            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
-        elif send == "limit" and send_limit is not None:
-            self._add(f"bgp additional-paths send limit {send_limit}")
-        else:
-            self._add(f"bgp additional-paths send {send}")
 
-    def _render_af_neighbor_additional_paths_send(self, entity_id: str, additional_paths: Any) -> None:
-        """Render 'neighbor X additional-paths send ...' at L2 for an address-family block."""
-        send = additional_paths.send
-        send_limit = additional_paths.send_limit
-        if send is None:
-            return
-        if send == "disabled":
-            self._add(f"no neighbor {entity_id} additional-paths send")
-        elif send == "ecmp" and send_limit is not None:
-            self._add(f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}")
-        elif send == "limit":
-            self._add("neighbor {} additional-paths send limit {}", entity_id, send_limit)
-        else:
-            self._add(f"neighbor {entity_id} additional-paths send {send}")
+class RouterBgpVrf(CliSection):
+    """Renders a single 'vrf X' block inside 'router bgp'."""
 
-    def _render_af_evpn_peer_group(self, pg: Any) -> None:
-        """Render address-family evpn commands for a peer group at L2 (J2 lines 845-903)."""
-        name = pg.name
-        if pg.activate is True:
-            self._add(f"neighbor {name} activate")
-        elif pg.activate is False:
-            self._add(f"no neighbor {name} activate")
-        if pg.additional_paths.receive is True:
-            self._add(f"neighbor {name} additional-paths receive")
-        self._add("neighbor {} route-map {} in", name, pg.route_map_in)
-        self._add("neighbor {} route-map {} out", name, pg.route_map_out)
-        self._add("neighbor {} rcf in {}", name, pg.rcf_in)
-        self._add("neighbor {} rcf out {}", name, pg.rcf_out)
-        if pg.default_route.enabled is True:
-            dr_cli = f"neighbor {name} default-route"
-            if pg.default_route.rcf is not None:
-                dr_cli += f" rcf {pg.default_route.rcf}"
-            elif pg.default_route.route_map is not None:
-                dr_cli += f" route-map {pg.default_route.route_map}"
-            self._add(dr_cli)
-        self._render_af_neighbor_additional_paths_send(name, pg.additional_paths)
-        self._add("neighbor {} peer-tag in {}", name, pg.peer_tag_in)
-        self._add("neighbor {} peer-tag out discard {}", name, pg.peer_tag_out_discard)
-        if pg.encapsulation is not None:
-            enc_cli = f"neighbor {name} encapsulation {pg.encapsulation}"
-            if pg.encapsulation == "mpls" and pg.next_hop_self_source_interface is not None:
-                enc_cli += f" next-hop-self source-interface {pg.next_hop_self_source_interface}"
-            self._add(enc_cli)
-        if pg.domain_remote is True:
-            self._add(f"neighbor {name} domain remote")
+    def __init__(self, vrf: Any, data: EosCliConfigGen) -> None:
+        self.vrf = vrf
+        self.data = data
 
-    def _render_af_evpn_neighbor(self, neighbor: Any) -> None:
-        """Render address-family evpn commands for a neighbor at L2 (J2 lines 905-961)."""
-        ip = neighbor.ip_address
-        if neighbor.activate is True:
-            self._add(f"neighbor {ip} activate")
-        elif neighbor.activate is False:
-            self._add(f"no neighbor {ip} activate")
-        if neighbor.additional_paths.receive is True:
-            self._add(f"neighbor {ip} additional-paths receive")
-        self._add("neighbor {} route-map {} in", ip, neighbor.route_map_in)
-        self._add("neighbor {} route-map {} out", ip, neighbor.route_map_out)
-        self._add("neighbor {} rcf in {}", ip, neighbor.rcf_in)
-        self._add("neighbor {} rcf out {}", ip, neighbor.rcf_out)
-        if neighbor.default_route.enabled is True:
-            dr_cli = f"neighbor {ip} default-route"
-            if neighbor.default_route.rcf is not None:
-                dr_cli += f" rcf {neighbor.default_route.rcf}"
-            elif neighbor.default_route.route_map is not None:
-                dr_cli += f" route-map {neighbor.default_route.route_map}"
-            self._add(dr_cli)
-        self._render_af_neighbor_additional_paths_send(ip, neighbor.additional_paths)
-        self._add("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
-        self._add("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
-        if neighbor.encapsulation is not None:
-            enc_cli = f"neighbor {ip} encapsulation {neighbor.encapsulation}"
-            if neighbor.encapsulation == "mpls" and neighbor.next_hop_self_source_interface is not None:
-                enc_cli += f" next-hop-self source-interface {neighbor.next_hop_self_source_interface}"
-            self._add(enc_cli)
+    def _generate(self) -> None:
+        vrf = self.vrf
+        self._header(f"vrf {vrf.name}")
 
-    def _render_af_ipv4_additional_paths_send(self, entity_id: str, additional_paths: Any) -> None:
-        """Render 'neighbor X additional-paths send ...' with optional prefix-list at L2 (J2 IPv4 AF variant)."""
-        send = additional_paths.send
-        send_limit = additional_paths.send_limit
-        prefix_list = additional_paths.prefix_list
-        if send is None:
-            return
-        if send == "disabled":
-            self._add(f"no neighbor {entity_id} additional-paths send")
-            return
-        cmd = None
-        if send == "ecmp" and send_limit is not None:
-            cmd = f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}"
-        elif send == "limit":
-            if send_limit is not None:
-                cmd = f"neighbor {entity_id} additional-paths send limit {send_limit}"
-        else:
-            cmd = f"neighbor {entity_id} additional-paths send {send}"
-        if cmd is not None:
-            if prefix_list is not None:
-                cmd += f" prefix-list {prefix_list}"
-            self._add(cmd)
+        self._add("rd {}", vrf.rd)
+        self._add("rd evpn domain {} {}", vrf.rd_evpn_domain.domain, vrf.rd_evpn_domain.rd)
 
-    def _render_af_ipv4_peer_group(self, pg: Any) -> None:
-        """Render address-family ipv4 commands for a peer group at L2 (J2 lines 1090-1161)."""
-        name = pg.name
-        if pg.activate is True:
-            self._add(f"neighbor {name} activate")
-        elif pg.activate is False:
-            self._add(f"no neighbor {name} activate")
-        if pg.additional_paths.receive is True:
-            self._add(f"neighbor {name} additional-paths receive")
-        self._add("neighbor {} route-map {} in", name, pg.route_map_in)
-        self._add("neighbor {} route-map {} out", name, pg.route_map_out)
-        self._add("neighbor {} rcf in {}", name, pg.rcf_in)
-        self._add("neighbor {} rcf out {}", name, pg.rcf_out)
-        self._add("neighbor {} prefix-list {} in", name, pg.prefix_list_in)
-        self._add("neighbor {} prefix-list {} out", name, pg.prefix_list_out)
-        if pg.default_originate:
-            do_cli = f"neighbor {name} default-originate"
-            if pg.default_originate.route_map is not None:
-                do_cli += f" route-map {pg.default_originate.route_map}"
-            if pg.default_originate.always is True:
-                do_cli += " always"
-            self._add(do_cli)
-        self._render_af_ipv4_additional_paths_send(name, pg.additional_paths)
-        if pg.next_hop.address_family_ipv6.enabled is True:
-            nhv6_cli = f"neighbor {name} next-hop address-family ipv6"
-            if pg.next_hop.address_family_ipv6.originate is True:
-                nhv6_cli += " originate"
-            self._add(nhv6_cli)
-        self._add("neighbor {} peer-tag in {}", name, pg.peer_tag_in)
-        self._add("neighbor {} peer-tag out discard {}", name, pg.peer_tag_out_discard)
-
-    def _render_af_ipv4_neighbor(self, neighbor: Any) -> None:
-        """Render address-family ipv4 commands for a neighbor at L2 (J2 lines 1162-1237)."""
-        ip = neighbor.ip_address
-        if neighbor.activate is True:
-            self._add(f"neighbor {ip} activate")
-        elif neighbor.activate is False:
-            self._add(f"no neighbor {ip} activate")
-        if neighbor.additional_paths.receive is True:
-            self._add(f"neighbor {ip} additional-paths receive")
-        self._add("neighbor {} route-map {} in", ip, neighbor.route_map_in)
-        self._add("neighbor {} route-map {} out", ip, neighbor.route_map_out)
-        self._add("neighbor {} rcf in {}", ip, neighbor.rcf_in)
-        self._add("neighbor {} rcf out {}", ip, neighbor.rcf_out)
-        self._add("neighbor {} prefix-list {} in", ip, neighbor.prefix_list_in)
-        self._add("neighbor {} prefix-list {} out", ip, neighbor.prefix_list_out)
-        if neighbor.default_originate:
-            do_cli = f"neighbor {ip} default-originate"
-            if neighbor.default_originate.route_map is not None:
-                do_cli += f" route-map {neighbor.default_originate.route_map}"
-            if neighbor.default_originate.always is True:
-                do_cli += " always"
-            self._add(do_cli)
-        self._render_af_ipv4_additional_paths_send(ip, neighbor.additional_paths)
-        if neighbor.next_hop.address_family_ipv6.enabled is True:
-            nhv6_cli = f"neighbor {ip} next-hop address-family ipv6"
-            if neighbor.next_hop.address_family_ipv6.originate is True:
-                nhv6_cli += " originate"
-            self._add(nhv6_cli)
-        elif neighbor.next_hop.address_family_ipv6.enabled is False:
-            self._add(f"no neighbor {ip} next-hop address-family ipv6")
-        self._add("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
-        self._add("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
-
-    def _render_af_ipv4_redistribute(self, r: Any) -> None:
-        """Render redistribute entries for address-family ipv4 at L2 (J2 lines 1250-1412)."""
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            self._add(cli)
-
-        if r.bgp.enabled is True:
-            cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
-            self._add(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.include_leaked is True:
-                cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
-            self._add(cli)
-
-        if r.dynamic.enabled is True:
-            cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
-            self._add(cli)
-
-        if r.user.enabled is True:
-            cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
-            self._add(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            self._add(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            self._add(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.rip.enabled is True:
-            cli = "redistribute rip"
-            if r.rip.route_map is not None:
-                cli += f" route-map {r.rip.route_map}"
-            self._add(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.include_leaked is True:
-                cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
-            self._add(cli)
-
-    # TODO: fix the double space
-    def _build_missing_policy_cli(self, prefix: str, missing_policy: Any, double_space_before_include: bool = False) -> list[str]:
-        """
-        Build 'missing-policy' CLI lines for directions in and out.
-
-        Returns a list of zero, one, or two CLI strings (one per direction that
-        has an action defined).  The caller is responsible for appending each
-        line at the correct indentation level.
-
-        Args:
-            prefix:                    Command prefix, e.g. ``"bgp missing-policy"`` or
-                                       ``"neighbor X missing-policy"``.
-            missing_policy:            AvdModel with ``direction_in`` / ``direction_out`` fields.
-            double_space_before_include: When True, inserts two spaces before ``include``
-                                       instead of one (required for ipv4 labeled-unicast neighbors).
-        """
-        lines: list[str] = []
-        for direction in ["in", "out"]:
-            policy = getattr(missing_policy, f"direction_{direction}", None)
-            if policy is None or policy.action is None:
-                continue
-            cli = prefix
-            if policy.include_community_list is True or policy.include_prefix_list is True or policy.include_sub_route_map is True:
-                cli += "  include" if double_space_before_include else " include"
-                if policy.include_community_list is True:
-                    cli += " community-list"
-                if policy.include_prefix_list is True:
-                    cli += " prefix-list"
-                if policy.include_sub_route_map is True:
-                    cli += " sub-route-map"
-            cli += f" direction {direction} action {policy.action}"
-            lines.append(cli)
-        return lines
-
-    def _render_address_family_ipv4_labeled_unicast(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family ipv4 labeled-unicast' block (J2 lines 1414-1714)."""
-        af = bgp.address_family_ipv4_labeled_unicast
-        if not af:
-            return
-        with self._block("address-family ipv4 labeled-unicast"):
-            self._add("update wait-for-convergence", af.update_wait_for_convergence)
-
-            if af.bgp.missing_policy:
-                for line in self._build_missing_policy_cli("bgp missing-policy", af.bgp.missing_policy):
-                    self._add(line)
-
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
-
-            self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
-
-            self._add("bgp next-hop-unchanged", af.bgp.next_hop_unchanged)
-
-            self._add("neighbor default next-hop-self", af.neighbor_default.next_hop_self)
-
-            next_hop_ribs = af.next_hop_resolution_ribs
-            if next_hop_ribs:
-                rib_tokens: list[str] = []
-                for rib in next_hop_ribs:
-                    if rib.rib_type == "tunnel-rib-colored":
-                        rib_tokens.append("tunnel-rib colored system-colored-tunnel-rib")
-                    elif rib.rib_type == "tunnel-rib":
-                        if rib.rib_name is not None:
-                            rib_tokens.append(f"tunnel-rib {rib.rib_name}")
-                    elif rib.rib_type is not None:
-                        rib_tokens.append(rib.rib_type)
-                if rib_tokens:
-                    self._add(f"next-hop resolution ribs {' '.join(rib_tokens)}")
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_lu_entity(pg.name, pg)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_lu_entity(neighbor.ip_address, neighbor)
-
-            for network in af.networks or []:
-                cli = f"network {network.prefix}"
-                if network.route_map is not None:
-                    cli += f" route-map {network.route_map}"
-                elif network.rcf is not None:
-                    cli += f" rcf {network.rcf}"
-                self._add(cli)
-
-            for next_hop in af.next_hops or []:
-                cli = f"next-hop {next_hop.ip_address} originate"
-                if next_hop.lfib_backup_ip_forwarding is True:
-                    cli += " lfib-backup ip-forwarding"
-                self._add(cli)
-
-            self._add("lfib entry installation skipped", af.lfib_entry_installation_skipped)
-
-            self._add("label local-termination {}", af.label_local_termination)
-
-            self._add("graceful-restart", af.graceful_restart)
-
-            for tunnel_protocol in af.tunnel_source_protocols or []:
-                cli = f"tunnel source-protocol {tunnel_protocol.protocol}"
-                if tunnel_protocol.rcf is not None:
-                    cli += f" rcf {tunnel_protocol.rcf}"
-                self._add(cli)
-
-            aigp_session = af.aigp_session
-            if aigp_session:
-                for session_type in ["ibgp", "confederation", "ebgp"]:
-                    if getattr(aigp_session, session_type, None) is True:
-                        self._add(f"aigp-session {session_type}")
-
-    def _render_af_lu_entity(self, entity_id: str, entity: Any) -> None:
-        """Render AF IPv4 labeled-unicast commands for a peer-group or neighbor at L2."""
-        # J2 uses if/else (not elif): always renders activate or no activate.
-        if entity.activate is True:
-            self._add(f"neighbor {entity_id} activate")
-        else:
-            self._add(f"no neighbor {entity_id} activate")
-
-        if entity.additional_paths.receive is True:
-            self._add(f"neighbor {entity_id} additional-paths receive")
-
-        if entity.graceful_restart is True:
-            self._add(f"neighbor {entity_id} graceful-restart")
-
-        self._add("neighbor {} graceful-restart-helper stale-route route-map {}", entity_id, entity.graceful_restart_helper.stale_route_map)
-
-        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
-
-        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
-
-        self._add("neighbor {} rcf in {}", entity_id, entity.rcf_in)
-
-        self._add("neighbor {} rcf out {}", entity_id, entity.rcf_out)
-
-        self._render_af_neighbor_additional_paths_send(entity_id, entity.additional_paths)
-
-        if entity.next_hop_unchanged is True:
-            self._add(f"neighbor {entity_id} next-hop-unchanged")
-
-        if entity.next_hop_self is True:
-            self._add(f"neighbor {entity_id} next-hop-self")
-
-        if entity.next_hop_self_v4_mapped_v6_source_interface is not None:
-            self._add(f"neighbor {entity_id} next-hop-self v4-mapped-v6 source-interface {entity.next_hop_self_v4_mapped_v6_source_interface}")
-        elif entity.next_hop_self_source_interface is not None:
-            self._add(f"neighbor {entity_id} next-hop-self source-interface {entity.next_hop_self_source_interface}")
-
-        if entity.maximum_advertised_routes is not None:
-            cli = f"neighbor {entity_id} maximum-advertised-routes {entity.maximum_advertised_routes}"
-            if entity.maximum_advertised_routes_warning_limit is not None:
-                cli += f" warning-limit {entity.maximum_advertised_routes_warning_limit}"
-            self._add(cli)
-
-        if entity.missing_policy:
-            for line in self._build_missing_policy_cli(f"neighbor {entity_id} missing-policy", entity.missing_policy, double_space_before_include=True):
-                self._add(line)
-
-        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
-
-        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
-
-        if entity.aigp_session is True:
-            self._add(f"neighbor {entity_id} aigp-session")
-
-        if entity.multi_path is True:
-            self._add(f"neighbor {entity_id} multi-path")
-
-    def _render_address_family_ipv4_multicast(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family ipv4 multicast' block (J2 lines 1715-1865)."""
-        af = bgp.address_family_ipv4_multicast
-        if not af:
-            return
-        with self._block("address-family ipv4 multicast"):
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_ipv4mc_entity(pg.name, pg)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_ipv4mc_entity(neighbor.ip_address, neighbor)
-
-            if af.redistribute:
-                self._render_af_ipv4mc_redistribute(af.redistribute)
-
-    def _render_af_ipv4mc_entity(self, entity_id: str, entity: Any) -> None:
-        """Render AF IPv4 multicast commands for a peer-group or neighbor at L2."""
-        # J2 uses if/elif: only renders when explicitly True or explicitly False.
-        if entity.activate is True:
-            self._add(f"neighbor {entity_id} activate")
-        elif entity.activate is False:
-            self._add(f"no neighbor {entity_id} activate")
-
-        if entity.additional_paths.receive is True:
-            self._add(f"neighbor {entity_id} additional-paths receive")
-
-        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
-
-        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
-
-        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
-
-        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
-
-    def _render_af_ipv4mc_redistribute(self, r: Any) -> None:
-        """Render IPv4 multicast address-family redistribute commands at L2."""
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            self._add(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            self._add(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            self._add(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            self._add(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            self._add(cli)
-
-    def _render_address_family_ipv4_sr_te(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family ipv4 sr-te' block (J2 lines 1866-1908)."""
-        af = bgp.address_family_ipv4_sr_te
-        if not af:
-            return
-        with self._block("address-family ipv4 sr-te"):
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_sr_te_entity(pg.name, pg)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_sr_te_entity(neighbor.ip_address, neighbor)
-
-    def _render_af_sr_te_entity(self, entity_id: str, entity: Any) -> None:
-        """Render AF SR-TE commands for a peer-group or neighbor at L2 (shared by ipv4 and ipv6 sr-te)."""
-        if entity.activate is True:
-            self._add(f"neighbor {entity_id} activate")
-        elif entity.activate is False:
-            self._add(f"no neighbor {entity_id} activate")
-
-        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
-
-        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
-
-        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
-
-        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
-
-    def _render_address_family_ipv6(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family ipv6' block (J2 lines 1909-2177)."""
-        af = bgp.address_family_ipv6
-        if not af:
-            return
-        with self._block("address-family ipv6"):
-            if af.bgp.additional_paths.install is True:
-                self._add("bgp additional-paths install")
-            elif af.bgp.additional_paths.install_ecmp_primary is True:
-                self._add("bgp additional-paths install ecmp-primary")
-
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
-
-            self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
-
-            # Section-level prefix_list is appended to per-neighbor send commands.
-            # Use getattr since prefix_list is not always present in the schema model.
-            bg_prefix_list = getattr(af.bgp.additional_paths, "prefix_list", None)
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_ipv6_entity(pg.name, pg, bg_prefix_list)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_ipv6_entity(neighbor.ip_address, neighbor, bg_prefix_list)
-
-            for network in natural_sort(af.networks or [], sort_key="prefix"):
-                cli = f"network {network.prefix}"
-                if network.route_map is not None:
-                    cli += f" route-map {network.route_map}"
-                elif network.rcf is not None:
-                    cli += f" rcf {network.rcf}"
-                self._add(cli)
-
-            if af.bgp.redistribute_internal is True:
-                self._add("bgp redistribute-internal")
-            elif af.bgp.redistribute_internal is False:
-                self._add("no bgp redistribute-internal")
-
-            if af.redistribute:
-                self._render_af_ipv6_redistribute(af.redistribute)
-
-    def _render_af_ipv6_entity(self, entity_id: str, entity: Any, bg_prefix_list: str | None) -> None:
-        """Render AF IPv6 commands for a peer-group or neighbor at L2."""
-        if entity.activate is True:
-            self._add(f"neighbor {entity_id} activate")
-        elif entity.activate is False:
-            self._add(f"no neighbor {entity_id} activate")
-
-        if entity.additional_paths.receive is True:
-            self._add(f"neighbor {entity_id} additional-paths receive")
-
-        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
-
-        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
-
-        self._add("neighbor {} rcf in {}", entity_id, entity.rcf_in)
-
-        self._add("neighbor {} rcf out {}", entity_id, entity.rcf_out)
-
-        self._add("neighbor {} prefix-list {} in", entity_id, entity.prefix_list_in)
-
-        self._add("neighbor {} prefix-list {} out", entity_id, entity.prefix_list_out)
-
-        default_originate = getattr(entity, "default_originate", None)
-        if default_originate:
-            do_cli = f"neighbor {entity_id} default-originate"
-            if default_originate.route_map is not None:
-                do_cli += f" route-map {default_originate.route_map}"
-            if default_originate.always is True:
-                do_cli += " always"
-            self._add(do_cli)
-
-        # additional_paths send: section-level prefix_list is appended when set.
-        send = entity.additional_paths.send
-        send_limit = entity.additional_paths.send_limit
-        if send is not None:
-            if send == "disabled":
-                self._add(f"no neighbor {entity_id} additional-paths send")
-            else:
-                cmd: str | None = None
-                if send == "ecmp" and send_limit is not None:
-                    cmd = f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}"
-                elif send == "limit":
-                    if send_limit is not None:
-                        cmd = f"neighbor {entity_id} additional-paths send limit {send_limit}"
-                else:
-                    cmd = f"neighbor {entity_id} additional-paths send {send}"
-                if cmd is not None:
-                    if bg_prefix_list is not None:
-                        cmd += f" prefix-list {bg_prefix_list}"
-                    self._add(cmd)
-
-        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
-
-        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
-
-    def _render_af_ipv6_redistribute(self, r: Any) -> None:
-        """Render IPv6 address-family redistribute commands at L2."""
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
-            self._add(cli)
-
-        if r.bgp.enabled is True:
-            cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
-            self._add(cli)
-
-        if r.dhcp.enabled is True:
-            cli = "redistribute dhcp"
-            if r.dhcp.route_map is not None:
-                cli += f" route-map {r.dhcp.route_map}"
-            self._add(cli)
-
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.include_leaked is True:
-                cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
-            self._add(cli)
-
-        if r.dynamic.enabled is True:
-            cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
-            self._add(cli)
-
-        if r.user.enabled is True:
-            cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
-            self._add(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            self._add(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
-                cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.include_leaked is True:
-                cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
-            self._add(cli)
-
-    def _render_address_family_ipv6_multicast(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family ipv6 multicast' block (J2 lines 2178-2320)."""
-        af = bgp.address_family_ipv6_multicast
-        if not af:
-            return
-        with self._block("address-family ipv6 multicast"):
-            # bgp missing-policy uses flat direction_{in,out}_action fields (not nested).
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
-
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                if pg.activate is True:
-                    self._add(f"neighbor {pg.name} activate")
-                elif pg.activate is False:
-                    self._add(f"no neighbor {pg.name} activate")
-                if pg.additional_paths.receive is True:
-                    self._add(f"neighbor {pg.name} additional-paths receive")
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                # J2 checks only 'if True' (no elif False) for neighbor activate.
-                if neighbor.activate is True:
-                    self._add(f"neighbor {neighbor.ip_address} activate")
-                if neighbor.additional_paths.receive is True:
-                    self._add(f"neighbor {neighbor.ip_address} additional-paths receive")
-                self._add("neighbor {} route-map {} in", neighbor.ip_address, neighbor.route_map_in)
-                self._add("neighbor {} route-map {} out", neighbor.ip_address, neighbor.route_map_out)
-                self._add("neighbor {} peer-tag in {}", neighbor.ip_address, neighbor.peer_tag_in)
-                self._add("neighbor {} peer-tag out discard {}", neighbor.ip_address, neighbor.peer_tag_out_discard)
-
-            for network in natural_sort(af.networks or [], sort_key="prefix"):
-                cli = f"network {network.prefix}"
-                if network.route_map is not None:
-                    cli += f" route-map {network.route_map}"
-                self._add(cli)
-
-            if af.redistribute:
-                self._render_af_ipv6mc_redistribute(af.redistribute)
-
-    def _render_af_ipv6mc_redistribute(self, r: Any) -> None:
-        """Render IPv6 multicast address-family redistribute commands at L2."""
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            self._add(cli)
-
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            self._add(cli)
-
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            self._add(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            self._add(cli)
-
-    def _render_address_family_ipv6_sr_te(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family ipv6 sr-te' block (J2 lines 2321-2363)."""
-        af = bgp.address_family_ipv6_sr_te
-        if not af:
-            return
-        with self._block("address-family ipv6 sr-te"):
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_sr_te_entity(pg.name, pg)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_sr_te_entity(neighbor.ip_address, neighbor)
-
-    def _render_address_family_link_state(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family link-state' block (J2 lines 2364-2413)."""
-        af = bgp.address_family_link_state
-        if not af:
-            return
-        with self._block("address-family link-state"):
-            # bgp missing-policy uses flat direction_{in,out}_action fields.
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                if pg.activate is True:
-                    self._add(f"neighbor {pg.name} activate")
-                elif pg.activate is False:
-                    self._add(f"no neighbor {pg.name} activate")
-                self._add("neighbor {} missing-policy direction in action {}", pg.name, pg.missing_policy.direction_in_action)
-                self._add("neighbor {} missing-policy direction out action {}", pg.name, pg.missing_policy.direction_out_action)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                # J2 checks only 'if True' (no elif False) for neighbor activate.
-                if neighbor.activate is True:
-                    self._add(f"neighbor {neighbor.ip_address} activate")
-                self._add("neighbor {} missing-policy direction in action {}", neighbor.ip_address, neighbor.missing_policy.direction_in_action)
-                self._add("neighbor {} missing-policy direction out action {}", neighbor.ip_address, neighbor.missing_policy.direction_out_action)
-
-            path_selection = af.path_selection
-            if path_selection:
-                roles = path_selection.roles
-                self._add("path-selection", roles.producer)
-                if roles.consumer is True or roles.propagator is True:
-                    cli = "path-selection role"
-                    if roles.consumer is True:
-                        cli += " consumer"
-                    if roles.propagator is True:
-                        cli += " propagator"
-                    self._add(cli)
-
-    def _render_address_family_path_selection(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family path-selection' block (J2 lines 2414-2480)."""
-        af = bgp.address_family_path_selection
-        if not af:
-            return
-        with self._block("address-family path-selection"):
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
-
-            self._render_af_bgp_additional_paths_send(af.bgp.additional_paths)
-
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                if pg.activate is True:
-                    self._add(f"neighbor {pg.name} activate")
-                elif pg.activate is False:
-                    self._add(f"no neighbor {pg.name} activate")
-                if pg.additional_paths.receive is True:
-                    self._add(f"neighbor {pg.name} additional-paths receive")
-                # Path-selection peer-group send: send_limit checked before send type.
-                send = pg.additional_paths.send
-                send_limit = pg.additional_paths.send_limit
-                if send is not None:
-                    if send == "disabled":
-                        self._add(f"no neighbor {pg.name} additional-paths send")
-                    elif send_limit is not None:
-                        if send == "ecmp":
-                            self._add(f"neighbor {pg.name} additional-paths send ecmp limit {send_limit}")
-                        elif send == "limit":
-                            self._add(f"neighbor {pg.name} additional-paths send limit {send_limit}")
-                    else:
-                        self._add(f"neighbor {pg.name} additional-paths send {send}")
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                if neighbor.activate is True:
-                    self._add(f"neighbor {neighbor.ip_address} activate")
-                elif neighbor.activate is False:
-                    self._add(f"no neighbor {neighbor.ip_address} activate")
-                if neighbor.additional_paths.receive is True:
-                    self._add(f"neighbor {neighbor.ip_address} additional-paths receive")
-                self._render_af_neighbor_additional_paths_send(neighbor.ip_address, neighbor.additional_paths)
-
-    def _render_address_family_rtc(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family rt-membership' block (J2 lines 2481-2502)."""
-        af = bgp.address_family_rtc
-        if not af:
-            return
-        with self._block("address-family rt-membership"):
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                if pg.activate is True:
-                    self._add(f"neighbor {pg.name} activate")
-                elif pg.activate is False:
-                    self._add(f"no neighbor {pg.name} activate")
-                # default_route_target: key-presence check (null value is valid, means plain "default-route-target").
-                if pg._get_defined_attr("default_route_target") is not Undefined:
-                    default_rt = pg.default_route_target
-                    if default_rt is not None and default_rt.only is True:
-                        self._add(f"neighbor {pg.name} default-route-target only")
-                    else:
-                        self._add(f"neighbor {pg.name} default-route-target")
-                    # encoding_origin_as_omit is type str; YAML null means key is present → render command.
-                    if default_rt is not None and default_rt._get_defined_attr("encoding_origin_as_omit") is not Undefined:
-                        self._add(f"neighbor {pg.name} default-route-target encoding origin-as omit")
-
-    def _render_address_family_vpn_ipv4(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family vpn-ipv4' block (J2 lines 2503-2584)."""
-        af = bgp.address_family_vpn_ipv4
-        if not af:
-            return
-        with self._block("address-family vpn-ipv4"):
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_vpn_entity(pg.name, pg)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_vpn_entity(neighbor.ip_address, neighbor)
-
-            if af.neighbor_default_encapsulation_mpls_next_hop_self.source_interface is not None:
-                src_iface = af.neighbor_default_encapsulation_mpls_next_hop_self.source_interface
-                self._add(f"neighbor default encapsulation mpls next-hop-self source-interface {src_iface}")
-            self._add("domain identifier {}", af.domain_identifier)
-            if af.route.import_match_failure_action == "discard":
-                self._add("route import match-failure action discard")
-
-    def _render_address_family_vpn_ipv6(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render 'address-family vpn-ipv6' block (J2 lines 2585-2666)."""
-        af = bgp.address_family_vpn_ipv6
-        if not af:
-            return
-        with self._block("address-family vpn-ipv6"):
-            for pg in natural_sort(af.peer_groups or [], sort_key="name"):
-                self._render_af_vpn_entity(pg.name, pg)
-
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                self._render_af_vpn_entity(neighbor.ip_address, neighbor)
-
-            if af.neighbor_default_encapsulation_mpls_next_hop_self.source_interface is not None:
-                src_iface = af.neighbor_default_encapsulation_mpls_next_hop_self.source_interface
-                self._add(f"neighbor default encapsulation mpls next-hop-self source-interface {src_iface}")
-            self._add("domain identifier {}", af.domain_identifier)
-            if af.route.import_match_failure_action == "discard":
-                self._add("route import match-failure action discard")
-
-    def _render_af_vpn_entity(self, entity_id: str, entity: Any) -> None:
-        """Render AF VPN-IPv4/IPv6 commands for a peer-group or neighbor at L2."""
-        if entity.activate is True:
-            self._add(f"neighbor {entity_id} activate")
-        elif entity.activate is False:
-            self._add(f"no neighbor {entity_id} activate")
-        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
-        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
-        self._add("neighbor {} rcf in {}", entity_id, entity.rcf_in)
-        self._add("neighbor {} rcf out {}", entity_id, entity.rcf_out)
-        if entity.default_route.enabled is True:
-            cli = f"neighbor {entity_id} default-route"
-            if entity.default_route.rcf is not None:
-                cli += f" rcf {entity.default_route.rcf}"
-            elif entity.default_route.route_map is not None:
-                cli += f" route-map {entity.default_route.route_map}"
-            self._add(cli)
-        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
-        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
-
-    def _render_vrfs(self, bgp: EosCliConfigGen.RouterBgp) -> None:
-        """Render all 'vrf' blocks (J2 lines 2667+)."""
-        for vrf in natural_sort(bgp.vrfs or [], sort_key="name"):
-            self._render_vrf(vrf)
-
-    def _render_vrf(self, vrf: Any) -> None:
-        """Render a single VRF block."""
-        with self._block(f"vrf {vrf.name}"):
-            self._add("rd {}", vrf.rd)
-            self._add("rd evpn domain {} {}", vrf.rd_evpn_domain.domain, vrf.rd_evpn_domain.rd)
-
-            for export in natural_sort(vrf.default_route_exports or [], sort_key="address_family"):
-                cli = f"default-route export {export.address_family}"
-                if export.always is True:
-                    cli += " always"
-                if export.rcf is not None:
-                    cli += f" rcf {export.rcf}"
-                elif export.route_map is not None:
-                    cli += f" route-map {export.route_map}"
-                self._add(cli)
-
-            for af in vrf.route_targets.field_import or []:
-                for rt in af.route_targets or []:
-                    self._add(f"route-target import {af.address_family} {rt}")
-                if af.address_family in ["evpn", "vpn-ipv4", "vpn-ipv6"]:
-                    if af.rcf is not None:
-                        if af.vpn_route_filter_rcf is not None and af.address_family in ["vpn-ipv4", "vpn-ipv6"]:
-                            self._add(f"route-target import {af.address_family} rcf {af.rcf} vpn-route filter-rcf {af.vpn_route_filter_rcf}")
-                        else:
-                            self._add(f"route-target import {af.address_family} rcf {af.rcf}")
-                    self._add("route-target import {} route-map {}", af.address_family, af.route_map)
-
-            for rt in natural_sort([r for r in vrf.route_targets.import_evpn_domains or [] if r.domain == "all"], sort_key="route_target"):
-                self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
-            for rt in natural_sort([r for r in vrf.route_targets.import_evpn_domains or [] if r.domain == "remote"], sort_key="route_target"):
-                self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
-
-            for af in vrf.route_targets.export or []:
-                for rt in af.route_targets or []:
-                    self._add(f"route-target export {af.address_family} {rt}")
-                if af.address_family in ["evpn", "vpn-ipv4", "vpn-ipv6"]:
-                    if af.rcf is not None:
-                        if af.vrf_route_filter_rcf is not None and af.address_family in ["vpn-ipv4", "vpn-ipv6"]:
-                            self._add(f"route-target export {af.address_family} rcf {af.rcf} vrf-route filter-rcf {af.vrf_route_filter_rcf}")
-                        else:
-                            self._add(f"route-target export {af.address_family} rcf {af.rcf}")
-                    self._add("route-target export {} route-map {}", af.address_family, af.route_map)
-
-            for rt in natural_sort([r for r in vrf.route_targets.export_evpn_domains or [] if r.domain == "all"], sort_key="route_target"):
-                self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
-            for rt in natural_sort([r for r in vrf.route_targets.export_evpn_domains or [] if r.domain == "remote"], sort_key="route_target"):
-                self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
-
-            self._add("router-id {}", vrf.router_id)
-            self._add("update wait-for-convergence", vrf.updates.wait_for_convergence)
-            self._add("update wait-install", vrf.updates.wait_install)
-            self._add("timers bgp {}", vrf.timers)
-
-            if vrf.graceful_restart.enabled is True:
-                self._add("graceful-restart restart-time {}", vrf.graceful_restart.restart_time)
-                self._add("graceful-restart stalepath-time {}", vrf.graceful_restart.stalepath_time)
-                self._add("graceful-restart")
-
-            if vrf.maximum_paths.paths is not None:
-                cli = f"maximum-paths {vrf.maximum_paths.paths}"
-                if vrf.maximum_paths.ecmp is not None:
-                    cli += f" ecmp {vrf.maximum_paths.ecmp}"
-                self._add(cli)
-
-            if vrf.bgp.additional_paths.install is True:
-                self._add("bgp additional-paths install")
-            elif vrf.bgp.additional_paths.install_ecmp_primary is True:
-                self._add("bgp additional-paths install ecmp-primary")
-            self._add("bgp additional-paths receive", vrf.bgp.additional_paths.receive)
-            self._render_af_bgp_additional_paths_send(vrf.bgp.additional_paths)
-
-            for listen_range in natural_sort(vrf.listen_ranges or [], sort_key="peer_group"):
-                if listen_range.peer_group is None or listen_range.prefix is None:
-                    continue
-                if listen_range.peer_filter is None and listen_range.remote_as is None:
-                    continue
-                cli = f"bgp listen range {listen_range.prefix}"
-                if listen_range.peer_id_include_router_id is True:
-                    cli += " peer-id include router-id"
-                cli += f" peer-group {listen_range.peer_group}"
-                if listen_range.peer_filter is not None:
-                    cli += f" peer-filter {listen_range.peer_filter}"
-                elif listen_range.remote_as is not None:
-                    cli += f" remote-as {listen_range.remote_as}"
-                self._add(cli)
-
-            for neighbor in natural_sort(vrf.neighbors or [], sort_key="ip_address"):
-                self._render_vrf_neighbor(neighbor)
-
-            self._render_vrf_body(vrf)
-
-    def _render_vrf_neighbor(self, neighbor: Any) -> None:
-        """Render a single VRF neighbor block at L2 (J2 lines 2791-2912+)."""
-        ip = neighbor.ip_address
-
-        self._add("neighbor {} peer group {}", ip, neighbor.peer_group)
-        self._add("neighbor {} remote-as {}", ip, neighbor.remote_as)
-        if neighbor.next_hop_self is True:
-            self._add(f"neighbor {ip} next-hop-self")
-        if neighbor.next_hop_peer is True:
-            self._add(f"neighbor {ip} next-hop-peer")
-        if neighbor.shutdown is True:
-            self._add(f"neighbor {ip} shutdown")
-
-        if neighbor.remove_private_as.enabled is True:
-            cli = f"neighbor {ip} remove-private-as"
-            if neighbor.remove_private_as.all is True:
-                cli += " all"
-                if neighbor.remove_private_as.replace_as is True:
-                    cli += " replace-as"
-            self._add(cli)
-        elif neighbor.remove_private_as.enabled is False:
-            self._add(f"no neighbor {ip} remove-private-as")
-
-        if neighbor.as_path.prepend_own_disabled is True:
-            self._add(f"neighbor {ip} as-path prepend-own disabled")
-        if neighbor.as_path.remote_as_replace_out is True:
-            self._add(f"neighbor {ip} as-path remote-as replace out")
-        self._add("neighbor {} local-as {} no-prepend replace-as", ip, neighbor.local_as)
-        self._add("neighbor {} weight {}", ip, neighbor.weight)
-        if neighbor.passive is True:
-            self._add(f"neighbor {ip} passive")
-        self._add("neighbor {} update-source {}", ip, neighbor.update_source)
-
-        if neighbor.bfd is True:
-            self._add(f"neighbor {ip} bfd")
-            bfd_timers = neighbor.bfd_timers
-            self._add("neighbor {} bfd interval {} min-rx {} multiplier {}", ip, bfd_timers.interval, bfd_timers.min_rx, bfd_timers.multiplier)
-        elif neighbor.bfd is False and neighbor.peer_group is not None:
-            self._add(f"no neighbor {ip} bfd")
-
-        self._add("neighbor {} description {}", ip, neighbor.description)
-
-        if neighbor.allowas_in.enabled is True:
-            cli = f"neighbor {ip} allowas-in"
-            if neighbor.allowas_in.times is not None:
-                cli += f" {neighbor.allowas_in.times}"
-            self._add(cli)
-
-        if neighbor.rib_in_pre_policy_retain.enabled is True:
-            cli = f"neighbor {ip} rib-in pre-policy retain"
-            if neighbor.rib_in_pre_policy_retain.all is True:
-                cli += " all"
-            self._add(cli)
-        elif neighbor.rib_in_pre_policy_retain.enabled is False:
-            self._add(f"no neighbor {ip} rib-in pre-policy retain")
-
-        self._add("neighbor {} ebgp-multihop {}", ip, neighbor.ebgp_multihop)
-
-        if neighbor.route_reflector_client is True:
-            self._add(f"neighbor {ip} route-reflector-client")
-        elif neighbor.route_reflector_client is False:
-            self._add(f"no neighbor {ip} route-reflector-client")
-
-        self._add("neighbor {} timers {}", ip, neighbor.timers)
-        self._add("neighbor {} route-map {} in", ip, neighbor.route_map_in)
-
-        if neighbor.additional_paths.receive is True:
-            self._add(f"neighbor {ip} additional-paths receive")
-        self._render_af_neighbor_additional_paths_send(ip, neighbor.additional_paths)
-
-        self._add("neighbor {} route-map {} out", ip, neighbor.route_map_out)
-
-        if neighbor.password is not None:
-            pw = hide_passwords(neighbor.password, self.data.eos_cli_config_gen_configuration.hide_passwords)
-            pw_type = neighbor.password_type if neighbor.password_type is not None else "7"
-            self._add(f"neighbor {ip} password {pw_type} {pw}")
-
-        # default_originate: object-presence check (no enabled flag required).
-        default_originate = neighbor.default_originate
-        if default_originate:
-            cli = f"neighbor {ip} default-originate"
-            if default_originate.route_map is not None:
-                cli += f" route-map {default_originate.route_map}"
-            if default_originate.always is True:
+        for export in natural_sort(vrf.default_route_exports or [], sort_key="address_family"):
+            cli = f"default-route export {export.address_family}"
+            if export.always is True:
                 cli += " always"
+            if export.rcf is not None:
+                cli += f" rcf {export.rcf}"
+            elif export.route_map is not None:
+                cli += f" route-map {export.route_map}"
             self._add(cli)
 
-        if neighbor.send_community == "all":
-            self._add(f"neighbor {ip} send-community")
-        elif neighbor.send_community is not None:
-            self._add(f"neighbor {ip} send-community {neighbor.send_community}")
+        for address_family_entry in vrf.route_targets.field_import or []:
+            for rt in address_family_entry.route_targets or []:
+                self._add(f"route-target import {address_family_entry.address_family} {rt}")
+            if address_family_entry.address_family in ["evpn", "vpn-ipv4", "vpn-ipv6"]:
+                if address_family_entry.rcf is not None:
+                    if address_family_entry.vpn_route_filter_rcf is not None and address_family_entry.address_family in ["vpn-ipv4", "vpn-ipv6"]:
+                        self._add(f"route-target import {address_family_entry.address_family} rcf {address_family_entry.rcf} vpn-route filter-rcf {address_family_entry.vpn_route_filter_rcf}")
+                    else:
+                        self._add(f"route-target import {address_family_entry.address_family} rcf {address_family_entry.rcf}")
+                self._add("route-target import {} route-map {}", address_family_entry.address_family, address_family_entry.route_map)
 
-        if neighbor.maximum_routes is not None:
-            cli = f"neighbor {ip} maximum-routes {neighbor.maximum_routes}"
-            if neighbor.maximum_routes_warning_limit is not None:
-                cli += f" warning-limit {neighbor.maximum_routes_warning_limit}"
-            if neighbor.maximum_routes_warning_only is True:
-                cli += " warning-only"
+        for rt in natural_sort([r for r in vrf.route_targets.import_evpn_domains or [] if r.domain == "all"], sort_key="route_target"):
+            self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
+        for rt in natural_sort([r for r in vrf.route_targets.import_evpn_domains or [] if r.domain == "remote"], sort_key="route_target"):
+            self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
+
+        for address_family_entry in vrf.route_targets.export or []:
+            for rt in address_family_entry.route_targets or []:
+                self._add(f"route-target export {address_family_entry.address_family} {rt}")
+            if address_family_entry.address_family in ["evpn", "vpn-ipv4", "vpn-ipv6"]:
+                if address_family_entry.rcf is not None:
+                    if address_family_entry.vrf_route_filter_rcf is not None and address_family_entry.address_family in ["vpn-ipv4", "vpn-ipv6"]:
+                        self._add(f"route-target export {address_family_entry.address_family} rcf {address_family_entry.rcf} vrf-route filter-rcf {address_family_entry.vrf_route_filter_rcf}")
+                    else:
+                        self._add(f"route-target export {address_family_entry.address_family} rcf {address_family_entry.rcf}")
+                self._add("route-target export {} route-map {}", address_family_entry.address_family, address_family_entry.route_map)
+
+        for rt in natural_sort([r for r in vrf.route_targets.export_evpn_domains or [] if r.domain == "all"], sort_key="route_target"):
+            self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
+        for rt in natural_sort([r for r in vrf.route_targets.export_evpn_domains or [] if r.domain == "remote"], sort_key="route_target"):
+            self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
+
+        self._add("router-id {}", vrf.router_id)
+        self._add("update wait-for-convergence", vrf.updates.wait_for_convergence)
+        self._add("update wait-install", vrf.updates.wait_install)
+        self._add("timers bgp {}", vrf.timers)
+
+        if vrf.graceful_restart.enabled is True:
+            self._add("graceful-restart restart-time {}", vrf.graceful_restart.restart_time)
+            self._add("graceful-restart stalepath-time {}", vrf.graceful_restart.stalepath_time)
+            self._add("graceful-restart")
+
+        if vrf.maximum_paths.paths is not None:
+            cli = f"maximum-paths {vrf.maximum_paths.paths}"
+            if vrf.maximum_paths.ecmp is not None:
+                cli += f" ecmp {vrf.maximum_paths.ecmp}"
             self._add(cli)
 
-        self._add("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
-        self._add("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
+        if vrf.bgp.additional_paths.install is True:
+            self._add("bgp additional-paths install")
+        elif vrf.bgp.additional_paths.install_ecmp_primary is True:
+            self._add("bgp additional-paths install ecmp-primary")
+        self._add("bgp additional-paths receive", vrf.bgp.additional_paths.receive)
+        self._render_bgp_additional_paths_send(vrf.bgp.additional_paths)
 
-        if neighbor.remove_private_as_ingress.enabled is True:
-            cli = f"neighbor {ip} remove-private-as ingress"
-            if neighbor.remove_private_as_ingress.replace_as is True:
-                cli += " replace-as"
+        for listen_range in natural_sort(vrf.listen_ranges or [], sort_key="peer_group"):
+            if listen_range.peer_group is None or listen_range.prefix is None:
+                continue
+            if listen_range.peer_filter is None and listen_range.remote_as is None:
+                continue
+            cli = f"bgp listen range {listen_range.prefix}"
+            if listen_range.peer_id_include_router_id is True:
+                cli += " peer-id include router-id"
+            cli += f" peer-group {listen_range.peer_group}"
+            if listen_range.peer_filter is not None:
+                cli += f" peer-filter {listen_range.peer_filter}"
+            elif listen_range.remote_as is not None:
+                cli += f" remote-as {listen_range.remote_as}"
             self._add(cli)
-        elif neighbor.remove_private_as_ingress.enabled is False:
-            self._add(f"no neighbor {ip} remove-private-as ingress")
 
-    def _render_vrf_body(self, vrf: Any) -> None:
-        """
-        Render the VRF sections that follow the neighbors loop.
+        for neighbor in natural_sort(vrf.neighbors or [], sort_key="ip_address"):
+            self._render_neighbor(neighbor)
 
-        Called from _render_vrf after the neighbors loop (J2 lines 2948-3151).
-        Networks, bgp redistribute-internal, aggregate-addresses, redistribute,
-        neighbor-interfaces, and nested address-families are handled here.
-        """
         for network in natural_sort(vrf.networks or [], sort_key="prefix"):
             cli = f"network {network.prefix}"
             if network.route_map is not None:
@@ -2239,7 +841,7 @@ class RouterBgpGenerator(CliGenerator):
             self._add(cli)
 
         if vrf.redistribute:
-            self._render_vrf_redistribute(vrf.redistribute)
+            self._render_redistribute(vrf.redistribute)
 
         for ni in natural_sort(vrf.neighbor_interfaces or [], sort_key="name"):
             if ni.peer_group is not None and ni.remote_as is not None:
@@ -2247,793 +849,2467 @@ class RouterBgpGenerator(CliGenerator):
             elif ni.peer_group is not None and ni.peer_filter is not None:
                 self._add(f"neighbor interface {ni.name} peer-group {ni.peer_group} peer-filter {ni.peer_filter}")
 
-        self._render_vrf_af_flow_spec(vrf.address_family_flow_spec_ipv4, "ipv4")
-        self._render_vrf_af_flow_spec(vrf.address_family_flow_spec_ipv6, "ipv6")
-        self._render_vrf_af_ipv4(vrf)
-        self._render_vrf_af_ipv4mc(vrf)
-        self._render_vrf_af_ipv6(vrf)
-        self._render_vrf_af_ipv6mc(vrf)
-        self._render_vrf_evpn_multicast(vrf)
+        self._sub(RouterBgpVrfAddressFamilyFlowSpec(vrf.address_family_flow_spec_ipv4, "ipv4"))
+        self._sub(RouterBgpVrfAddressFamilyFlowSpec(vrf.address_family_flow_spec_ipv6, "ipv6"))
+        self._sub(RouterBgpVrfAddressFamilyIpv4(vrf))
+        self._sub(RouterBgpVrfAddressFamilyIpv4Multicast(vrf))
+        self._sub(RouterBgpVrfAddressFamilyIpv6(vrf))
+        self._sub(RouterBgpVrfAddressFamilyIpv6Multicast(vrf))
+        self._sub(RouterBgpVrfEvpnMulticast(vrf))
+
         if vrf.eos_cli is not None:
-            self._add(self._EXCLAMATION)
+            self._add("!")
             for line in vrf.eos_cli.splitlines():
                 self._add(line)
             if vrf.eos_cli.endswith("\n"):
-                self._model._lines.append("")
+                self._output_lines.append("")
 
-    def _render_vrf_redistribute(self, r: Any) -> None:
-        """Render VRF-level redistribute commands at L2 (J2 lines 2982-3144)."""
-        if r.connected.enabled is True:
+    def _render_neighbor(self, neighbor: Any) -> None:
+        neighbor_ip_address = neighbor.ip_address
+
+        self._add("neighbor {} peer group {}", neighbor_ip_address, neighbor.peer_group)
+        self._add("neighbor {} remote-as {}", neighbor_ip_address, neighbor.remote_as)
+        if neighbor.next_hop_self is True:
+            self._add(f"neighbor {neighbor_ip_address} next-hop-self")
+        if neighbor.next_hop_peer is True:
+            self._add(f"neighbor {neighbor_ip_address} next-hop-peer")
+        if neighbor.shutdown is True:
+            self._add(f"neighbor {neighbor_ip_address} shutdown")
+
+        if neighbor.remove_private_as.enabled is True:
+            cli = f"neighbor {neighbor_ip_address} remove-private-as"
+            if neighbor.remove_private_as.all is True:
+                cli += " all"
+                if neighbor.remove_private_as.replace_as is True:
+                    cli += " replace-as"
+            self._add(cli)
+        elif neighbor.remove_private_as.enabled is False:
+            self._add(f"no neighbor {neighbor_ip_address} remove-private-as")
+
+        if neighbor.as_path.prepend_own_disabled is True:
+            self._add(f"neighbor {neighbor_ip_address} as-path prepend-own disabled")
+        if neighbor.as_path.remote_as_replace_out is True:
+            self._add(f"neighbor {neighbor_ip_address} as-path remote-as replace out")
+        self._add("neighbor {} local-as {} no-prepend replace-as", neighbor_ip_address, neighbor.local_as)
+        self._add("neighbor {} weight {}", neighbor_ip_address, neighbor.weight)
+        if neighbor.passive is True:
+            self._add(f"neighbor {neighbor_ip_address} passive")
+        self._add("neighbor {} update-source {}", neighbor_ip_address, neighbor.update_source)
+
+        if neighbor.bfd is True:
+            self._add(f"neighbor {neighbor_ip_address} bfd")
+            bfd_timers = neighbor.bfd_timers
+            self._add("neighbor {} bfd interval {} min-rx {} multiplier {}", neighbor_ip_address, bfd_timers.interval, bfd_timers.min_rx, bfd_timers.multiplier)
+        elif neighbor.bfd is False and neighbor.peer_group is not None:
+            self._add(f"no neighbor {neighbor_ip_address} bfd")
+
+        self._add("neighbor {} description {}", neighbor_ip_address, neighbor.description)
+
+        if neighbor.allowas_in.enabled is True:
+            cli = f"neighbor {neighbor_ip_address} allowas-in"
+            if neighbor.allowas_in.times is not None:
+                cli += f" {neighbor.allowas_in.times}"
+            self._add(cli)
+
+        if neighbor.rib_in_pre_policy_retain.enabled is True:
+            cli = f"neighbor {neighbor_ip_address} rib-in pre-policy retain"
+            if neighbor.rib_in_pre_policy_retain.all is True:
+                cli += " all"
+            self._add(cli)
+        elif neighbor.rib_in_pre_policy_retain.enabled is False:
+            self._add(f"no neighbor {neighbor_ip_address} rib-in pre-policy retain")
+
+        self._add("neighbor {} ebgp-multihop {}", neighbor_ip_address, neighbor.ebgp_multihop)
+
+        if neighbor.route_reflector_client is True:
+            self._add(f"neighbor {neighbor_ip_address} route-reflector-client")
+        elif neighbor.route_reflector_client is False:
+            self._add(f"no neighbor {neighbor_ip_address} route-reflector-client")
+
+        self._add("neighbor {} timers {}", neighbor_ip_address, neighbor.timers)
+        self._add("neighbor {} route-map {} in", neighbor_ip_address, neighbor.route_map_in)
+
+        if neighbor.additional_paths.receive is True:
+            self._add(f"neighbor {neighbor_ip_address} additional-paths receive")
+        self._render_neighbor_additional_paths_send(neighbor_ip_address, neighbor.additional_paths)
+
+        self._add("neighbor {} route-map {} out", neighbor_ip_address, neighbor.route_map_out)
+
+        if neighbor.password is not None:
+            hashed_password = hide_passwords(neighbor.password, self.data.eos_cli_config_gen_configuration.hide_passwords)
+            pw_type = neighbor.password_type if neighbor.password_type is not None else "7"
+            self._add(f"neighbor {neighbor_ip_address} password {pw_type} {hashed_password}")
+
+        default_originate = neighbor.default_originate
+        if default_originate:
+            cli = f"neighbor {neighbor_ip_address} default-originate"
+            if default_originate.route_map is not None:
+                cli += f" route-map {default_originate.route_map}"
+            if default_originate.always is True:
+                cli += " always"
+            self._add(cli)
+
+        if neighbor.send_community == "all":
+            self._add(f"neighbor {neighbor_ip_address} send-community")
+        elif neighbor.send_community is not None:
+            self._add(f"neighbor {neighbor_ip_address} send-community {neighbor.send_community}")
+
+        if neighbor.maximum_routes is not None:
+            cli = f"neighbor {neighbor_ip_address} maximum-routes {neighbor.maximum_routes}"
+            if neighbor.maximum_routes_warning_limit is not None:
+                cli += f" warning-limit {neighbor.maximum_routes_warning_limit}"
+            if neighbor.maximum_routes_warning_only is True:
+                cli += " warning-only"
+            self._add(cli)
+
+        self._add("neighbor {} peer-tag in {}", neighbor_ip_address, neighbor.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", neighbor_ip_address, neighbor.peer_tag_out_discard)
+
+        if neighbor.remove_private_as_ingress.enabled is True:
+            cli = f"neighbor {neighbor_ip_address} remove-private-as ingress"
+            if neighbor.remove_private_as_ingress.replace_as is True:
+                cli += " replace-as"
+            self._add(cli)
+        elif neighbor.remove_private_as_ingress.enabled is False:
+            self._add(f"no neighbor {neighbor_ip_address} remove-private-as ingress")
+
+    def _render_neighbor_additional_paths_send(self, ip: str, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add(f"no neighbor {ip} additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"neighbor {ip} additional-paths send ecmp limit {send_limit}")
+        elif send == "limit":
+            self._add("neighbor {} additional-paths send limit {}", ip, send_limit)
+        else:
+            self._add(f"neighbor {ip} additional-paths send {send}")
+
+    def _render_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
+
+    def _render_redistribute(self, redistribute: Any) -> None:
+        if redistribute.connected.enabled is True:
             cli = "redistribute connected"
-            if r.connected.include_leaked is True:
+            if redistribute.connected.include_leaked is True:
                 cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            elif redistribute.connected.rcf is not None:
+                cli += f" rcf {redistribute.connected.rcf}"
             self._add(cli)
 
-        if r.isis.enabled is True:
+        if redistribute.isis.enabled is True:
             cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
                 cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
             self._add(cli)
 
-        if r.ospf.enabled is True:
+        if redistribute.ospf.enabled is True:
             cli = "redistribute ospf"
-            if r.ospf.include_leaked is True:
+            if redistribute.ospf.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
+            if redistribute.ospf.route_map is not None:
+                cli += f" route-map {redistribute.ospf.route_map}"
             self._add(cli)
-        elif r.ospf.match_internal.enabled is True:
+        elif redistribute.ospf.match_internal.enabled is True:
             cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.include_leaked is True:
+            if redistribute.ospf.match_internal.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
+            if redistribute.ospf.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_internal.route_map}"
             self._add(cli)
 
-        if r.ospf.match_external.enabled is True:
+        if redistribute.ospf.match_external.enabled is True:
             cli = "redistribute ospf match external"
-            if r.ospf.match_external.include_leaked is True:
+            if redistribute.ospf.match_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
+            if redistribute.ospf.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_external.route_map}"
             self._add(cli)
 
-        if r.ospf.match_nssa_external.enabled is True:
+        if redistribute.ospf.match_nssa_external.enabled is True:
             cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.include_leaked is True:
+            if redistribute.ospf.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospf.match_nssa_external.nssa_type}"
+            if redistribute.ospf.match_nssa_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
+            if redistribute.ospf.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_nssa_external.route_map}"
             self._add(cli)
 
-        if r.ospfv3.enabled is True:
+        if redistribute.ospfv3.enabled is True:
             cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
+            if redistribute.ospfv3.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
             self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
+        elif redistribute.ospfv3.match_internal.enabled is True:
             cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
+            if redistribute.ospfv3.match_internal.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_external.enabled is True:
+        if redistribute.ospfv3.match_external.enabled is True:
             cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
+            if redistribute.ospfv3.match_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_nssa_external.enabled is True:
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
             cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
             self._add(cli)
 
-        if r.static.enabled is True:
+        if redistribute.static.enabled is True:
             cli = "redistribute static"
-            if r.static.include_leaked is True:
+            if redistribute.static.include_leaked is True:
                 cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            elif redistribute.static.rcf is not None:
+                cli += f" rcf {redistribute.static.rcf}"
             self._add(cli)
 
-        if r.rip.enabled is True:
+        if redistribute.rip.enabled is True:
             cli = "redistribute rip"
-            if r.rip.route_map is not None:
-                cli += f" route-map {r.rip.route_map}"
+            if redistribute.rip.route_map is not None:
+                cli += f" route-map {redistribute.rip.route_map}"
             self._add(cli)
 
-        if r.attached_host.enabled is True:
+        if redistribute.attached_host.enabled is True:
             cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
+            if redistribute.attached_host.route_map is not None:
+                cli += f" route-map {redistribute.attached_host.route_map}"
             self._add(cli)
 
-        if r.dynamic.enabled is True:
+        if redistribute.dynamic.enabled is True:
             cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
+            if redistribute.dynamic.route_map is not None:
+                cli += f" route-map {redistribute.dynamic.route_map}"
+            elif redistribute.dynamic.rcf is not None:
+                cli += f" rcf {redistribute.dynamic.rcf}"
             self._add(cli)
 
-        if r.bgp.enabled is True:
+        if redistribute.bgp.enabled is True:
             cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
+            if redistribute.bgp.route_map is not None:
+                cli += f" route-map {redistribute.bgp.route_map}"
             self._add(cli)
 
-        if r.user.enabled is True:
+        if redistribute.user.enabled is True:
             cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
+            if redistribute.user.rcf is not None:
+                cli += f" rcf {redistribute.user.rcf}"
             self._add(cli)
 
-    def _render_vrf_af_flow_spec(self, af: Any, protocol: str) -> None:
-        """Render VRF 'address-family flow-spec {ipv4|ipv6}' block at L2/L3."""
-        if not af:
+
+class RouterBgpVrfAddressFamilyFlowSpec(CliSection):
+    """Renders 'address-family flow-spec {ipv4|ipv6}' inside a VRF block."""
+
+    def __init__(self, address_family: Any, protocol: str) -> None:
+        self.address_family = address_family
+        self.protocol = protocol
+
+    def _generate(self) -> None:
+        if not self.address_family:
             return
-        with self._block(f"address-family flow-spec {protocol}"):
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                if neighbor.activate is True:
-                    self._add(f"neighbor {neighbor.ip_address} activate")
+        self._header(f"address-family flow-spec {self.protocol}")
+        address_family = self.address_family
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            if neighbor.activate is True:
+                self._add(f"neighbor {neighbor.ip_address} activate")
 
-    def _render_vrf_af_ipv4(self, vrf: Any) -> None:
-        """Render VRF 'address-family ipv4' block at L2/L3 (J2 lines 3182-3411+)."""
-        af = vrf.address_family_ipv4
-        if not af:
+
+class RouterBgpVrfAddressFamilyIpv4(CliSection):
+    """Renders 'address-family ipv4' inside a VRF block."""
+
+    def __init__(self, vrf: Any) -> None:
+        self.vrf = vrf
+
+    def _generate(self) -> None:
+        address_family = self.vrf.address_family_ipv4
+        if not address_family:
             return
-        with self._block("address-family ipv4"):
-            if af.bgp.additional_paths.install is True:
-                self._add("bgp additional-paths install")
-            elif af.bgp.additional_paths.install_ecmp_primary is True:
-                self._add("bgp additional-paths install ecmp-primary")
+        self._header("address-family ipv4")
 
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
+        if address_family.bgp.additional_paths.install is True:
+            self._add("bgp additional-paths install")
+        elif address_family.bgp.additional_paths.install_ecmp_primary is True:
+            self._add("bgp additional-paths install ecmp-primary")
 
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+        self._render_bgp_additional_paths_send(address_family.bgp.additional_paths)
 
-            # bgp additional-paths send (standard EVPN pattern) at L3.
-            send = af.bgp.additional_paths.send
-            send_limit = af.bgp.additional_paths.send_limit
-            if send is not None:
-                if send == "disabled":
-                    self._add("no bgp additional-paths send")
-                elif send == "ecmp" and send_limit is not None:
-                    self._add(f"bgp additional-paths send ecmp limit {send_limit}")
-                elif send == "limit" and send_limit is not None:
-                    self._add(f"bgp additional-paths send limit {send_limit}")
-                else:
-                    self._add(f"bgp additional-paths send {send}")
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_neighbor(neighbor)
 
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                ip = neighbor.ip_address
-                if neighbor.activate is True:
-                    self._add(f"neighbor {ip} activate")
-                if neighbor.additional_paths.receive is True:
-                    self._add(f"neighbor {ip} additional-paths receive")
-                self._add("neighbor {} route-map {} in", ip, neighbor.route_map_in)
-                self._add("neighbor {} route-map {} out", ip, neighbor.route_map_out)
-                self._add("neighbor {} rcf in {}", ip, neighbor.rcf_in)
-                self._add("neighbor {} rcf out {}", ip, neighbor.rcf_out)
-                self._add("neighbor {} prefix-list {} in", ip, neighbor.prefix_list_in)
-                self._add("neighbor {} prefix-list {} out", ip, neighbor.prefix_list_out)
-                # additional-paths send at L3 (standard EVPN pattern, no prefix_list).
-                neighbor_send = neighbor.additional_paths.send
-                neighbor_send_limit = neighbor.additional_paths.send_limit
-                if neighbor_send is not None:
-                    if neighbor_send == "disabled":
-                        self._add(f"no neighbor {ip} additional-paths send")
-                    elif neighbor_send == "ecmp" and neighbor_send_limit is not None:
-                        self._add(f"neighbor {ip} additional-paths send ecmp limit {neighbor_send_limit}")
-                    elif neighbor_send == "limit" and neighbor_send_limit is not None:
-                        self._add(f"neighbor {ip} additional-paths send limit {neighbor_send_limit}")
-                    else:
-                        self._add(f"neighbor {ip} additional-paths send {neighbor_send}")
-                # next-hop address-family ipv6.
-                next_hop_ipv6 = neighbor.next_hop.address_family_ipv6
-                if next_hop_ipv6.enabled is not None:
-                    if next_hop_ipv6.enabled:
-                        cli = f"neighbor {ip} next-hop address-family ipv6"
-                        if next_hop_ipv6.originate is True:
-                            cli += " originate"
-                        self._add(cli)
-                    else:
-                        self._add(f"no neighbor {ip} next-hop address-family ipv6")
-                self._add("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
-                self._add("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
+        for network in natural_sort(address_family.networks or [], sort_key="prefix"):
+            cli = f"network {network.prefix}"
+            if network.route_map is not None:
+                cli += f" route-map {network.route_map}"
+            elif network.rcf is not None:
+                cli += f" rcf {network.rcf}"
+            self._add(cli)
 
-            for network in natural_sort(af.networks or [], sort_key="prefix"):
-                cli = f"network {network.prefix}"
-                if network.route_map is not None:
-                    cli += f" route-map {network.route_map}"
-                elif network.rcf is not None:
-                    cli += f" rcf {network.rcf}"
+        if address_family.bgp.redistribute_internal is True:
+            self._add("bgp redistribute-internal")
+        elif address_family.bgp.redistribute_internal is False:
+            self._add("no bgp redistribute-internal")
+
+        if address_family.redistribute:
+            self._render_redistribute(address_family.redistribute)
+
+    def _render_neighbor(self, neighbor: Any) -> None:
+        neighbor_ip_address = neighbor.ip_address
+        if neighbor.activate is True:
+            self._add(f"neighbor {neighbor_ip_address} activate")
+        if neighbor.additional_paths.receive is True:
+            self._add(f"neighbor {neighbor_ip_address} additional-paths receive")
+        self._add("neighbor {} route-map {} in", neighbor_ip_address, neighbor.route_map_in)
+        self._add("neighbor {} route-map {} out", neighbor_ip_address, neighbor.route_map_out)
+        self._add("neighbor {} rcf in {}", neighbor_ip_address, neighbor.rcf_in)
+        self._add("neighbor {} rcf out {}", neighbor_ip_address, neighbor.rcf_out)
+        self._add("neighbor {} prefix-list {} in", neighbor_ip_address, neighbor.prefix_list_in)
+        self._add("neighbor {} prefix-list {} out", neighbor_ip_address, neighbor.prefix_list_out)
+        self._render_neighbor_additional_paths_send(neighbor_ip_address, neighbor.additional_paths)
+        next_hop_ipv6 = neighbor.next_hop.address_family_ipv6
+        if next_hop_ipv6.enabled is not None:
+            if next_hop_ipv6.enabled:
+                cli = f"neighbor {neighbor_ip_address} next-hop address-family ipv6"
+                if next_hop_ipv6.originate is True:
+                    cli += " originate"
                 self._add(cli)
+            else:
+                self._add(f"no neighbor {neighbor_ip_address} next-hop address-family ipv6")
+        self._add("neighbor {} peer-tag in {}", neighbor_ip_address, neighbor.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", neighbor_ip_address, neighbor.peer_tag_out_discard)
 
-            if af.bgp.redistribute_internal is True:
-                self._add("bgp redistribute-internal")
-            elif af.bgp.redistribute_internal is False:
-                self._add("no bgp redistribute-internal")
+    def _render_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
 
-            if af.redistribute:
-                self._render_vrf_af_ipv4_redistribute(af.redistribute)
+    def _render_neighbor_additional_paths_send(self, ip: str, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add(f"no neighbor {ip} additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"neighbor {ip} additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"neighbor {ip} additional-paths send limit {send_limit}")
+        else:
+            self._add(f"neighbor {ip} additional-paths send {send}")
 
-    def _render_vrf_af_ipv4_redistribute(self, r: Any) -> None:
-        """Render VRF address-family ipv4 redistribute commands at L3 (J2 lines 3280-3411+)."""
-        if r.attached_host.enabled is True:
+    def _render_redistribute(self, redistribute: Any) -> None:
+        if redistribute.attached_host.enabled is True:
             cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
+            if redistribute.attached_host.route_map is not None:
+                cli += f" route-map {redistribute.attached_host.route_map}"
             self._add(cli)
 
-        if r.bgp.enabled is True:
+        if redistribute.bgp.enabled is True:
             cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
+            if redistribute.bgp.route_map is not None:
+                cli += f" route-map {redistribute.bgp.route_map}"
             self._add(cli)
 
-        if r.connected.enabled is True:
+        if redistribute.connected.enabled is True:
             cli = "redistribute connected"
-            if r.connected.include_leaked is True:
+            if redistribute.connected.include_leaked is True:
                 cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            elif redistribute.connected.rcf is not None:
+                cli += f" rcf {redistribute.connected.rcf}"
             self._add(cli)
 
-        if r.dynamic.enabled is True:
+        if redistribute.dynamic.enabled is True:
             cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
+            if redistribute.dynamic.route_map is not None:
+                cli += f" route-map {redistribute.dynamic.route_map}"
+            elif redistribute.dynamic.rcf is not None:
+                cli += f" rcf {redistribute.dynamic.rcf}"
             self._add(cli)
 
-        if r.user.enabled is True:
+        if redistribute.user.enabled is True:
             cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
+            if redistribute.user.rcf is not None:
+                cli += f" rcf {redistribute.user.rcf}"
             self._add(cli)
 
-        if r.isis.enabled is True:
+        if redistribute.isis.enabled is True:
             cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
                 cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
             self._add(cli)
 
-        if r.ospf.enabled is True:
+        if redistribute.ospf.enabled is True:
             cli = "redistribute ospf"
-            if r.ospf.include_leaked is True:
+            if redistribute.ospf.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
+            if redistribute.ospf.route_map is not None:
+                cli += f" route-map {redistribute.ospf.route_map}"
             self._add(cli)
-        elif r.ospf.match_internal.enabled is True:
+        elif redistribute.ospf.match_internal.enabled is True:
             cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.include_leaked is True:
+            if redistribute.ospf.match_internal.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
+            if redistribute.ospf.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_internal.route_map}"
             self._add(cli)
 
-        if r.ospfv3.enabled is True:
+        if redistribute.ospfv3.enabled is True:
             cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
+            if redistribute.ospfv3.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
             self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
+        elif redistribute.ospfv3.match_internal.enabled is True:
             cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
+            if redistribute.ospfv3.match_internal.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_external.enabled is True:
+        if redistribute.ospfv3.match_external.enabled is True:
             cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
+            if redistribute.ospfv3.match_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_nssa_external.enabled is True:
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
             cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
             self._add(cli)
 
-        if r.ospf.match_external.enabled is True:
+        if redistribute.ospf.match_external.enabled is True:
             cli = "redistribute ospf match external"
-            if r.ospf.match_external.include_leaked is True:
+            if redistribute.ospf.match_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
+            if redistribute.ospf.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_external.route_map}"
             self._add(cli)
 
-        if r.ospf.match_nssa_external.enabled is True:
+        if redistribute.ospf.match_nssa_external.enabled is True:
             cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.include_leaked is True:
+            if redistribute.ospf.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospf.match_nssa_external.nssa_type}"
+            if redistribute.ospf.match_nssa_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
+            if redistribute.ospf.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_nssa_external.route_map}"
             self._add(cli)
 
-        if r.rip.enabled is True:
+        if redistribute.rip.enabled is True:
             cli = "redistribute rip"
-            if r.rip.route_map is not None:
-                cli += f" route-map {r.rip.route_map}"
+            if redistribute.rip.route_map is not None:
+                cli += f" route-map {redistribute.rip.route_map}"
             self._add(cli)
 
-        if r.static.enabled is True:
+        if redistribute.static.enabled is True:
             cli = "redistribute static"
-            if r.static.include_leaked is True:
+            if redistribute.static.include_leaked is True:
                 cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            elif redistribute.static.rcf is not None:
+                cli += f" rcf {redistribute.static.rcf}"
             self._add(cli)
 
-    def _render_vrf_af_ipv4mc(self, vrf: Any) -> None:
-        """Render VRF 'address-family ipv4 multicast' block at L2/L3 (J2 lines 3444-3582)."""
-        af = vrf.address_family_ipv4_multicast
-        if not af:
+
+class RouterBgpVrfAddressFamilyIpv4Multicast(CliSection):
+    """Renders 'address-family ipv4 multicast' inside a VRF block."""
+
+    def __init__(self, vrf: Any) -> None:
+        self.vrf = vrf
+
+    def _generate(self) -> None:
+        address_family = self.vrf.address_family_ipv4_multicast
+        if not address_family:
             return
-        with self._block("address-family ipv4 multicast"):
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
+        self._header("address-family ipv4 multicast")
 
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                ip = neighbor.ip_address
-                if neighbor.activate is True:
-                    self._add(f"neighbor {ip} activate")
-                if neighbor.additional_paths.receive is True:
-                    self._add(f"neighbor {ip} additional-paths receive")
-                self._add("neighbor {} route-map {} in", ip, neighbor.route_map_in)
-                self._add("neighbor {} route-map {} out", ip, neighbor.route_map_out)
-                self._add("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
-                self._add("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
 
-            for network in natural_sort(af.networks or [], sort_key="prefix"):
-                cli = f"network {network.prefix}"
-                if network.route_map is not None:
-                    cli += f" route-map {network.route_map}"
-                self._add(cli)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            neighbor_ip_address = neighbor.ip_address
+            if neighbor.activate is True:
+                self._add(f"neighbor {neighbor_ip_address} activate")
+            if neighbor.additional_paths.receive is True:
+                self._add(f"neighbor {neighbor_ip_address} additional-paths receive")
+            self._add("neighbor {} route-map {} in", neighbor_ip_address, neighbor.route_map_in)
+            self._add("neighbor {} route-map {} out", neighbor_ip_address, neighbor.route_map_out)
+            self._add("neighbor {} peer-tag in {}", neighbor_ip_address, neighbor.peer_tag_in)
+            self._add("neighbor {} peer-tag out discard {}", neighbor_ip_address, neighbor.peer_tag_out_discard)
 
-            if af.redistribute:
-                self._render_vrf_af_ipv4mc_redistribute(af.redistribute)
-
-    def _render_vrf_af_ipv4mc_redistribute(self, r: Any) -> None:
-        """Render VRF address-family ipv4 multicast redistribute commands at L3 (J2 lines 3485-3580)."""
-        if r.attached_host.enabled is True:
-            cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
+        for network in natural_sort(address_family.networks or [], sort_key="prefix"):
+            cli = f"network {network.prefix}"
+            if network.route_map is not None:
+                cli += f" route-map {network.route_map}"
             self._add(cli)
 
-        if r.connected.enabled is True:
+        if address_family.redistribute:
+            self._render_redistribute(address_family.redistribute)
+
+    def _render_redistribute(self, redistribute: Any) -> None:
+        if redistribute.attached_host.enabled is True:
+            cli = "redistribute attached-host"
+            if redistribute.attached_host.route_map is not None:
+                cli += f" route-map {redistribute.attached_host.route_map}"
+            self._add(cli)
+
+        if redistribute.connected.enabled is True:
             cli = "redistribute connected"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
             self._add(cli)
 
-        if r.isis.enabled is True:
+        if redistribute.isis.enabled is True:
             cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
                 cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
             self._add(cli)
 
-        if r.ospf.enabled is True:
+        if redistribute.ospf.enabled is True:
             cli = "redistribute ospf"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
+            if redistribute.ospf.route_map is not None:
+                cli += f" route-map {redistribute.ospf.route_map}"
             self._add(cli)
-        elif r.ospf.match_internal.enabled is True:
+        elif redistribute.ospf.match_internal.enabled is True:
             cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
+            if redistribute.ospf.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_internal.route_map}"
             self._add(cli)
 
-        if r.ospfv3.enabled is True:
+        if redistribute.ospfv3.enabled is True:
             cli = "redistribute ospfv3"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
             self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
+        elif redistribute.ospfv3.match_internal.enabled is True:
             cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_external.enabled is True:
+        if redistribute.ospfv3.match_external.enabled is True:
             cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_nssa_external.enabled is True:
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
             cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
             self._add(cli)
 
-        if r.ospf.match_external.enabled is True:
+        if redistribute.ospf.match_external.enabled is True:
             cli = "redistribute ospf match external"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
+            if redistribute.ospf.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_external.route_map}"
             self._add(cli)
 
-        if r.ospf.match_nssa_external.enabled is True:
+        if redistribute.ospf.match_nssa_external.enabled is True:
             cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
+            if redistribute.ospf.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospf.match_nssa_external.nssa_type}"
+            if redistribute.ospf.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_nssa_external.route_map}"
             self._add(cli)
 
-        if r.static.enabled is True:
+        if redistribute.static.enabled is True:
             cli = "redistribute static"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
             self._add(cli)
 
-    def _render_vrf_af_ipv6(self, vrf: Any) -> None:
-        """Render VRF 'address-family ipv6' block at L2/L3 (J2 lines 3583-3791)."""
-        af = vrf.address_family_ipv6
-        if not af:
+
+class RouterBgpVrfAddressFamilyIpv6(CliSection):
+    """Renders 'address-family ipv6' inside a VRF block."""
+
+    def __init__(self, vrf: Any) -> None:
+        self.vrf = vrf
+
+    def _generate(self) -> None:
+        address_family = self.vrf.address_family_ipv6
+        if not address_family:
             return
-        with self._block("address-family ipv6"):
-            if af.bgp.additional_paths.install is True:
-                self._add("bgp additional-paths install")
-            elif af.bgp.additional_paths.install_ecmp_primary is True:
-                self._add("bgp additional-paths install ecmp-primary")
+        self._header("address-family ipv6")
 
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
+        if address_family.bgp.additional_paths.install is True:
+            self._add("bgp additional-paths install")
+        elif address_family.bgp.additional_paths.install_ecmp_primary is True:
+            self._add("bgp additional-paths install ecmp-primary")
 
-            # bgp additional-paths send (standard EVPN pattern) at L3.
-            send = af.bgp.additional_paths.send
-            send_limit = af.bgp.additional_paths.send_limit
-            if send is not None:
-                if send == "disabled":
-                    self._add("no bgp additional-paths send")
-                elif send == "ecmp" and send_limit is not None:
-                    self._add(f"bgp additional-paths send ecmp limit {send_limit}")
-                elif send == "limit" and send_limit is not None:
-                    self._add(f"bgp additional-paths send limit {send_limit}")
-                else:
-                    self._add(f"bgp additional-paths send {send}")
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+        self._render_bgp_additional_paths_send(address_family.bgp.additional_paths)
 
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                ip = neighbor.ip_address
-                if neighbor.activate is True:
-                    self._add(f"neighbor {ip} activate")
-                if neighbor.additional_paths.receive is True:
-                    self._add(f"neighbor {ip} additional-paths receive")
-                self._add("neighbor {} route-map {} in", ip, neighbor.route_map_in)
-                self._add("neighbor {} route-map {} out", ip, neighbor.route_map_out)
-                self._add("neighbor {} rcf in {}", ip, neighbor.rcf_in)
-                self._add("neighbor {} rcf out {}", ip, neighbor.rcf_out)
-                self._add("neighbor {} prefix-list {} in", ip, neighbor.prefix_list_in)
-                self._add("neighbor {} prefix-list {} out", ip, neighbor.prefix_list_out)
-                # additional-paths send per-neighbor (standard EVPN pattern).
-                neighbor_send = neighbor.additional_paths.send
-                neighbor_send_limit = neighbor.additional_paths.send_limit
-                if neighbor_send is not None:
-                    if neighbor_send == "disabled":
-                        self._add(f"no neighbor {ip} additional-paths send")
-                    elif neighbor_send == "ecmp" and neighbor_send_limit is not None:
-                        self._add(f"neighbor {ip} additional-paths send ecmp limit {neighbor_send_limit}")
-                    elif neighbor_send == "limit" and neighbor_send_limit is not None:
-                        self._add(f"neighbor {ip} additional-paths send limit {neighbor_send_limit}")
-                    else:
-                        self._add(f"neighbor {ip} additional-paths send {neighbor_send}")
-                self._add("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
-                self._add("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_neighbor(neighbor)
 
-            for network in natural_sort(af.networks or [], sort_key="prefix"):
-                cli = f"network {network.prefix}"
-                if network.route_map is not None:
-                    cli += f" route-map {network.route_map}"
-                elif network.rcf is not None:
-                    cli += f" rcf {network.rcf}"
-                self._add(cli)
+        for network in natural_sort(address_family.networks or [], sort_key="prefix"):
+            cli = f"network {network.prefix}"
+            if network.route_map is not None:
+                cli += f" route-map {network.route_map}"
+            elif network.rcf is not None:
+                cli += f" rcf {network.rcf}"
+            self._add(cli)
 
-            if af.bgp.redistribute_internal is True:
-                self._add("bgp redistribute-internal")
-            elif af.bgp.redistribute_internal is False:
-                self._add("no bgp redistribute-internal")
+        if address_family.bgp.redistribute_internal is True:
+            self._add("bgp redistribute-internal")
+        elif address_family.bgp.redistribute_internal is False:
+            self._add("no bgp redistribute-internal")
 
-            if af.redistribute:
-                self._render_vrf_af_ipv6_redistribute(af.redistribute)
+        if address_family.redistribute:
+            self._render_redistribute(address_family.redistribute)
 
-    def _render_vrf_af_ipv6_redistribute(self, r: Any) -> None:
-        """Render VRF address-family ipv6 redistribute commands at L3 (J2 lines 3672-3789)."""
-        if r.attached_host.enabled is True:
+    def _render_neighbor(self, neighbor: Any) -> None:
+        neighbor_ip_address = neighbor.ip_address
+        if neighbor.activate is True:
+            self._add(f"neighbor {neighbor_ip_address} activate")
+        if neighbor.additional_paths.receive is True:
+            self._add(f"neighbor {neighbor_ip_address} additional-paths receive")
+        self._add("neighbor {} route-map {} in", neighbor_ip_address, neighbor.route_map_in)
+        self._add("neighbor {} route-map {} out", neighbor_ip_address, neighbor.route_map_out)
+        self._add("neighbor {} rcf in {}", neighbor_ip_address, neighbor.rcf_in)
+        self._add("neighbor {} rcf out {}", neighbor_ip_address, neighbor.rcf_out)
+        self._add("neighbor {} prefix-list {} in", neighbor_ip_address, neighbor.prefix_list_in)
+        self._add("neighbor {} prefix-list {} out", neighbor_ip_address, neighbor.prefix_list_out)
+        self._render_neighbor_additional_paths_send(neighbor_ip_address, neighbor.additional_paths)
+        self._add("neighbor {} peer-tag in {}", neighbor_ip_address, neighbor.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", neighbor_ip_address, neighbor.peer_tag_out_discard)
+
+    def _render_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
+
+    def _render_neighbor_additional_paths_send(self, ip: str, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add(f"no neighbor {ip} additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"neighbor {ip} additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"neighbor {ip} additional-paths send limit {send_limit}")
+        else:
+            self._add(f"neighbor {ip} additional-paths send {send}")
+
+    def _render_redistribute(self, redistribute: Any) -> None:
+        if redistribute.attached_host.enabled is True:
             cli = "redistribute attached-host"
-            if r.attached_host.route_map is not None:
-                cli += f" route-map {r.attached_host.route_map}"
+            if redistribute.attached_host.route_map is not None:
+                cli += f" route-map {redistribute.attached_host.route_map}"
             self._add(cli)
 
-        if r.bgp.enabled is True:
+        if redistribute.bgp.enabled is True:
             cli = "redistribute bgp leaked"
-            if r.bgp.route_map is not None:
-                cli += f" route-map {r.bgp.route_map}"
+            if redistribute.bgp.route_map is not None:
+                cli += f" route-map {redistribute.bgp.route_map}"
             self._add(cli)
 
-        if r.dhcp.enabled is True:
+        if redistribute.dhcp.enabled is True:
             cli = "redistribute dhcp"
-            if r.dhcp.route_map is not None:
-                cli += f" route-map {r.dhcp.route_map}"
+            if redistribute.dhcp.route_map is not None:
+                cli += f" route-map {redistribute.dhcp.route_map}"
             self._add(cli)
 
-        if r.connected.enabled is True:
+        if redistribute.connected.enabled is True:
             cli = "redistribute connected"
-            if r.connected.include_leaked is True:
+            if redistribute.connected.include_leaked is True:
                 cli += " include leaked"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            elif r.connected.rcf is not None:
-                cli += f" rcf {r.connected.rcf}"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            elif redistribute.connected.rcf is not None:
+                cli += f" rcf {redistribute.connected.rcf}"
             self._add(cli)
 
-        if r.dynamic.enabled is True:
+        if redistribute.dynamic.enabled is True:
             cli = "redistribute dynamic"
-            if r.dynamic.route_map is not None:
-                cli += f" route-map {r.dynamic.route_map}"
-            elif r.dynamic.rcf is not None:
-                cli += f" rcf {r.dynamic.rcf}"
+            if redistribute.dynamic.route_map is not None:
+                cli += f" route-map {redistribute.dynamic.route_map}"
+            elif redistribute.dynamic.rcf is not None:
+                cli += f" rcf {redistribute.dynamic.rcf}"
             self._add(cli)
 
-        if r.user.enabled is True:
+        if redistribute.user.enabled is True:
             cli = "redistribute user"
-            if r.user.rcf is not None:
-                cli += f" rcf {r.user.rcf}"
+            if redistribute.user.rcf is not None:
+                cli += f" rcf {redistribute.user.rcf}"
             self._add(cli)
 
-        if r.isis.enabled is True:
+        if redistribute.isis.enabled is True:
             cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
                 cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
             self._add(cli)
 
-        if r.ospfv3.enabled is True:
+        if redistribute.ospfv3.enabled is True:
             cli = "redistribute ospfv3"
-            if r.ospfv3.include_leaked is True:
+            if redistribute.ospfv3.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
             self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
+        elif redistribute.ospfv3.match_internal.enabled is True:
             cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.include_leaked is True:
+            if redistribute.ospfv3.match_internal.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_external.enabled is True:
+        if redistribute.ospfv3.match_external.enabled is True:
             cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.include_leaked is True:
+            if redistribute.ospfv3.match_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
             self._add(cli)
 
-        if r.ospfv3.match_nssa_external.enabled is True:
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
             cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.include_leaked is True:
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.include_leaked is True:
                 cli += " include leaked"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
             self._add(cli)
 
-        if r.static.enabled is True:
+        if redistribute.static.enabled is True:
             cli = "redistribute static"
-            if r.static.include_leaked is True:
+            if redistribute.static.include_leaked is True:
                 cli += " include leaked"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            elif r.static.rcf is not None:
-                cli += f" rcf {r.static.rcf}"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            elif redistribute.static.rcf is not None:
+                cli += f" rcf {redistribute.static.rcf}"
             self._add(cli)
 
-    def _render_vrf_af_ipv6mc(self, vrf: Any) -> None:
-        """Render VRF 'address-family ipv6 multicast' block at L2/L3 (J2 lines 3792-3910+)."""
-        af = vrf.address_family_ipv6_multicast
-        if not af:
+
+class RouterBgpVrfAddressFamilyIpv6Multicast(CliSection):
+    """Renders 'address-family ipv6 multicast' inside a VRF block."""
+
+    def __init__(self, vrf: Any) -> None:
+        self.vrf = vrf
+
+    def _generate(self) -> None:
+        address_family = self.vrf.address_family_ipv6_multicast
+        if not address_family:
             return
-        with self._block("address-family ipv6 multicast"):
-            self._add("bgp missing-policy direction in action {}", af.bgp.missing_policy.direction_in_action)
-            self._add("bgp missing-policy direction out action {}", af.bgp.missing_policy.direction_out_action)
-            self._add("bgp additional-paths receive", af.bgp.additional_paths.receive)
+        self._header("address-family ipv6 multicast")
 
-            for neighbor in natural_sort(af.neighbors or [], sort_key="ip_address"):
-                ip = neighbor.ip_address
-                if neighbor.activate is True:
-                    self._add(f"neighbor {ip} activate")
-                if neighbor.additional_paths.receive is True:
-                    self._add(f"neighbor {ip} additional-paths receive")
-                self._add("neighbor {} route-map {} in", ip, neighbor.route_map_in)
-                self._add("neighbor {} route-map {} out", ip, neighbor.route_map_out)
-                self._add("neighbor {} peer-tag in {}", ip, neighbor.peer_tag_in)
-                self._add("neighbor {} peer-tag out discard {}", ip, neighbor.peer_tag_out_discard)
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
 
-            for network in natural_sort(af.networks or [], sort_key="prefix"):
-                cli = f"network {network.prefix}"
-                if network.route_map is not None:
-                    cli += f" route-map {network.route_map}"
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            neighbor_ip_address = neighbor.ip_address
+            if neighbor.activate is True:
+                self._add(f"neighbor {neighbor_ip_address} activate")
+            if neighbor.additional_paths.receive is True:
+                self._add(f"neighbor {neighbor_ip_address} additional-paths receive")
+            self._add("neighbor {} route-map {} in", neighbor_ip_address, neighbor.route_map_in)
+            self._add("neighbor {} route-map {} out", neighbor_ip_address, neighbor.route_map_out)
+            self._add("neighbor {} peer-tag in {}", neighbor_ip_address, neighbor.peer_tag_in)
+            self._add("neighbor {} peer-tag out discard {}", neighbor_ip_address, neighbor.peer_tag_out_discard)
+
+        for network in natural_sort(address_family.networks or [], sort_key="prefix"):
+            cli = f"network {network.prefix}"
+            if network.route_map is not None:
+                cli += f" route-map {network.route_map}"
+            self._add(cli)
+
+        if address_family.redistribute:
+            self._render_redistribute(address_family.redistribute)
+
+    def _render_redistribute(self, redistribute: Any) -> None:
+        if redistribute.connected.enabled is True:
+            cli = "redistribute connected"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            self._add(cli)
+
+        if redistribute.isis.enabled is True:
+            cli = "redistribute isis"
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
+            self._add(cli)
+
+        if redistribute.ospf.enabled is True:
+            cli = "redistribute ospf"
+            if redistribute.ospf.route_map is not None:
+                cli += f" route-map {redistribute.ospf.route_map}"
+            self._add(cli)
+        elif redistribute.ospf.match_internal.enabled is True:
+            cli = "redistribute ospf match internal"
+            if redistribute.ospf.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.enabled is True:
+            cli = "redistribute ospfv3"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
+            self._add(cli)
+        elif redistribute.ospfv3.match_internal.enabled is True:
+            cli = "redistribute ospfv3 match internal"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_external.enabled is True:
+            cli = "redistribute ospfv3 match external"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
+            cli = "redistribute ospfv3 match nssa-external"
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_external.enabled is True:
+            cli = "redistribute ospf match external"
+            if redistribute.ospf.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_nssa_external.enabled is True:
+            cli = "redistribute ospf match nssa-external"
+            if redistribute.ospf.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospf.match_nssa_external.nssa_type}"
+            if redistribute.ospf.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.static.enabled is True:
+            cli = "redistribute static"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            self._add(cli)
+
+
+class RouterBgpVrfEvpnMulticast(CliSection):
+    """Renders 'evpn multicast' inside a VRF block (no separator)."""
+
+    separator = False
+
+    def __init__(self, vrf: Any) -> None:
+        self.vrf = vrf
+
+    def _generate(self) -> None:
+        if self.vrf.evpn_multicast is not True:
+            return
+        self._header("evpn multicast")
+        dr_election_algorithm = self.vrf.evpn_multicast_gateway_dr_election.algorithm
+        if dr_election_algorithm is not None:
+            if dr_election_algorithm == "preference":
+                preference_value = self.vrf.evpn_multicast_gateway_dr_election.preference_value
+                self._add("gateway dr election algorithm preference {}", preference_value)
+            else:
+                self._add(f"gateway dr election algorithm {dr_election_algorithm}")
+        self._sub(_RouterBgpVrfEvpnMulticastAddressFamilyIpv4(self.vrf))
+
+
+class _RouterBgpVrfEvpnMulticastAddressFamilyIpv4(CliSection):
+    """Renders 'address-family ipv4' inside 'evpn multicast' (no separator)."""
+
+    separator = False
+
+    def __init__(self, vrf: Any) -> None:
+        self.vrf = vrf
+
+    def _generate(self) -> None:
+        af_ipv4 = self.vrf.evpn_multicast_address_family.ipv4
+        if not af_ipv4 or af_ipv4.transit is not True:
+            return
+        self._header("address-family ipv4")
+        self._add("transit")
+
+
+class RouterBgpVlan(CliSection):
+    """Renders a single 'vlan X' block inside 'router bgp'."""
+
+    def __init__(self, vlan: Any) -> None:
+        self.vlan = vlan
+
+    def _generate(self) -> None:
+        vlan = self.vlan
+        self._header(f"vlan {vlan.id}")
+        self._add("rd {}", vlan.rd)
+        self._add("rd evpn domain {} {}", vlan.rd_evpn_domain.domain, vlan.rd_evpn_domain.rd)
+        for rt in natural_sort(vlan.route_targets.both or []):
+            self._add(f"route-target both {rt}")
+        for rt in natural_sort(vlan.route_targets.field_import or []):
+            self._add(f"route-target import {rt}")
+        for rt in natural_sort(vlan.route_targets.export or []):
+            self._add(f"route-target export {rt}")
+        for rt in natural_sort(vlan.route_targets.import_evpn_domains or [], sort_key="domain"):
+            self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
+        for rt in natural_sort(vlan.route_targets.export_evpn_domains or [], sort_key="domain"):
+            self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
+        for rt in natural_sort(vlan.route_targets.import_export_evpn_domains or [], sort_key="domain"):
+            self._add(f"route-target import export evpn domain {rt.domain} {rt.route_target}")
+        for r in natural_sort(vlan.redistribute_routes or []):
+            self._add(f"redistribute {r}")
+        for r in natural_sort(vlan.no_redistribute_routes or []):
+            self._add(f"no redistribute {r}")
+        if vlan.eos_cli is not None:
+            self._add("!")
+            for line in vlan.eos_cli.splitlines():
+                self._add(line)
+            if vlan.eos_cli.endswith("\n"):
+                self._output_lines.append("")
+
+
+class RouterBgpVpwsService(CliSection):
+    """Renders a single 'vpws X' block inside 'router bgp'."""
+
+    def __init__(self, svc: Any) -> None:
+        self.vpws_service = svc
+
+    def _generate(self) -> None:
+        svc = self.vpws_service
+        if svc.name is None:
+            return
+        self._header(f"vpws {svc.name}")
+        self._add("rd {}", svc.rd)
+        self._add("route-target import export evpn {}", svc.route_targets.import_export)
+        self._add("mpls control-word", svc.mpls_control_word)
+        self._add("label flow", svc.label_flow)
+        self._add("mtu {}", svc.mtu)
+        for hashed_password in natural_sort(svc.pseudowires or [], sort_key="name"):
+            self._sub(RouterBgpVpwsPseudowire(hashed_password))
+
+
+class RouterBgpVpwsPseudowire(CliSection):
+    """Renders a single 'pseudowire X' block inside a 'vpws' service block."""
+
+    def __init__(self, hashed_password: Any) -> None:
+        self.pseudowire = hashed_password
+
+    def _generate(self) -> None:
+        hashed_password = self.pseudowire
+        if hashed_password.name is None or hashed_password.id_local is None or hashed_password.id_remote is None:
+            return
+        self._header(f"pseudowire {hashed_password.name}")
+        self._add(f"evpn vpws id local {hashed_password.id_local} remote {hashed_password.id_remote}")
+
+
+class RouterBgpVlanAwareBundle(CliSection):
+    """Renders a single 'vlan-aware-bundle X' block inside 'router bgp'."""
+
+    def __init__(self, bundle: Any) -> None:
+        self.bundle = bundle
+
+    def _generate(self) -> None:
+        bundle = self.bundle
+        self._header(f"vlan-aware-bundle {bundle.name}")
+        self._add("rd {}", bundle.rd)
+        self._add("rd evpn domain {} {}", bundle.rd_evpn_domain.domain, bundle.rd_evpn_domain.rd)
+        for rt in natural_sort(bundle.route_targets.both or []):
+            self._add(f"route-target both {rt}")
+        for rt in natural_sort(bundle.route_targets.field_import or []):
+            self._add(f"route-target import {rt}")
+        for rt in natural_sort(bundle.route_targets.export or []):
+            self._add(f"route-target export {rt}")
+        for rt in natural_sort(bundle.route_targets.import_evpn_domains or [], sort_key="domain"):
+            self._add(f"route-target import evpn domain {rt.domain} {rt.route_target}")
+        for rt in natural_sort(bundle.route_targets.export_evpn_domains or [], sort_key="domain"):
+            self._add(f"route-target export evpn domain {rt.domain} {rt.route_target}")
+        for rt in natural_sort(bundle.route_targets.import_export_evpn_domains or [], sort_key="domain"):
+            self._add(f"route-target import export evpn domain {rt.domain} {rt.route_target}")
+        for r in natural_sort(bundle.redistribute_routes or []):
+            self._add(f"redistribute {r}")
+        for r in natural_sort(bundle.no_redistribute_routes or []):
+            self._add(f"no redistribute {r}")
+        self._add("vlan {}", bundle.vlan)
+        if bundle.eos_cli is not None:
+            self._add("!")
+            for line in bundle.eos_cli.splitlines():
+                self._add(line)
+            if bundle.eos_cli.endswith("\n"):
+                self._output_lines.append("")
+
+
+class RouterBgpRouteDistinguisher(CliSection):
+    """Renders the 'route-distinguisher' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        assignment_auto = self.bgp.route_distinguisher.assignment_auto
+        if not assignment_auto:
+            return
+        self._header("route-distinguisher")
+        self._add("assignment auto range {} {}", assignment_auto.range.start, assignment_auto.range.end)
+        for address_family in natural_sort(assignment_auto.address_families or []):
+            self._add(f"assignment auto address-family {address_family}")
+
+
+class RouterBgpAddressFamilyEvpn(CliSection):
+    """Renders the 'address-family evpn' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_evpn
+        if not address_family:
+            return
+        self._header("address-family evpn")
+        self._add("route export ethernet-segment ip mass-withdraw", address_family.route.export_ethernet_segment_ip_mass_withdraw)
+        self._add("route import ethernet-segment ip mass-withdraw", address_family.route.import_ethernet_segment_ip_mass_withdraw)
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+        self._render_af_bgp_additional_paths_send(address_family.bgp.additional_paths)
+        self._add("bgp next-hop-unchanged", address_family.next_hop_unchanged)
+        if address_family.neighbor_default.encapsulation is not None:
+            enc_cli = f"neighbor default encapsulation {address_family.neighbor_default.encapsulation}"
+            if address_family.neighbor_default.encapsulation == "mpls" and address_family.neighbor_default.next_hop_self_source_interface is not None:
+                enc_cli += f" next-hop-self source-interface {address_family.neighbor_default.next_hop_self_source_interface}"
+            self._add(enc_cli)
+
+        rib_tokens: list[str] = []
+        for rib in address_family.next_hop_mpls_resolution_ribs or []:
+            if rib.rib_type == "tunnel-rib-colored":
+                rib_tokens.append("tunnel-rib colored system-colored-tunnel-rib")
+            elif rib.rib_type == "tunnel-rib" and rib.rib_name is not None:
+                rib_tokens.append(f"tunnel-rib {rib.rib_name}")
+            elif rib.rib_type is not None:
+                rib_tokens.append(rib.rib_type)
+        if rib_tokens:
+            self._add(f"next-hop mpls resolution ribs {' '.join(rib_tokens)}")
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_evpn_peer_group(peer_group)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_evpn_neighbor(neighbor)
+
+        self._add("domain identifier {}", address_family.domain_identifier)
+        self._add("domain identifier {} remote", address_family.domain_identifier_remote)
+        self._add("next-hop resolution disabled", address_family.next_hop.resolution_disabled)
+        if address_family.route.import_match_failure_action == "discard":
+            self._add("route import match-failure action discard")
+        if address_family.neighbor_default.next_hop_self_received_evpn_routes.enable is True:
+            nhs_cli = "neighbor default next-hop-self received-evpn-routes route-type ip-prefix"
+            if address_family.neighbor_default.next_hop_self_received_evpn_routes.inter_domain is True:
+                nhs_cli += " inter-domain"
+            self._add(nhs_cli)
+
+        if address_family.evpn_hostflap_detection.enabled is False:
+            self._add("no host-flap detection")
+        elif address_family.evpn_hostflap_detection.enabled is True:
+            hfd_suffix = ""
+            if address_family.evpn_hostflap_detection.window is not None:
+                hfd_suffix += f" window {address_family.evpn_hostflap_detection.window}"
+            if address_family.evpn_hostflap_detection.threshold is not None:
+                hfd_suffix += f" threshold {address_family.evpn_hostflap_detection.threshold}"
+            if address_family.evpn_hostflap_detection.expiry_timeout is not None:
+                hfd_suffix += f" expiry timeout {address_family.evpn_hostflap_detection.expiry_timeout} seconds"
+            if hfd_suffix:
+                self._add(f"host-flap detection{hfd_suffix}")
+
+        if address_family.layer_2_fec_in_place_update.enabled is True:
+            l2_cli = "layer-2 fec in-place update"
+            if address_family.layer_2_fec_in_place_update.timeout is not None:
+                l2_cli += f" timeout {address_family.layer_2_fec_in_place_update.timeout} seconds"
+            self._add(l2_cli)
+
+        self._add("route import overlay-index gateway", address_family.route.import_overlay_index_gateway)
+
+        for segment in natural_sort(address_family.evpn_ethernet_segment or [], sort_key="domain"):
+            self._sub(RouterBgpAddressFamilyEvpnEthernetSegment(segment))
+
+    def _render_af_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
+
+    def _render_af_evpn_peer_group(self, peer_group: Any) -> None:
+        name = peer_group.name
+        if peer_group.activate is True:
+            self._add(f"neighbor {name} activate")
+        elif peer_group.activate is False:
+            self._add(f"no neighbor {name} activate")
+        if peer_group.additional_paths.receive is True:
+            self._add(f"neighbor {name} additional-paths receive")
+        self._add("neighbor {} route-map {} in", name, peer_group.route_map_in)
+        self._add("neighbor {} route-map {} out", name, peer_group.route_map_out)
+        self._add("neighbor {} rcf in {}", name, peer_group.rcf_in)
+        self._add("neighbor {} rcf out {}", name, peer_group.rcf_out)
+        if peer_group.default_route.enabled is True:
+            dr_cli = f"neighbor {name} default-route"
+            if peer_group.default_route.rcf is not None:
+                dr_cli += f" rcf {peer_group.default_route.rcf}"
+            elif peer_group.default_route.route_map is not None:
+                dr_cli += f" route-map {peer_group.default_route.route_map}"
+            self._add(dr_cli)
+        self._render_af_neighbor_additional_paths_send(name, peer_group.additional_paths)
+        self._add("neighbor {} peer-tag in {}", name, peer_group.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", name, peer_group.peer_tag_out_discard)
+        if peer_group.encapsulation is not None:
+            enc_cli = f"neighbor {name} encapsulation {peer_group.encapsulation}"
+            if peer_group.encapsulation == "mpls" and peer_group.next_hop_self_source_interface is not None:
+                enc_cli += f" next-hop-self source-interface {peer_group.next_hop_self_source_interface}"
+            self._add(enc_cli)
+        if peer_group.domain_remote is True:
+            self._add(f"neighbor {name} domain remote")
+
+    def _render_af_evpn_neighbor(self, neighbor: Any) -> None:
+        neighbor_ip_address = neighbor.ip_address
+        if neighbor.activate is True:
+            self._add(f"neighbor {neighbor_ip_address} activate")
+        elif neighbor.activate is False:
+            self._add(f"no neighbor {neighbor_ip_address} activate")
+        if neighbor.additional_paths.receive is True:
+            self._add(f"neighbor {neighbor_ip_address} additional-paths receive")
+        self._add("neighbor {} route-map {} in", neighbor_ip_address, neighbor.route_map_in)
+        self._add("neighbor {} route-map {} out", neighbor_ip_address, neighbor.route_map_out)
+        self._add("neighbor {} rcf in {}", neighbor_ip_address, neighbor.rcf_in)
+        self._add("neighbor {} rcf out {}", neighbor_ip_address, neighbor.rcf_out)
+        if neighbor.default_route.enabled is True:
+            dr_cli = f"neighbor {neighbor_ip_address} default-route"
+            if neighbor.default_route.rcf is not None:
+                dr_cli += f" rcf {neighbor.default_route.rcf}"
+            elif neighbor.default_route.route_map is not None:
+                dr_cli += f" route-map {neighbor.default_route.route_map}"
+            self._add(dr_cli)
+        self._render_af_neighbor_additional_paths_send(neighbor_ip_address, neighbor.additional_paths)
+        self._add("neighbor {} peer-tag in {}", neighbor_ip_address, neighbor.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", neighbor_ip_address, neighbor.peer_tag_out_discard)
+        if neighbor.encapsulation is not None:
+            enc_cli = f"neighbor {neighbor_ip_address} encapsulation {neighbor.encapsulation}"
+            if neighbor.encapsulation == "mpls" and neighbor.next_hop_self_source_interface is not None:
+                enc_cli += f" next-hop-self source-interface {neighbor.next_hop_self_source_interface}"
+            self._add(enc_cli)
+
+    def _render_af_neighbor_additional_paths_send(self, entity_id: str, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add(f"no neighbor {entity_id} additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}")
+        elif send == "limit":
+            self._add("neighbor {} additional-paths send limit {}", entity_id, send_limit)
+        else:
+            self._add(f"neighbor {entity_id} additional-paths send {send}")
+
+
+class RouterBgpAddressFamilyEvpnEthernetSegment(CliSection):
+    """Renders a single 'evpn ethernet-segment domain X' block inside address-family evpn."""
+
+    def __init__(self, segment: Any) -> None:
+        self.segment = segment
+
+    def _generate(self) -> None:
+        segment = self.segment
+        self._header(f"evpn ethernet-segment domain {segment.domain}")
+        self._add("identifier {}", segment.identifier)
+        self._add("route-target import {}", segment.route_target_import)
+
+
+class RouterBgpAddressFamilyFlowSpec(CliSection):
+    """Renders 'address-family flow-spec {ipv4|ipv6}' inside 'router bgp'."""
+
+    def __init__(self, address_family: Any, protocol: str) -> None:
+        self.address_family = address_family
+        self.protocol = protocol
+
+    def _generate(self) -> None:
+        address_family = self.address_family
+        if not address_family:
+            return
+        self._header(f"address-family flow-spec {self.protocol}")
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            if peer_group.activate is True:
+                self._add(f"neighbor {peer_group.name} activate")
+            elif peer_group.activate is False:
+                self._add(f"no neighbor {peer_group.name} activate")
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            if neighbor.activate is True:
+                self._add(f"neighbor {neighbor.ip_address} activate")
+
+
+class RouterBgpAddressFamilyIpv4(CliSection):
+    """Renders the 'address-family ipv4' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_ipv4
+        if not address_family:
+            return
+        self._header("address-family ipv4")
+        if address_family.bgp.additional_paths.install is True:
+            self._add("bgp additional-paths install")
+        elif address_family.bgp.additional_paths.install_ecmp_primary is True:
+            self._add("bgp additional-paths install ecmp-primary")
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+        self._render_af_bgp_additional_paths_send(address_family.bgp.additional_paths)
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_ipv4_peer_group(peer_group)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_ipv4_neighbor(neighbor)
+
+        for network in natural_sort(address_family.networks or [], sort_key="prefix"):
+            if network.route_map is not None:
+                self._add(f"network {network.prefix} route-map {network.route_map}")
+            elif network.rcf is not None:
+                self._add(f"network {network.prefix} rcf {network.rcf}")
+            else:
+                self._add(f"network {network.prefix}")
+
+        if address_family.bgp.redistribute_internal is True:
+            self._add("bgp redistribute-internal")
+        elif address_family.bgp.redistribute_internal is False:
+            self._add("no bgp redistribute-internal")
+
+        self._render_af_ipv4_redistribute(address_family.redistribute)
+
+    def _render_af_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
+
+    def _render_af_ipv4_peer_group(self, peer_group: Any) -> None:
+        name = peer_group.name
+        if peer_group.activate is True:
+            self._add(f"neighbor {name} activate")
+        elif peer_group.activate is False:
+            self._add(f"no neighbor {name} activate")
+        if peer_group.additional_paths.receive is True:
+            self._add(f"neighbor {name} additional-paths receive")
+        self._add("neighbor {} route-map {} in", name, peer_group.route_map_in)
+        self._add("neighbor {} route-map {} out", name, peer_group.route_map_out)
+        self._add("neighbor {} rcf in {}", name, peer_group.rcf_in)
+        self._add("neighbor {} rcf out {}", name, peer_group.rcf_out)
+        self._add("neighbor {} prefix-list {} in", name, peer_group.prefix_list_in)
+        self._add("neighbor {} prefix-list {} out", name, peer_group.prefix_list_out)
+        if peer_group.default_originate:
+            do_cli = f"neighbor {name} default-originate"
+            if peer_group.default_originate.route_map is not None:
+                do_cli += f" route-map {peer_group.default_originate.route_map}"
+            if peer_group.default_originate.always is True:
+                do_cli += " always"
+            self._add(do_cli)
+        self._render_af_ipv4_additional_paths_send(name, peer_group.additional_paths)
+        if peer_group.next_hop.address_family_ipv6.enabled is True:
+            nhv6_cli = f"neighbor {name} next-hop address-family ipv6"
+            if peer_group.next_hop.address_family_ipv6.originate is True:
+                nhv6_cli += " originate"
+            self._add(nhv6_cli)
+        self._add("neighbor {} peer-tag in {}", name, peer_group.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", name, peer_group.peer_tag_out_discard)
+
+    def _render_af_ipv4_neighbor(self, neighbor: Any) -> None:
+        neighbor_ip_address = neighbor.ip_address
+        if neighbor.activate is True:
+            self._add(f"neighbor {neighbor_ip_address} activate")
+        elif neighbor.activate is False:
+            self._add(f"no neighbor {neighbor_ip_address} activate")
+        if neighbor.additional_paths.receive is True:
+            self._add(f"neighbor {neighbor_ip_address} additional-paths receive")
+        self._add("neighbor {} route-map {} in", neighbor_ip_address, neighbor.route_map_in)
+        self._add("neighbor {} route-map {} out", neighbor_ip_address, neighbor.route_map_out)
+        self._add("neighbor {} rcf in {}", neighbor_ip_address, neighbor.rcf_in)
+        self._add("neighbor {} rcf out {}", neighbor_ip_address, neighbor.rcf_out)
+        self._add("neighbor {} prefix-list {} in", neighbor_ip_address, neighbor.prefix_list_in)
+        self._add("neighbor {} prefix-list {} out", neighbor_ip_address, neighbor.prefix_list_out)
+        if neighbor.default_originate:
+            do_cli = f"neighbor {neighbor_ip_address} default-originate"
+            if neighbor.default_originate.route_map is not None:
+                do_cli += f" route-map {neighbor.default_originate.route_map}"
+            if neighbor.default_originate.always is True:
+                do_cli += " always"
+            self._add(do_cli)
+        self._render_af_ipv4_additional_paths_send(neighbor_ip_address, neighbor.additional_paths)
+        if neighbor.next_hop.address_family_ipv6.enabled is True:
+            nhv6_cli = f"neighbor {neighbor_ip_address} next-hop address-family ipv6"
+            if neighbor.next_hop.address_family_ipv6.originate is True:
+                nhv6_cli += " originate"
+            self._add(nhv6_cli)
+        elif neighbor.next_hop.address_family_ipv6.enabled is False:
+            self._add(f"no neighbor {neighbor_ip_address} next-hop address-family ipv6")
+        self._add("neighbor {} peer-tag in {}", neighbor_ip_address, neighbor.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", neighbor_ip_address, neighbor.peer_tag_out_discard)
+
+    def _render_af_ipv4_additional_paths_send(self, entity_id: str, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        prefix_list = additional_paths.prefix_list
+        if send is None:
+            return
+        if send == "disabled":
+            self._add(f"no neighbor {entity_id} additional-paths send")
+            return
+        cmd = None
+        if send == "ecmp" and send_limit is not None:
+            cmd = f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}"
+        elif send == "limit":
+            if send_limit is not None:
+                cmd = f"neighbor {entity_id} additional-paths send limit {send_limit}"
+        else:
+            cmd = f"neighbor {entity_id} additional-paths send {send}"
+        if cmd is not None:
+            if prefix_list is not None:
+                cmd += f" prefix-list {prefix_list}"
+            self._add(cmd)
+
+    def _render_af_ipv4_redistribute(self, redistribute: Any) -> None:
+        if redistribute.attached_host.enabled is True:
+            cli = "redistribute attached-host"
+            if redistribute.attached_host.route_map is not None:
+                cli += f" route-map {redistribute.attached_host.route_map}"
+            self._add(cli)
+
+        if redistribute.bgp.enabled is True:
+            cli = "redistribute bgp leaked"
+            if redistribute.bgp.route_map is not None:
+                cli += f" route-map {redistribute.bgp.route_map}"
+            self._add(cli)
+
+        if redistribute.connected.enabled is True:
+            cli = "redistribute connected"
+            if redistribute.connected.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            elif redistribute.connected.rcf is not None:
+                cli += f" rcf {redistribute.connected.rcf}"
+            self._add(cli)
+
+        if redistribute.dynamic.enabled is True:
+            cli = "redistribute dynamic"
+            if redistribute.dynamic.route_map is not None:
+                cli += f" route-map {redistribute.dynamic.route_map}"
+            elif redistribute.dynamic.rcf is not None:
+                cli += f" rcf {redistribute.dynamic.rcf}"
+            self._add(cli)
+
+        if redistribute.user.enabled is True:
+            cli = "redistribute user"
+            if redistribute.user.rcf is not None:
+                cli += f" rcf {redistribute.user.rcf}"
+            self._add(cli)
+
+        if redistribute.isis.enabled is True:
+            cli = "redistribute isis"
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
+            self._add(cli)
+
+        if redistribute.ospf.enabled is True:
+            cli = "redistribute ospf"
+            if redistribute.ospf.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospf.route_map is not None:
+                cli += f" route-map {redistribute.ospf.route_map}"
+            self._add(cli)
+        elif redistribute.ospf.match_internal.enabled is True:
+            cli = "redistribute ospf match internal"
+            if redistribute.ospf.match_internal.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospf.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.enabled is True:
+            cli = "redistribute ospfv3"
+            if redistribute.ospfv3.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
+            self._add(cli)
+        elif redistribute.ospfv3.match_internal.enabled is True:
+            cli = "redistribute ospfv3 match internal"
+            if redistribute.ospfv3.match_internal.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_external.enabled is True:
+            cli = "redistribute ospfv3 match external"
+            if redistribute.ospfv3.match_external.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
+            cli = "redistribute ospfv3 match nssa-external"
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_external.enabled is True:
+            cli = "redistribute ospf match external"
+            if redistribute.ospf.match_external.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospf.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_nssa_external.enabled is True:
+            cli = "redistribute ospf match nssa-external"
+            if redistribute.ospf.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospf.match_nssa_external.nssa_type}"
+            if redistribute.ospf.match_nssa_external.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospf.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.rip.enabled is True:
+            cli = "redistribute rip"
+            if redistribute.rip.route_map is not None:
+                cli += f" route-map {redistribute.rip.route_map}"
+            self._add(cli)
+
+        if redistribute.static.enabled is True:
+            cli = "redistribute static"
+            if redistribute.static.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            elif redistribute.static.rcf is not None:
+                cli += f" rcf {redistribute.static.rcf}"
+            self._add(cli)
+
+
+class RouterBgpAddressFamilyIpv4LabeledUnicast(CliSection):
+    """Renders the 'address-family ipv4 labeled-unicast' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_ipv4_labeled_unicast
+        if not address_family:
+            return
+        self._header("address-family ipv4 labeled-unicast")
+        self._add("update wait-for-convergence", address_family.update_wait_for_convergence)
+
+        if address_family.bgp.missing_policy:
+            for line in self._build_missing_policy_cli("bgp missing-policy", address_family.bgp.missing_policy):
+                self._add(line)
+
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+        self._render_af_bgp_additional_paths_send(address_family.bgp.additional_paths)
+        self._add("bgp next-hop-unchanged", address_family.bgp.next_hop_unchanged)
+        self._add("neighbor default next-hop-self", address_family.neighbor_default.next_hop_self)
+
+        next_hop_ribs = address_family.next_hop_resolution_ribs
+        if next_hop_ribs:
+            rib_tokens: list[str] = []
+            for rib in next_hop_ribs:
+                if rib.rib_type == "tunnel-rib-colored":
+                    rib_tokens.append("tunnel-rib colored system-colored-tunnel-rib")
+                elif rib.rib_type == "tunnel-rib":
+                    if rib.rib_name is not None:
+                        rib_tokens.append(f"tunnel-rib {rib.rib_name}")
+                elif rib.rib_type is not None:
+                    rib_tokens.append(rib.rib_type)
+            if rib_tokens:
+                self._add(f"next-hop resolution ribs {' '.join(rib_tokens)}")
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_lu_entity(peer_group.name, peer_group)
+
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_lu_entity(neighbor.ip_address, neighbor)
+
+        for network in address_family.networks or []:
+            cli = f"network {network.prefix}"
+            if network.route_map is not None:
+                cli += f" route-map {network.route_map}"
+            elif network.rcf is not None:
+                cli += f" rcf {network.rcf}"
+            self._add(cli)
+
+        for next_hop in address_family.next_hops or []:
+            cli = f"next-hop {next_hop.ip_address} originate"
+            if next_hop.lfib_backup_ip_forwarding is True:
+                cli += " lfib-backup ip-forwarding"
+            self._add(cli)
+
+        self._add("lfib entry installation skipped", address_family.lfib_entry_installation_skipped)
+        self._add("label local-termination {}", address_family.label_local_termination)
+        self._add("graceful-restart", address_family.graceful_restart)
+
+        for tunnel_protocol in address_family.tunnel_source_protocols or []:
+            cli = f"tunnel source-protocol {tunnel_protocol.protocol}"
+            if tunnel_protocol.rcf is not None:
+                cli += f" rcf {tunnel_protocol.rcf}"
+            self._add(cli)
+
+        aigp_session = address_family.aigp_session
+        if aigp_session:
+            for session_type in ["ibgp", "confederation", "ebgp"]:
+                if getattr(aigp_session, session_type, None) is True:
+                    self._add(f"aigp-session {session_type}")
+
+    def _render_af_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
+
+    def _render_af_neighbor_additional_paths_send(self, entity_id: str, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add(f"no neighbor {entity_id} additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}")
+        elif send == "limit":
+            self._add("neighbor {} additional-paths send limit {}", entity_id, send_limit)
+        else:
+            self._add(f"neighbor {entity_id} additional-paths send {send}")
+
+    def _build_missing_policy_cli(self, prefix: str, missing_policy: Any, double_space_before_include: bool = False) -> list[str]:
+        lines: list[str] = []
+        for direction in ["in", "out"]:
+            policy = getattr(missing_policy, f"direction_{direction}", None)
+            if policy is None or policy.action is None:
+                continue
+            cli = prefix
+            if policy.include_community_list is True or policy.include_prefix_list is True or policy.include_sub_route_map is True:
+                cli += "  include" if double_space_before_include else " include"
+                if policy.include_community_list is True:
+                    cli += " community-list"
+                if policy.include_prefix_list is True:
+                    cli += " prefix-list"
+                if policy.include_sub_route_map is True:
+                    cli += " sub-route-map"
+            cli += f" direction {direction} action {policy.action}"
+            lines.append(cli)
+        return lines
+
+    def _render_af_lu_entity(self, entity_id: str, entity: Any) -> None:
+        if entity.activate is True:
+            self._add(f"neighbor {entity_id} activate")
+        else:
+            self._add(f"no neighbor {entity_id} activate")
+
+        if entity.additional_paths.receive is True:
+            self._add(f"neighbor {entity_id} additional-paths receive")
+
+        if entity.graceful_restart is True:
+            self._add(f"neighbor {entity_id} graceful-restart")
+
+        self._add("neighbor {} graceful-restart-helper stale-route route-map {}", entity_id, entity.graceful_restart_helper.stale_route_map)
+        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        self._add("neighbor {} rcf in {}", entity_id, entity.rcf_in)
+        self._add("neighbor {} rcf out {}", entity_id, entity.rcf_out)
+        self._render_af_neighbor_additional_paths_send(entity_id, entity.additional_paths)
+
+        if entity.next_hop_unchanged is True:
+            self._add(f"neighbor {entity_id} next-hop-unchanged")
+
+        if entity.next_hop_self is True:
+            self._add(f"neighbor {entity_id} next-hop-self")
+
+        if entity.next_hop_self_v4_mapped_v6_source_interface is not None:
+            self._add(f"neighbor {entity_id} next-hop-self v4-mapped-v6 source-interface {entity.next_hop_self_v4_mapped_v6_source_interface}")
+        elif entity.next_hop_self_source_interface is not None:
+            self._add(f"neighbor {entity_id} next-hop-self source-interface {entity.next_hop_self_source_interface}")
+
+        if entity.maximum_advertised_routes is not None:
+            cli = f"neighbor {entity_id} maximum-advertised-routes {entity.maximum_advertised_routes}"
+            if entity.maximum_advertised_routes_warning_limit is not None:
+                cli += f" warning-limit {entity.maximum_advertised_routes_warning_limit}"
+            self._add(cli)
+
+        if entity.missing_policy:
+            for line in self._build_missing_policy_cli(f"neighbor {entity_id} missing-policy", entity.missing_policy, double_space_before_include=True):
+                self._add(line)
+
+        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
+
+        if entity.aigp_session is True:
+            self._add(f"neighbor {entity_id} aigp-session")
+
+        if entity.multi_path is True:
+            self._add(f"neighbor {entity_id} multi-path")
+
+
+class RouterBgpAddressFamilyIpv4Multicast(CliSection):
+    """Renders the 'address-family ipv4 multicast' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_ipv4_multicast
+        if not address_family:
+            return
+        self._header("address-family ipv4 multicast")
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_ipv4mc_entity(peer_group.name, peer_group)
+
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_ipv4mc_entity(neighbor.ip_address, neighbor)
+
+        if address_family.redistribute:
+            self._render_af_ipv4mc_redistribute(address_family.redistribute)
+
+    def _render_af_ipv4mc_entity(self, entity_id: str, entity: Any) -> None:
+        if entity.activate is True:
+            self._add(f"neighbor {entity_id} activate")
+        elif entity.activate is False:
+            self._add(f"no neighbor {entity_id} activate")
+
+        if entity.additional_paths.receive is True:
+            self._add(f"neighbor {entity_id} additional-paths receive")
+
+        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
+
+    def _render_af_ipv4mc_redistribute(self, redistribute: Any) -> None:
+        if redistribute.attached_host.enabled is True:
+            cli = "redistribute attached-host"
+            if redistribute.attached_host.route_map is not None:
+                cli += f" route-map {redistribute.attached_host.route_map}"
+            self._add(cli)
+
+        if redistribute.connected.enabled is True:
+            cli = "redistribute connected"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            self._add(cli)
+
+        if redistribute.isis.enabled is True:
+            cli = "redistribute isis"
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
+            self._add(cli)
+
+        if redistribute.ospf.enabled is True:
+            cli = "redistribute ospf"
+            if redistribute.ospf.route_map is not None:
+                cli += f" route-map {redistribute.ospf.route_map}"
+            self._add(cli)
+        elif redistribute.ospf.match_internal.enabled is True:
+            cli = "redistribute ospf match internal"
+            if redistribute.ospf.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.enabled is True:
+            cli = "redistribute ospfv3"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
+            self._add(cli)
+        elif redistribute.ospfv3.match_internal.enabled is True:
+            cli = "redistribute ospfv3 match internal"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_external.enabled is True:
+            cli = "redistribute ospfv3 match external"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
+            cli = "redistribute ospfv3 match nssa-external"
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_external.enabled is True:
+            cli = "redistribute ospf match external"
+            if redistribute.ospf.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_nssa_external.enabled is True:
+            cli = "redistribute ospf match nssa-external"
+            if redistribute.ospf.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospf.match_nssa_external.nssa_type}"
+            if redistribute.ospf.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.static.enabled is True:
+            cli = "redistribute static"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            self._add(cli)
+
+
+class RouterBgpAddressFamilyIpv4SrTe(CliSection):
+    """Renders the 'address-family ipv4 sr-te' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_ipv4_sr_te
+        if not address_family:
+            return
+        self._header("address-family ipv4 sr-te")
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_sr_te_entity(peer_group.name, peer_group)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_sr_te_entity(neighbor.ip_address, neighbor)
+
+    def _render_af_sr_te_entity(self, entity_id: str, entity: Any) -> None:
+        if entity.activate is True:
+            self._add(f"neighbor {entity_id} activate")
+        elif entity.activate is False:
+            self._add(f"no neighbor {entity_id} activate")
+        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
+
+
+class RouterBgpAddressFamilyIpv6(CliSection):
+    """Renders the 'address-family ipv6' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_ipv6
+        if not address_family:
+            return
+        self._header("address-family ipv6")
+        if address_family.bgp.additional_paths.install is True:
+            self._add("bgp additional-paths install")
+        elif address_family.bgp.additional_paths.install_ecmp_primary is True:
+            self._add("bgp additional-paths install ecmp-primary")
+
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+        self._render_af_bgp_additional_paths_send(address_family.bgp.additional_paths)
+
+        bg_prefix_list = getattr(address_family.bgp.additional_paths, "prefix_list", None)
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_ipv6_entity(peer_group.name, peer_group, bg_prefix_list)
+
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_ipv6_entity(neighbor.ip_address, neighbor, bg_prefix_list)
+
+        for network in natural_sort(address_family.networks or [], sort_key="prefix"):
+            cli = f"network {network.prefix}"
+            if network.route_map is not None:
+                cli += f" route-map {network.route_map}"
+            elif network.rcf is not None:
+                cli += f" rcf {network.rcf}"
+            self._add(cli)
+
+        if address_family.bgp.redistribute_internal is True:
+            self._add("bgp redistribute-internal")
+        elif address_family.bgp.redistribute_internal is False:
+            self._add("no bgp redistribute-internal")
+
+        if address_family.redistribute:
+            self._render_af_ipv6_redistribute(address_family.redistribute)
+
+    def _render_af_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
+
+    def _render_af_ipv6_entity(self, entity_id: str, entity: Any, bg_prefix_list: str | None) -> None:
+        if entity.activate is True:
+            self._add(f"neighbor {entity_id} activate")
+        elif entity.activate is False:
+            self._add(f"no neighbor {entity_id} activate")
+
+        if entity.additional_paths.receive is True:
+            self._add(f"neighbor {entity_id} additional-paths receive")
+
+        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        self._add("neighbor {} rcf in {}", entity_id, entity.rcf_in)
+        self._add("neighbor {} rcf out {}", entity_id, entity.rcf_out)
+        self._add("neighbor {} prefix-list {} in", entity_id, entity.prefix_list_in)
+        self._add("neighbor {} prefix-list {} out", entity_id, entity.prefix_list_out)
+
+        default_originate = getattr(entity, "default_originate", None)
+        if default_originate:
+            do_cli = f"neighbor {entity_id} default-originate"
+            if default_originate.route_map is not None:
+                do_cli += f" route-map {default_originate.route_map}"
+            if default_originate.always is True:
+                do_cli += " always"
+            self._add(do_cli)
+
+        send = entity.additional_paths.send
+        send_limit = entity.additional_paths.send_limit
+        if send is not None:
+            if send == "disabled":
+                self._add(f"no neighbor {entity_id} additional-paths send")
+            else:
+                cmd: str | None = None
+                if send == "ecmp" and send_limit is not None:
+                    cmd = f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}"
+                elif send == "limit":
+                    if send_limit is not None:
+                        cmd = f"neighbor {entity_id} additional-paths send limit {send_limit}"
+                else:
+                    cmd = f"neighbor {entity_id} additional-paths send {send}"
+                if cmd is not None:
+                    if bg_prefix_list is not None:
+                        cmd += f" prefix-list {bg_prefix_list}"
+                    self._add(cmd)
+
+        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
+
+    def _render_af_ipv6_redistribute(self, redistribute: Any) -> None:
+        if redistribute.attached_host.enabled is True:
+            cli = "redistribute attached-host"
+            if redistribute.attached_host.route_map is not None:
+                cli += f" route-map {redistribute.attached_host.route_map}"
+            self._add(cli)
+
+        if redistribute.bgp.enabled is True:
+            cli = "redistribute bgp leaked"
+            if redistribute.bgp.route_map is not None:
+                cli += f" route-map {redistribute.bgp.route_map}"
+            self._add(cli)
+
+        if redistribute.dhcp.enabled is True:
+            cli = "redistribute dhcp"
+            if redistribute.dhcp.route_map is not None:
+                cli += f" route-map {redistribute.dhcp.route_map}"
+            self._add(cli)
+
+        if redistribute.connected.enabled is True:
+            cli = "redistribute connected"
+            if redistribute.connected.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            elif redistribute.connected.rcf is not None:
+                cli += f" rcf {redistribute.connected.rcf}"
+            self._add(cli)
+
+        if redistribute.dynamic.enabled is True:
+            cli = "redistribute dynamic"
+            if redistribute.dynamic.route_map is not None:
+                cli += f" route-map {redistribute.dynamic.route_map}"
+            elif redistribute.dynamic.rcf is not None:
+                cli += f" rcf {redistribute.dynamic.rcf}"
+            self._add(cli)
+
+        if redistribute.user.enabled is True:
+            cli = "redistribute user"
+            if redistribute.user.rcf is not None:
+                cli += f" rcf {redistribute.user.rcf}"
+            self._add(cli)
+
+        if redistribute.isis.enabled is True:
+            cli = "redistribute isis"
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
+            self._add(cli)
+
+        if redistribute.ospfv3.enabled is True:
+            cli = "redistribute ospfv3"
+            if redistribute.ospfv3.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
+            self._add(cli)
+        elif redistribute.ospfv3.match_internal.enabled is True:
+            cli = "redistribute ospfv3 match internal"
+            if redistribute.ospfv3.match_internal.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_external.enabled is True:
+            cli = "redistribute ospfv3 match external"
+            if redistribute.ospfv3.match_external.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
+            cli = "redistribute ospfv3 match nssa-external"
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.static.enabled is True:
+            cli = "redistribute static"
+            if redistribute.static.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            elif redistribute.static.rcf is not None:
+                cli += f" rcf {redistribute.static.rcf}"
+            self._add(cli)
+
+
+class RouterBgpAddressFamilyIpv6Multicast(CliSection):
+    """Renders the 'address-family ipv6 multicast' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_ipv6_multicast
+        if not address_family:
+            return
+        self._header("address-family ipv6 multicast")
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            if peer_group.activate is True:
+                self._add(f"neighbor {peer_group.name} activate")
+            elif peer_group.activate is False:
+                self._add(f"no neighbor {peer_group.name} activate")
+            if peer_group.additional_paths.receive is True:
+                self._add(f"neighbor {peer_group.name} additional-paths receive")
+
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            if neighbor.activate is True:
+                self._add(f"neighbor {neighbor.ip_address} activate")
+            if neighbor.additional_paths.receive is True:
+                self._add(f"neighbor {neighbor.ip_address} additional-paths receive")
+            self._add("neighbor {} route-map {} in", neighbor.ip_address, neighbor.route_map_in)
+            self._add("neighbor {} route-map {} out", neighbor.ip_address, neighbor.route_map_out)
+            self._add("neighbor {} peer-tag in {}", neighbor.ip_address, neighbor.peer_tag_in)
+            self._add("neighbor {} peer-tag out discard {}", neighbor.ip_address, neighbor.peer_tag_out_discard)
+
+        for network in natural_sort(address_family.networks or [], sort_key="prefix"):
+            cli = f"network {network.prefix}"
+            if network.route_map is not None:
+                cli += f" route-map {network.route_map}"
+            self._add(cli)
+
+        if address_family.redistribute:
+            self._render_af_ipv6mc_redistribute(address_family.redistribute)
+
+    def _render_af_ipv6mc_redistribute(self, redistribute: Any) -> None:
+        if redistribute.connected.enabled is True:
+            cli = "redistribute connected"
+            if redistribute.connected.route_map is not None:
+                cli += f" route-map {redistribute.connected.route_map}"
+            self._add(cli)
+
+        if redistribute.isis.enabled is True:
+            cli = "redistribute isis"
+            if redistribute.isis.isis_level is not None:
+                cli += f" {redistribute.isis.isis_level}"
+            if redistribute.isis.include_leaked is True:
+                cli += " include leaked"
+            if redistribute.isis.route_map is not None:
+                cli += f" route-map {redistribute.isis.route_map}"
+            elif redistribute.isis.rcf is not None:
+                cli += f" rcf {redistribute.isis.rcf}"
+            self._add(cli)
+
+        if redistribute.ospf.enabled is True:
+            cli = "redistribute ospf"
+            if redistribute.ospf.route_map is not None:
+                cli += f" route-map {redistribute.ospf.route_map}"
+            self._add(cli)
+        elif redistribute.ospf.match_internal.enabled is True:
+            cli = "redistribute ospf match internal"
+            if redistribute.ospf.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.enabled is True:
+            cli = "redistribute ospfv3"
+            if redistribute.ospfv3.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.route_map}"
+            self._add(cli)
+        elif redistribute.ospfv3.match_internal.enabled is True:
+            cli = "redistribute ospfv3 match internal"
+            if redistribute.ospfv3.match_internal.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_internal.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_external.enabled is True:
+            cli = "redistribute ospfv3 match external"
+            if redistribute.ospfv3.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospfv3.match_nssa_external.enabled is True:
+            cli = "redistribute ospfv3 match nssa-external"
+            if redistribute.ospfv3.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospfv3.match_nssa_external.nssa_type}"
+            if redistribute.ospfv3.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospfv3.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_external.enabled is True:
+            cli = "redistribute ospf match external"
+            if redistribute.ospf.match_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_external.route_map}"
+            self._add(cli)
+
+        if redistribute.ospf.match_nssa_external.enabled is True:
+            cli = "redistribute ospf match nssa-external"
+            if redistribute.ospf.match_nssa_external.nssa_type is not None:
+                cli += f" {redistribute.ospf.match_nssa_external.nssa_type}"
+            if redistribute.ospf.match_nssa_external.route_map is not None:
+                cli += f" route-map {redistribute.ospf.match_nssa_external.route_map}"
+            self._add(cli)
+
+        if redistribute.static.enabled is True:
+            cli = "redistribute static"
+            if redistribute.static.route_map is not None:
+                cli += f" route-map {redistribute.static.route_map}"
+            self._add(cli)
+
+
+class RouterBgpAddressFamilyIpv6SrTe(CliSection):
+    """Renders the 'address-family ipv6 sr-te' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_ipv6_sr_te
+        if not address_family:
+            return
+        self._header("address-family ipv6 sr-te")
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_sr_te_entity(peer_group.name, peer_group)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_sr_te_entity(neighbor.ip_address, neighbor)
+
+    def _render_af_sr_te_entity(self, entity_id: str, entity: Any) -> None:
+        if entity.activate is True:
+            self._add(f"neighbor {entity_id} activate")
+        elif entity.activate is False:
+            self._add(f"no neighbor {entity_id} activate")
+        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
+
+
+class RouterBgpAddressFamilyLinkState(CliSection):
+    """Renders the 'address-family link-state' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_link_state
+        if not address_family:
+            return
+        self._header("address-family link-state")
+        self._add("bgp missing-policy direction in action {}", address_family.bgp.missing_policy.direction_in_action)
+        self._add("bgp missing-policy direction out action {}", address_family.bgp.missing_policy.direction_out_action)
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            if peer_group.activate is True:
+                self._add(f"neighbor {peer_group.name} activate")
+            elif peer_group.activate is False:
+                self._add(f"no neighbor {peer_group.name} activate")
+            self._add("neighbor {} missing-policy direction in action {}", peer_group.name, peer_group.missing_policy.direction_in_action)
+            self._add("neighbor {} missing-policy direction out action {}", peer_group.name, peer_group.missing_policy.direction_out_action)
+
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            if neighbor.activate is True:
+                self._add(f"neighbor {neighbor.ip_address} activate")
+            self._add("neighbor {} missing-policy direction in action {}", neighbor.ip_address, neighbor.missing_policy.direction_in_action)
+            self._add("neighbor {} missing-policy direction out action {}", neighbor.ip_address, neighbor.missing_policy.direction_out_action)
+
+        path_selection = address_family.path_selection
+        if path_selection:
+            roles = path_selection.roles
+            self._add("path-selection", roles.producer)
+            if roles.consumer is True or roles.propagator is True:
+                cli = "path-selection role"
+                if roles.consumer is True:
+                    cli += " consumer"
+                if roles.propagator is True:
+                    cli += " propagator"
                 self._add(cli)
 
-            if af.redistribute:
-                self._render_vrf_af_ipv6mc_redistribute(af.redistribute)
 
-    def _render_vrf_af_ipv6mc_redistribute(self, r: Any) -> None:
-        """Render VRF address-family ipv6 multicast redistribute commands at L3 (J2 lines 3831-3921)."""
-        if r.connected.enabled is True:
-            cli = "redistribute connected"
-            if r.connected.route_map is not None:
-                cli += f" route-map {r.connected.route_map}"
-            self._add(cli)
+class RouterBgpAddressFamilyPathSelection(CliSection):
+    """Renders the 'address-family path-selection' block inside 'router bgp'."""
 
-        if r.isis.enabled is True:
-            cli = "redistribute isis"
-            if r.isis.isis_level is not None:
-                cli += f" {r.isis.isis_level}"
-            if r.isis.include_leaked is True:
-                cli += " include leaked"
-            if r.isis.route_map is not None:
-                cli += f" route-map {r.isis.route_map}"
-            elif r.isis.rcf is not None:
-                cli += f" rcf {r.isis.rcf}"
-            self._add(cli)
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
 
-        if r.ospf.enabled is True:
-            cli = "redistribute ospf"
-            if r.ospf.route_map is not None:
-                cli += f" route-map {r.ospf.route_map}"
-            self._add(cli)
-        elif r.ospf.match_internal.enabled is True:
-            cli = "redistribute ospf match internal"
-            if r.ospf.match_internal.route_map is not None:
-                cli += f" route-map {r.ospf.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.enabled is True:
-            cli = "redistribute ospfv3"
-            if r.ospfv3.route_map is not None:
-                cli += f" route-map {r.ospfv3.route_map}"
-            self._add(cli)
-        elif r.ospfv3.match_internal.enabled is True:
-            cli = "redistribute ospfv3 match internal"
-            if r.ospfv3.match_internal.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_internal.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_external.enabled is True:
-            cli = "redistribute ospfv3 match external"
-            if r.ospfv3.match_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospfv3.match_nssa_external.enabled is True:
-            cli = "redistribute ospfv3 match nssa-external"
-            if r.ospfv3.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospfv3.match_nssa_external.nssa_type}"
-            if r.ospfv3.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospfv3.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_external.enabled is True:
-            cli = "redistribute ospf match external"
-            if r.ospf.match_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_external.route_map}"
-            self._add(cli)
-
-        if r.ospf.match_nssa_external.enabled is True:
-            cli = "redistribute ospf match nssa-external"
-            if r.ospf.match_nssa_external.nssa_type is not None:
-                cli += f" {r.ospf.match_nssa_external.nssa_type}"
-            if r.ospf.match_nssa_external.route_map is not None:
-                cli += f" route-map {r.ospf.match_nssa_external.route_map}"
-            self._add(cli)
-
-        if r.static.enabled is True:
-            cli = "redistribute static"
-            if r.static.route_map is not None:
-                cli += f" route-map {r.static.route_map}"
-            self._add(cli)
-
-    def _render_vrf_evpn_multicast(self, vrf: Any) -> None:
-        """Render VRF 'evpn multicast' block at L2/L3/L4 (J2 lines 3924-3942)."""
-        if vrf.evpn_multicast is not True:
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_path_selection
+        if not address_family:
             return
-        with self._block("evpn multicast", exclamation=False):
-            algo = vrf.evpn_multicast_gateway_dr_election.algorithm
-            if algo is not None:
-                if algo == "preference":
-                    pref = vrf.evpn_multicast_gateway_dr_election.preference_value
-                    self._add("gateway dr election algorithm preference {}", pref)
+        self._header("address-family path-selection")
+        self._add("bgp additional-paths receive", address_family.bgp.additional_paths.receive)
+        self._render_af_bgp_additional_paths_send(address_family.bgp.additional_paths)
+
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            if peer_group.activate is True:
+                self._add(f"neighbor {peer_group.name} activate")
+            elif peer_group.activate is False:
+                self._add(f"no neighbor {peer_group.name} activate")
+            if peer_group.additional_paths.receive is True:
+                self._add(f"neighbor {peer_group.name} additional-paths receive")
+            send = peer_group.additional_paths.send
+            send_limit = peer_group.additional_paths.send_limit
+            if send is not None:
+                if send == "disabled":
+                    self._add(f"no neighbor {peer_group.name} additional-paths send")
+                elif send_limit is not None:
+                    if send == "ecmp":
+                        self._add(f"neighbor {peer_group.name} additional-paths send ecmp limit {send_limit}")
+                    elif send == "limit":
+                        self._add(f"neighbor {peer_group.name} additional-paths send limit {send_limit}")
                 else:
-                    self._add(f"gateway dr election algorithm {algo}")
+                    self._add(f"neighbor {peer_group.name} additional-paths send {send}")
 
-            af_ipv4 = vrf.evpn_multicast_address_family.ipv4
-            if af_ipv4 and af_ipv4.transit is True:
-                with self._block("address-family ipv4", exclamation=False):
-                    self._add("transit")
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            if neighbor.activate is True:
+                self._add(f"neighbor {neighbor.ip_address} activate")
+            elif neighbor.activate is False:
+                self._add(f"no neighbor {neighbor.ip_address} activate")
+            if neighbor.additional_paths.receive is True:
+                self._add(f"neighbor {neighbor.ip_address} additional-paths receive")
+            self._render_af_neighbor_additional_paths_send(neighbor.ip_address, neighbor.additional_paths)
 
-    def _render_session_trackers(self, bgp: Any) -> None:
-        """Render 'session tracker' blocks at L1/L2 (J2 lines 3948-3954)."""
-        for tracker in natural_sort(bgp.session_trackers or [], sort_key="name"):
-            with self._block(f"session tracker {tracker.name}", exclamation=False):
-                self._add("recovery delay {} seconds", tracker.recovery_delay)
-
-    def _render_bgp_eos_cli(self, bgp: Any) -> None:
-        """Render top-level 'router bgp' eos_cli block at L1 (J2 lines 3955-3958)."""
-        if bgp.eos_cli is None:
+    def _render_af_bgp_additional_paths_send(self, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
             return
-        self._add(self._EXCLAMATION)
-        for line in bgp.eos_cli.splitlines():
-            self._add(line)
+        if send == "disabled":
+            self._add("no bgp additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"bgp additional-paths send ecmp limit {send_limit}")
+        elif send == "limit" and send_limit is not None:
+            self._add(f"bgp additional-paths send limit {send_limit}")
+        else:
+            self._add(f"bgp additional-paths send {send}")
+
+    def _render_af_neighbor_additional_paths_send(self, entity_id: str, additional_paths: Any) -> None:
+        send = additional_paths.send
+        send_limit = additional_paths.send_limit
+        if send is None:
+            return
+        if send == "disabled":
+            self._add(f"no neighbor {entity_id} additional-paths send")
+        elif send == "ecmp" and send_limit is not None:
+            self._add(f"neighbor {entity_id} additional-paths send ecmp limit {send_limit}")
+        elif send == "limit":
+            self._add("neighbor {} additional-paths send limit {}", entity_id, send_limit)
+        else:
+            self._add(f"neighbor {entity_id} additional-paths send {send}")
+
+
+class RouterBgpAddressFamilyRtc(CliSection):
+    """Renders the 'address-family rt-membership' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_rtc
+        if not address_family:
+            return
+        self._header("address-family rt-membership")
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            if peer_group.activate is True:
+                self._add(f"neighbor {peer_group.name} activate")
+            elif peer_group.activate is False:
+                self._add(f"no neighbor {peer_group.name} activate")
+            if peer_group._get_defined_attr("default_route_target") is not Undefined:
+                default_rt = peer_group.default_route_target
+                if default_rt is not None and default_rt.only is True:
+                    self._add(f"neighbor {peer_group.name} default-route-target only")
+                else:
+                    self._add(f"neighbor {peer_group.name} default-route-target")
+                if default_rt is not None and default_rt._get_defined_attr("encoding_origin_as_omit") is not Undefined:
+                    self._add(f"neighbor {peer_group.name} default-route-target encoding origin-as omit")
+
+
+class RouterBgpAddressFamilyVpnIpv4(CliSection):
+    """Renders the 'address-family vpn-ipv4' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_vpn_ipv4
+        if not address_family:
+            return
+        self._header("address-family vpn-ipv4")
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_vpn_entity(peer_group.name, peer_group)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_vpn_entity(neighbor.ip_address, neighbor)
+        if address_family.neighbor_default_encapsulation_mpls_next_hop_self.source_interface is not None:
+            src_iface = address_family.neighbor_default_encapsulation_mpls_next_hop_self.source_interface
+            self._add(f"neighbor default encapsulation mpls next-hop-self source-interface {src_iface}")
+        self._add("domain identifier {}", address_family.domain_identifier)
+        if address_family.route.import_match_failure_action == "discard":
+            self._add("route import match-failure action discard")
+
+    def _render_af_vpn_entity(self, entity_id: str, entity: Any) -> None:
+        if entity.activate is True:
+            self._add(f"neighbor {entity_id} activate")
+        elif entity.activate is False:
+            self._add(f"no neighbor {entity_id} activate")
+        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        self._add("neighbor {} rcf in {}", entity_id, entity.rcf_in)
+        self._add("neighbor {} rcf out {}", entity_id, entity.rcf_out)
+        if entity.default_route.enabled is True:
+            cli = f"neighbor {entity_id} default-route"
+            if entity.default_route.rcf is not None:
+                cli += f" rcf {entity.default_route.rcf}"
+            elif entity.default_route.route_map is not None:
+                cli += f" route-map {entity.default_route.route_map}"
+            self._add(cli)
+        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
+
+
+class RouterBgpAddressFamilyVpnIpv6(CliSection):
+    """Renders the 'address-family vpn-ipv6' block inside 'router bgp'."""
+
+    def __init__(self, bgp: Any) -> None:
+        self.bgp = bgp
+
+    def _generate(self) -> None:
+        address_family = self.bgp.address_family_vpn_ipv6
+        if not address_family:
+            return
+        self._header("address-family vpn-ipv6")
+        for peer_group in natural_sort(address_family.peer_groups or [], sort_key="name"):
+            self._render_af_vpn_entity(peer_group.name, peer_group)
+        for neighbor in natural_sort(address_family.neighbors or [], sort_key="ip_address"):
+            self._render_af_vpn_entity(neighbor.ip_address, neighbor)
+        if address_family.neighbor_default_encapsulation_mpls_next_hop_self.source_interface is not None:
+            src_iface = address_family.neighbor_default_encapsulation_mpls_next_hop_self.source_interface
+            self._add(f"neighbor default encapsulation mpls next-hop-self source-interface {src_iface}")
+        self._add("domain identifier {}", address_family.domain_identifier)
+        if address_family.route.import_match_failure_action == "discard":
+            self._add("route import match-failure action discard")
+
+    def _render_af_vpn_entity(self, entity_id: str, entity: Any) -> None:
+        if entity.activate is True:
+            self._add(f"neighbor {entity_id} activate")
+        elif entity.activate is False:
+            self._add(f"no neighbor {entity_id} activate")
+        self._add("neighbor {} route-map {} in", entity_id, entity.route_map_in)
+        self._add("neighbor {} route-map {} out", entity_id, entity.route_map_out)
+        self._add("neighbor {} rcf in {}", entity_id, entity.rcf_in)
+        self._add("neighbor {} rcf out {}", entity_id, entity.rcf_out)
+        if entity.default_route.enabled is True:
+            cli = f"neighbor {entity_id} default-route"
+            if entity.default_route.rcf is not None:
+                cli += f" rcf {entity.default_route.rcf}"
+            elif entity.default_route.route_map is not None:
+                cli += f" route-map {entity.default_route.route_map}"
+            self._add(cli)
+        self._add("neighbor {} peer-tag in {}", entity_id, entity.peer_tag_in)
+        self._add("neighbor {} peer-tag out discard {}", entity_id, entity.peer_tag_out_discard)
+
+
+class RouterBgpSessionTracker(CliSection):
+    """Renders a single 'session tracker X' block inside 'router bgp'."""
+
+    separator = False
+
+    def __init__(self, tracker: Any) -> None:
+        self.tracker = tracker
+
+    def _generate(self) -> None:
+        tracker = self.tracker
+        self._header(f"session tracker {tracker.name}")
+        self._add("recovery delay {} seconds", tracker.recovery_delay)

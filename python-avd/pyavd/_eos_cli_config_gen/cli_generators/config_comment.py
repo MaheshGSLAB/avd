@@ -5,15 +5,16 @@
 
 from __future__ import annotations
 
-from .base import CliGenerator, CliModel, cli_config_contributor
+from typing import TYPE_CHECKING
+
+from .base import CliGenerator, CliModel, CliSection, cli_config_contributor
+
+if TYPE_CHECKING:
+    from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 
 
 class ConfigCommentGenerator(CliGenerator):
-    """
-    Generator for config comment CLI configuration.
-
-    Renders the config comment section that appears at the beginning of the configuration.
-    """
+    """Generator for config comment CLI configuration."""
 
     @property
     def _model(self) -> CliModel:
@@ -22,10 +23,21 @@ class ConfigCommentGenerator(CliGenerator):
 
     @cli_config_contributor
     def config_comment(self) -> None:
-        """Render config comment CLI configuration using self.cli_config."""
+        """Render config comment CLI configuration."""
+        self._model.extend(ConfigComment(self.data).render(indent=0))
+
+
+class ConfigComment(CliSection):
+    """Renders config comment lines at indent 0 (no separator, no block header)."""
+
+    separator = False
+
+    def __init__(self, data: EosCliConfigGen) -> None:
+        self.data = data
+
+    def _generate(self) -> None:
         if not self.data.config_comment:
             return
-
-        self._add("!")
-        for comment_line in self.data.config_comment.split("\n"):
-            self._add(f"!{comment_line}")
+        self._header("!")
+        for line in self.data.config_comment.split("\n"):
+            self._header(f"!{line}")
