@@ -58,6 +58,9 @@
             },
             "documentation_options": {
               "$ref": "#/$defs/documentation_options"
+            },
+            "cli": {
+              "$ref": "#/$defs/cli"
             }
           },
           "additionalProperties": false
@@ -90,6 +93,9 @@
             },
             "documentation_options": {
               "$ref": "#/$defs/documentation_options"
+            },
+            "cli": {
+              "$ref": "#/$defs/cli"
             }
           },
           "additionalProperties": false
@@ -171,6 +177,9 @@
             },
             "documentation_options": {
               "$ref": "#/$defs/documentation_options"
+            },
+            "cli": {
+              "$ref": "#/$defs/cli"
             }
           },
           "additionalProperties": false
@@ -234,6 +243,9 @@
             },
             "documentation_options": {
               "$ref": "#/$defs/documentation_options"
+            },
+            "cli": {
+              "$ref": "#/$defs/cli"
             }
           },
           "additionalProperties": false
@@ -296,6 +308,9 @@
             },
             "documentation_options": {
               "$ref": "#/$defs/documentation_options_dict"
+            },
+            "cli": {
+              "$ref": "#/$defs/cli"
             },
             "$schema": {
               "type": "string"
@@ -372,6 +387,46 @@
           "$ref": "#/$defs/avd_schema_var"
         }
       }
+    },
+    "cli": {
+      "type": "object",
+      "description": "Options for driving CLI config rendering from schema annotations",
+      "properties": {
+        "separator": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit a '!' line before the section header"
+        },
+        "section": {
+          "type": "string",
+          "description": "Template for the CLI block header line (dict only). Variables like {as} are resolved from the dict's own data."
+        },
+        "line": {
+          "type": "string",
+          "description": "Template for a single CLI body line. Variables are resolved from the parent dict's data (sibling keys)."
+        },
+        "bool_true_line": {
+          "type": "string",
+          "description": "Fixed CLI line emitted verbatim when the field value is True (bool only)."
+        },
+        "bool_false_line": {
+          "type": "string",
+          "description": "Fixed CLI line emitted verbatim when the field value is False (bool only)."
+        },
+        "item_lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of line templates applied to each list item (list only). For scalar items use {_item}."
+        },
+        "section_only_if_content": {
+          "type": "boolean",
+          "default": true,
+          "description": "Skip the section header if no child lines were rendered."
+        }
+      },
+      "additionalProperties": false
     },
     "deprecation": {
       "type": "object",

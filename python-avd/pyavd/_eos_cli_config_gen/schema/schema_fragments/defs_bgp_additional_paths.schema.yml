@@ -12,6 +12,9 @@ $defs:
       receive:
         type: bool
         description: Enable or disable reception of additional-paths.
+        cli:
+          bool_true_line: "bgp additional-paths receive"
+          bool_false_line: "no bgp additional-paths receive"
       send:
         type: str
         description: |-

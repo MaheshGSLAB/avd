@@ -75,6 +75,49 @@ class AvdSchemaBaseModel(BaseModel, ABC):
         allow_with_new_key: bool | None = False
         """Allow the deprecated key to be used in parallel with the new key without raising a conflict error."""
 
+    class CliOptions(BaseModel):
+        """Schema field options for driving CLI config rendering from schema annotations."""
+
+        model_config = ConfigDict(extra="forbid")
+
+        separator: bool = True
+        """Emit a '!' separator line before this section in the CLI output."""
+        section: str | None = None
+        """
+        Template for the CLI section header. Variables use {key_name} syntax and are
+        resolved from the dict's own data context. Only valid on 'dict' type fields.
+        Example: "router bgp {as}"
+        """
+        line: str | None = None
+        """
+        Template for a single CLI body line. Variables use {key_name} syntax and are
+        resolved from the parent dict's data context (i.e. sibling keys + self).
+        Example: "router-id {router_id}"
+        """
+        bool_true_line: str | None = None
+        """
+        Fixed CLI line emitted verbatim when this bool field is True.
+        Example: "update wait-for-convergence"
+        """
+        bool_false_line: str | None = None
+        """
+        Fixed CLI line emitted verbatim when this bool field is False.
+        Example: "no bgp default ipv4-unicast"
+        """
+        item_lines: list[str] | None = None
+        """
+        List of line templates applied to each item in a list field.
+        Variables use {key_name} or {parent.child} dot-notation syntax resolved
+        from the item dict. For scalar list items use the special {_item} variable.
+        A template is only rendered if all its variable references resolve.
+        Example: ["neighbor {name} peer group", "neighbor {name} remote-as {remote_as}"]
+        """
+        section_only_if_content: bool = True
+        """
+        Only render the section header if at least one child line was rendered.
+        Prevents empty blocks like 'vrf FOO' with nothing inside.
+        """
+
     class DocumentationOptions(BaseModel):
         """Schema field options used for controlling documentation generation."""
 
@@ -107,6 +150,8 @@ class AvdSchemaBaseModel(BaseModel, ABC):
     """
     documentation_options: DocumentationOptions | None = None
     """Schema field options used for controlling documentation generation"""
+    cli: CliOptions | None = None
+    """Options for driving CLI config rendering from schema annotations"""
 
     # Type of schema docs generators to use for this schema field.
     _table_row_generator: type[TableRowGenBase]

@@ -9,6 +9,10 @@ type: dict
 keys:
   router_bgp:
     type: dict
+    cli:
+      separator: true
+      section: "router bgp {as}"
+      section_only_if_content: false
     keys:
       as:
         type: str
@@ -25,9 +29,13 @@ keys:
         valid_values:
           - asdot
           - asplain
+        cli:
+          line: "bgp asn notation {as_notation}"
       router_id:
         type: str
         description: In IP address format A.B.C.D.
+        cli:
+          line: "router-id {router_id}"
       timers:
         type: dict
         keys:
@@ -194,17 +202,26 @@ keys:
             type: bool
             description: |
               Disables FIB updates and route advertisement when the BGP instance is initiated until the BGP convergence state is reached.
+            cli:
+              bool_true_line: "update wait-for-convergence"
           wait_install:
             type: bool
             description: |
               Do not advertise reachability to a prefix until that prefix has been installed in hardware.
               This will eliminate any temporary black holes due to a BGP speaker advertising reachability to a prefix that may not yet be installed into the forwarding plane.
+            cli:
+              bool_true_line: "update wait-install"
       bgp_cluster_id:
         type: str
         description: IP Address A.B.C.D.
+        cli:
+          line: "bgp cluster-id {bgp_cluster_id}"
       bgp_defaults:
         type: list
         description: BGP command as string.
+        cli:
+          item_lines:
+            - "{_item}"
         items:
           type: str
       bgp:
@@ -216,9 +233,15 @@ keys:
               ipv4_unicast:
                 type: bool
                 description: Default activation of IPv4 unicast address-family on all IPv4 neighbors (EOS default = True).
+                cli:
+                  bool_true_line: "bgp default ipv4-unicast"
+                  bool_false_line: "no bgp default ipv4-unicast"
               ipv4_unicast_transport_ipv6:
                 type: bool
                 description: Default activation of IPv4 unicast address-family on all IPv6 neighbors (EOS default == False).
+                cli:
+                  bool_true_line: "bgp default ipv4-unicast transport ipv6"
+                  bool_false_line: "no bgp default ipv4-unicast transport ipv6"
           route_reflector_preserve_attributes:
             type: dict
             keys:
@@ -231,12 +254,17 @@ keys:
             keys:
               d_path:
                 type: bool
+                cli:
+                  bool_true_line: "bgp bestpath d-path"
           additional_paths:
             type: dict
             $ref: "eos_cli_config_gen#/$defs/bgp_additional_paths"
           redistribute_internal:
             type: bool
             description: Allow redistribution of iBGP routes into an Interior Gateway Protocol (IGP). EOS default is true.
+            cli:
+              bool_true_line: "bgp redistribute-internal"
+              bool_false_line: "no bgp redistribute-internal"
           labeled_unicast:
             type: dict
             keys:
@@ -310,6 +338,33 @@ keys:
       peer_groups:
         type: list
         primary_key: name
+        cli:
+          item_lines:
+            - "neighbor {name} peer group"
+            - "neighbor {name} remote-as {remote_as}"
+            - "neighbor {name} next-hop-self?next_hop_self"
+            - "neighbor {name} next-hop-peer?next_hop_peer"
+            - "neighbor {name} next-hop-unchanged?next_hop_unchanged"
+            - "neighbor {name} shutdown?shutdown"
+            - "neighbor {name} as-path prepend-own disabled?as_path.prepend_own_disabled"
+            - "neighbor {name} as-path remote-as replace out?as_path.remote_as_replace_out"
+            - "neighbor {name} local-as {local_as} no-prepend replace-as"
+            - "neighbor {name} weight {weight}"
+            - "neighbor {name} passive?passive"
+            - "neighbor {name} update-source {update_source}"
+            - "neighbor {name} bfd?bfd"
+            - "neighbor {name} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}?bfd"
+            - "neighbor {name} description {description}"
+            - "neighbor {name} ebgp-multihop {ebgp_multihop}"
+            - "neighbor {name} ttl maximum-hops {ttl_maximum_hops}"
+            - "neighbor {name} route-reflector-client?route_reflector_client"
+            - "neighbor {name} session tracker {session_tracker}"
+            - "neighbor {name} timers {timers}"
+            - "neighbor {name} route-map {route_map_in} in"
+            - "neighbor {name} route-map {route_map_out} out"
+            - "neighbor {name} password shared-secret profile {shared_secret.profile} algorithm {shared_secret.hash_algorithm}"
+            - "neighbor {name} peer-tag in {peer_tag_in}"
+            - "neighbor {name} peer-tag out discard {peer_tag_out_discard}"
         items:
           type: dict
           keys:
@@ -579,6 +634,32 @@ keys:
       neighbors:
         type: list
         primary_key: ip_address
+        cli:
+          item_lines:
+            - "neighbor {ip_address} peer group {peer_group}"
+            - "neighbor {ip_address} remote-as {remote_as}"
+            - "neighbor {ip_address} next-hop-self?next_hop_self"
+            - "neighbor {ip_address} next-hop-peer?next_hop_peer"
+            - "neighbor {ip_address} shutdown?shutdown"
+            - "neighbor {ip_address} as-path prepend-own disabled?as_path.prepend_own_disabled"
+            - "neighbor {ip_address} as-path remote-as replace out?as_path.remote_as_replace_out"
+            - "neighbor {ip_address} local-as {local_as} no-prepend replace-as"
+            - "neighbor {ip_address} weight {weight}"
+            - "neighbor {ip_address} passive?passive"
+            - "neighbor {ip_address} update-source {update_source}"
+            - "neighbor {ip_address} bfd?bfd"
+            - "neighbor {ip_address} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}?bfd"
+            - "neighbor {ip_address} description {description}"
+            - "neighbor {ip_address} ebgp-multihop {ebgp_multihop}"
+            - "neighbor {ip_address} ttl maximum-hops {ttl_maximum_hops}"
+            - "neighbor {ip_address} route-reflector-client?route_reflector_client"
+            - "neighbor {ip_address} session tracker {session_tracker}"
+            - "neighbor {ip_address} timers {timers}"
+            - "neighbor {ip_address} route-map {route_map_in} in"
+            - "neighbor {ip_address} route-map {route_map_out} out"
+            - "neighbor {ip_address} password shared-secret profile {shared_secret.profile} algorithm {shared_secret.hash_algorithm}"
+            - "neighbor {ip_address} peer-tag in {peer_tag_in}"
+            - "neighbor {ip_address} peer-tag out discard {peer_tag_out_discard}"
         items:
           type: dict
           keys:
@@ -850,6 +931,10 @@ keys:
       neighbor_interfaces:
         type: list
         primary_key: name
+        cli:
+          item_lines:
+            - "neighbor interface {name} peer-group {peer_group} remote-as {remote_as}"
+            - "neighbor interface {name} peer-group {peer_group} peer-filter {peer_filter}"
         items:
           type: dict
           keys:
