@@ -38,6 +38,12 @@ keys:
           line: "router-id {router_id}"
       timers:
         type: dict
+        cli:
+          line_fragments:
+            - "timers bgp"
+            - " {keepalive_time} {hold_time}"
+            - " min-hold-time {min_hold_time}"
+            - " send-failure hold-time {send_failure_hold_time}"
         keys:
           keepalive_time:
             description: |-
@@ -75,6 +81,10 @@ keys:
             max: 65535
       distance:
         type: dict
+        cli:
+          line_fragments:
+            - "distance bgp {external_routes}"
+            - " {internal_routes} {local_routes}"
         keys:
           external_routes:
             type: int
@@ -99,6 +109,12 @@ keys:
             max: 255
       graceful_restart:
         type: dict
+        cli:
+          gate: enabled
+          lines:
+            - "graceful-restart restart-time {restart_time}"
+            - "graceful-restart stalepath-time {stalepath_time}"
+            - "graceful-restart"
         keys:
           enabled:
             type: bool
@@ -138,6 +154,10 @@ keys:
               restart-time will take precedence if both are configured.
       maximum_paths:
         type: dict
+        cli:
+          line_fragments:
+            - "maximum-paths {paths}"
+            - " ecmp {ecmp}"
         keys:
           paths:
             type: int
@@ -244,6 +264,11 @@ keys:
                   bool_false_line: "no bgp default ipv4-unicast transport ipv6"
           route_reflector_preserve_attributes:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "bgp route-reflector preserve-attributes"
+                - " always?always"
             keys:
               enabled:
                 type: bool
@@ -296,6 +321,18 @@ keys:
         type: list
         description: |
           Improved "listen_ranges" data model to support multiple listen ranges and additional filter capabilities.
+        cli:
+          sort_key: peer_group
+          item_gate:
+            - "peer_group"
+            - "prefix"
+            - "peer_filter || remote_as"
+          item_line_fragments:
+            - "bgp listen range {prefix}"
+            - " peer-id include router-id?peer_id_include_router_id"
+            - " peer-group {peer_group}"
+            - " peer-filter {peer_filter}"
+            - " remote-as {remote_as}?!peer_filter"
         items:
           type: dict
           keys:
@@ -999,6 +1036,11 @@ keys:
         keys:
           attached_host:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute attached-host"
+                - " route-map {route_map}"
             keys:
               enabled:
                 type: bool
@@ -1007,6 +1049,11 @@ keys:
                 type: str
           bgp:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute bgp leaked"
+                - " route-map {route_map}"
             keys:
               enabled:
                 type: bool
@@ -1015,6 +1062,13 @@ keys:
                 type: str
           connected:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute connected"
+                - " include leaked?include_leaked"
+                - " route-map {route_map}"
+                - " rcf {rcf}?!route_map"
             keys:
               enabled:
                 type: bool
@@ -1032,6 +1086,12 @@ keys:
                 type: bool
           dynamic:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute dynamic"
+                - " route-map {route_map}"
+                - " rcf {rcf}?!route_map"
             keys:
               enabled:
                 type: bool
@@ -1046,6 +1106,14 @@ keys:
                   `route_map` and `rcf` are mutually exclusive. `route_map` takes precedence.
           isis:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute isis"
+                - " {isis_level}"
+                - " include leaked?include_leaked"
+                - " route-map {route_map}"
+                - " rcf {rcf}?!route_map"
             keys:
               enabled:
                 type: bool
@@ -1070,6 +1138,12 @@ keys:
                 type: bool
           ospf:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute ospf"
+                - " include leaked?include_leaked"
+                - " route-map {route_map}"
             keys:
               enabled:
                 type: bool
@@ -1077,6 +1151,12 @@ keys:
               match_external:
                 description: Redistribute OSPF routes learned from external sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                    - "redistribute ospf match external"
+                    - " include leaked?include_leaked"
+                    - " route-map {route_map}"
                 keys:
                   enabled:
                     type: bool
@@ -1089,6 +1169,14 @@ keys:
               match_internal:
                 description: Redistribute OSPF routes learned from internal sources.
                 type: dict
+                cli:
+                  gate:
+                    - "enabled"
+                    - "!^enabled"
+                  line_fragments:
+                    - "redistribute ospf match internal"
+                    - " include leaked?include_leaked"
+                    - " route-map {route_map}"
                 keys:
                   enabled:
                     type: bool
@@ -1101,6 +1189,13 @@ keys:
               match_nssa_external:
                 description: Redistribute OSPF routes learned from external NSSA sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                    - "redistribute ospf match nssa-external"
+                    - " {nssa_type}"
+                    - " include leaked?include_leaked"
+                    - " route-map {route_map}"
                 keys:
                   enabled:
                     type: bool
@@ -1125,6 +1220,12 @@ keys:
                 type: bool
           ospfv3:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute ospfv3"
+                - " include leaked?include_leaked"
+                - " route-map {route_map}"
             keys:
               enabled:
                 type: bool
@@ -1132,6 +1233,12 @@ keys:
               match_external:
                 description: Redistribute OSPFv3 routes learned from external sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                    - "redistribute ospfv3 match external"
+                    - " include leaked?include_leaked"
+                    - " route-map {route_map}"
                 keys:
                   enabled:
                     type: bool
@@ -1144,6 +1251,14 @@ keys:
               match_internal:
                 description: Redistribute OSPFv3 routes learned from internal sources.
                 type: dict
+                cli:
+                  gate:
+                    - "enabled"
+                    - "!^enabled"
+                  line_fragments:
+                    - "redistribute ospfv3 match internal"
+                    - " include leaked?include_leaked"
+                    - " route-map {route_map}"
                 keys:
                   enabled:
                     type: bool
@@ -1156,6 +1271,13 @@ keys:
               match_nssa_external:
                 description: Redistribute OSPFv3 routes learned from external NSSA sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                    - "redistribute ospfv3 match nssa-external"
+                    - " {nssa_type}"
+                    - " include leaked?include_leaked"
+                    - " route-map {route_map}"
                 keys:
                   enabled:
                     type: bool
@@ -1180,6 +1302,11 @@ keys:
                 type: bool
           rip:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute rip"
+                - " route-map {route_map}"
             keys:
               enabled:
                 type: bool
@@ -1188,6 +1315,13 @@ keys:
                 type: str
           static:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute static"
+                - " include leaked?include_leaked"
+                - " route-map {route_map}"
+                - " rcf {rcf}?!route_map"
             keys:
               enabled:
                 type: bool
@@ -1205,6 +1339,11 @@ keys:
                 description: Include following routes while redistributing.
           user:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+                - "redistribute user"
+                - " rcf {rcf}"
             keys:
               enabled:
                 type: bool

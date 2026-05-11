@@ -94,6 +94,43 @@ class AvdSchemaBaseModel(BaseModel, ABC):
         resolved from the parent dict's data context (i.e. sibling keys + self).
         Example: "router-id {router_id}"
         """
+        line_fragments: list[str] | None = None
+        """
+        Ordered fragments concatenated into one CLI line. The first fragment is
+        the anchor — if it carries {placeholders} that don't resolve, the entire
+        line is skipped. Subsequent fragments are appended only when all their
+        placeholders resolve from the dict's own data. If the anchor has no
+        placeholders and no data fragment resolves, the line is skipped.
+        Example:
+            line_fragments:
+              - "timers bgp"
+              - " {keepalive_time} {hold_time}"
+              - " min-hold-time {min_hold_time}"
+        """
+        lines: list[str] | None = None
+        """
+        Multiple CLI body lines emitted for one dict. Each template is resolved
+        independently from the dict's own data; a line is emitted only if all
+        its placeholders resolve. Templates may carry the '?field_path' truthy-
+        guard suffix from item_lines.
+        Example:
+            lines:
+              - "graceful-restart restart-time {restart_time}"
+              - "graceful-restart stalepath-time {stalepath_time}"
+              - "graceful-restart"
+        """
+        gate: str | list[str] | None = None
+        """
+        One or more truthy guards. Each expression is a field path that may
+        be prefixed with '!' to negate the check and/or '^' to evaluate
+        against the parent data context. The field renders only when all
+        expressions resolve truthy.
+        Examples:
+            gate: "enabled"
+            gate: "!enabled"
+            gate: "^enabled"
+            gate: ["enabled", "!^enabled"]   # own enabled True AND parent enabled NOT True
+        """
         bool_true_line: str | None = None
         """
         Fixed CLI line emitted verbatim when this bool field is True.
@@ -111,6 +148,35 @@ class AvdSchemaBaseModel(BaseModel, ABC):
         from the item dict. For scalar list items use the special {_item} variable.
         A template is only rendered if all its variable references resolve.
         Example: ["neighbor {name} peer group", "neighbor {name} remote-as {remote_as}"]
+        """
+        item_line_fragments: list[str] | None = None
+        """
+        Per-item version of line_fragments. For each list item, build one
+        composite line from an ordered fragment list. Same anchor + optional
+        fragments + ?guard semantics as line_fragments.
+        Example:
+            item_line_fragments:
+              - "aggregate-address {prefix}"
+              - " as-set?as_set"
+              - " summary-only?summary_only"
+              - " attribute-map {attribute_map}"
+        """
+        item_gate: str | list[str] | None = None
+        """
+        Per-item gate using the same syntax as cli.gate (supports '!', '^',
+        '||'). Items where the gate fails are skipped entirely.
+        Example:
+            item_gate:
+              - "peer_group"
+              - "prefix"
+              - "peer_filter || remote_as"
+        """
+        sort_key: str | None = None
+        """
+        Field name to natural-sort list items by before rendering.
+        AvdIndexedList items are always sorted by their primary key —
+        sort_key is ignored there.
+        Example: sort_key: "peer_group"
         """
         section_only_if_content: bool = True
         """

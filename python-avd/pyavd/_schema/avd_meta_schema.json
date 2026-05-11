@@ -405,6 +405,27 @@
           "type": "string",
           "description": "Template for a single CLI body line. Variables are resolved from the parent dict's data (sibling keys)."
         },
+        "line_fragments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered fragments concatenated into one CLI line (dict only). The first fragment is the anchor — if it has {placeholders} that don't resolve, the whole line is skipped. Subsequent fragments are appended only when all their placeholders resolve. If no data fragment resolves, the line is skipped."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Multiple CLI body lines for one dict (dict only). Each template is resolved independently from the dict's own data. A line is emitted only if all its placeholders resolve. Supports the '?field_path' (truthy-required) and '?!field_path' (truthy-forbidden) guard suffixes from item_lines."
+        },
+        "gate": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ],
+          "description": "One or more truthy guards. Each expression is a field path that may be prefixed with '!' to negate the check and/or '^' to evaluate against the parent data context. The field renders only when all expressions resolve truthy. Examples: 'enabled', '!enabled', '^enabled', '!^enabled', ['enabled', '!^enabled']."
+        },
         "bool_true_line": {
           "type": "string",
           "description": "Fixed CLI line emitted verbatim when the field value is True (bool only)."
@@ -419,6 +440,24 @@
             "type": "string"
           },
           "description": "List of line templates applied to each list item (list only). For scalar items use {_item}."
+        },
+        "item_line_fragments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Per-item version of line_fragments (list only). For each list item, build one composite line from an ordered fragment list. Same anchor + optional fragments + ?guard semantics as line_fragments."
+        },
+        "item_gate": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ],
+          "description": "Per-item gate using the same syntax as cli.gate (supports !, ^, ||). Items where the gate fails are skipped entirely."
+        },
+        "sort_key": {
+          "type": "string",
+          "description": "Field name to natural-sort list items by before rendering. AvdIndexedList items are always sorted by their primary key — sort_key is ignored there."
         },
         "section_only_if_content": {
           "type": "boolean",
