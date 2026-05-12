@@ -134,6 +134,11 @@ keys:
             description: Number of seconds.
       graceful_restart_helper:
         type: dict
+        cli:
+          lines:
+            - "no graceful-restart-helper?enabled == false"
+            - "graceful-restart-helper restart-time {restart_time}?enabled == true?restart_time"
+            - "graceful-restart-helper long-lived?enabled == true?long_lived?!restart_time"
         keys:
           enabled:
             type: bool
@@ -296,6 +301,14 @@ keys:
               rib:
                 type: dict
                 description: Configure LU RIB behavior for ip and/or tunnel.
+                cli:
+                  gate: "ip.enabled || tunnel.enabled"
+                  line_fragments:
+                    - "bgp labeled-unicast rib"
+                    - " ip?ip.enabled"
+                    - " route-map {ip.route_map}?ip.enabled"
+                    - " tunnel?tunnel.enabled"
+                    - " route-map {tunnel.route_map}?tunnel.enabled"
                 keys:
                   ip:
                     type: dict
@@ -360,6 +373,10 @@ keys:
                 For asdot notation in YAML inputs, the value must be put in quotes, to prevent it from being interpreted as a float number.
       neighbor_default:
         type: dict
+        cli:
+          lines:
+            - "neighbor default send-community?send_community == 'all'"
+            - "neighbor default send-community {send_community}?send_community?send_community != 'all'"
         keys:
           send_community:
             type: str
@@ -376,34 +393,84 @@ keys:
         type: list
         primary_key: name
         cli:
-          item_lines:
-            - "neighbor {name} peer group"
-            - "neighbor {name} remote-as {remote_as}"
-            - "neighbor {name} next-hop-self?next_hop_self"
-            - "neighbor {name} next-hop-peer?next_hop_peer"
-            - "neighbor {name} next-hop-unchanged?next_hop_unchanged"
-            - "neighbor {name} shutdown?shutdown"
-            - "neighbor {name} as-path prepend-own disabled?as_path.prepend_own_disabled"
-            - "neighbor {name} as-path remote-as replace out?as_path.remote_as_replace_out"
-            - "neighbor {name} local-as {local_as} no-prepend replace-as"
-            - "neighbor {name} weight {weight}"
-            - "neighbor {name} passive?passive"
-            - "neighbor {name} update-source {update_source}"
-            - "neighbor {name} bfd?bfd"
-            - "neighbor {name} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}?bfd"
-            - "neighbor {name} description {description}"
-            - "neighbor {name} ebgp-multihop {ebgp_multihop}"
-            - "neighbor {name} ttl maximum-hops {ttl_maximum_hops}"
-            - "neighbor {name} route-reflector-client?route_reflector_client"
-            - "neighbor {name} session tracker {session_tracker}"
-            - "neighbor {name} timers {timers}"
-            - "neighbor {name} route-map {route_map_in} in"
-            - "neighbor {name} route-map {route_map_out} out"
-            - "neighbor {name} password shared-secret profile {shared_secret.profile} algorithm {shared_secret.hash_algorithm}"
-            - "neighbor {name} peer-tag in {peer_tag_in}"
-            - "neighbor {name} peer-tag out discard {peer_tag_out_discard}"
+          item_gate: name
         items:
           type: dict
+          cli:
+            lines:
+              - "neighbor {name} peer group"
+              - "neighbor {name} remote-as {remote_as}?remote_as"
+              - "neighbor {name} next-hop-self?next_hop_self"
+              - "neighbor {name} next-hop-peer?next_hop_peer"
+              - "neighbor {name} next-hop-unchanged?next_hop_unchanged"
+              - "neighbor {name} shutdown?shutdown"
+              # remove_private_as
+              - ["neighbor {name} remove-private-as?remove_private_as.enabled == true",
+                 " all?remove_private_as.all",
+                 " replace-as?remove_private_as.replace_as?remove_private_as.all"]
+              - "no neighbor {name} remove-private-as?remove_private_as.enabled == false"
+              - "neighbor {name} as-path prepend-own disabled?as_path.prepend_own_disabled"
+              - "neighbor {name} as-path remote-as replace out?as_path.remote_as_replace_out"
+              - "neighbor {name} local-as {local_as} no-prepend replace-as?local_as"
+              - "neighbor {name} weight {weight}?weight"
+              - "neighbor {name} passive?passive"
+              - "neighbor {name} update-source {update_source}?update_source"
+              # bfd
+              - "neighbor {name} bfd?bfd == true"
+              - "neighbor {name} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}?bfd == true"
+              - "neighbor {name} description {description}?description"
+              # allowas_in
+              - ["neighbor {name} allowas-in?allowas_in.enabled == true",
+                 " {allowas_in.times}?allowas_in.times"]
+              # rib_in_pre_policy_retain (peer-groups don't support negation)
+              - ["neighbor {name} rib-in pre-policy retain?rib_in_pre_policy_retain.enabled == true",
+                 " all?rib_in_pre_policy_retain.all"]
+              - "neighbor {name} ebgp-multihop {ebgp_multihop}?ebgp_multihop"
+              - "neighbor {name} ttl maximum-hops {ttl_maximum_hops}?ttl_maximum_hops"
+              - "neighbor {name} route-reflector-client?route_reflector_client"
+              - "neighbor {name} session tracker {session_tracker}?session_tracker"
+              - "neighbor {name} timers {timers}?timers"
+              - "neighbor {name} route-map {route_map_in} in?route_map_in"
+              - "neighbor {name} route-map {route_map_out} out?route_map_out"
+              # password (peer-groups: password key BEFORE shared-secret)
+              - "neighbor {name} password {password_type} {password|hide_passwords}?password?password_type"
+              - "neighbor {name} password 7 {password|hide_passwords}?password?!password_type"
+              # shared_secret
+              - "neighbor {name} password shared-secret profile {shared_secret.profile} algorithm {shared_secret.hash_algorithm}?shared_secret.profile?shared_secret.hash_algorithm"
+              # default_originate
+              - ["neighbor {name} default-originate?default_originate.enabled == true",
+                 " route-map {default_originate.route_map}?default_originate.route_map",
+                 " always?default_originate.always"]
+              # send_community
+              - "neighbor {name} send-community?send_community == 'all'"
+              - "neighbor {name} send-community {send_community}?send_community?send_community != 'all'"
+              # maximum_routes
+              - ["neighbor {name} maximum-routes {maximum_routes}?maximum_routes",
+                 " warning-limit {maximum_routes_warning_limit}?maximum_routes_warning_limit",
+                 " warning-only?maximum_routes_warning_only"]
+              # missing_policy direction in
+              - ["neighbor {name} missing-policy address-family all?missing_policy.direction_in.action",
+                 " include?missing_policy.direction_in.include_community_list || missing_policy.direction_in.include_prefix_list || missing_policy.direction_in.include_sub_route_map",
+                 " community-list?missing_policy.direction_in.include_community_list",
+                 " prefix-list?missing_policy.direction_in.include_prefix_list",
+                 " sub-route-map?missing_policy.direction_in.include_sub_route_map",
+                 " direction in action {missing_policy.direction_in.action}"]
+              # missing_policy direction out
+              - ["neighbor {name} missing-policy address-family all?missing_policy.direction_out.action",
+                 " include?missing_policy.direction_out.include_community_list || missing_policy.direction_out.include_prefix_list || missing_policy.direction_out.include_sub_route_map",
+                 " community-list?missing_policy.direction_out.include_community_list",
+                 " prefix-list?missing_policy.direction_out.include_prefix_list",
+                 " sub-route-map?missing_policy.direction_out.include_sub_route_map",
+                 " direction out action {missing_policy.direction_out.action}"]
+              - "neighbor {name} peer-tag in {peer_tag_in}?peer_tag_in"
+              - "neighbor {name} peer-tag out discard {peer_tag_out_discard}?peer_tag_out_discard"
+              # link_bandwidth
+              - ["neighbor {name} link-bandwidth?link_bandwidth.enabled == true",
+                 " default {link_bandwidth.default}?link_bandwidth.default"]
+              # remove_private_as_ingress
+              - ["neighbor {name} remove-private-as ingress?remove_private_as_ingress.enabled == true",
+                 " replace-as?remove_private_as_ingress.replace_as"]
+              - "no neighbor {name} remove-private-as ingress?remove_private_as_ingress.enabled == false"
           keys:
             name:
               type: str
@@ -672,33 +739,86 @@ keys:
         type: list
         primary_key: ip_address
         cli:
-          item_lines:
-            - "neighbor {ip_address} peer group {peer_group}"
-            - "neighbor {ip_address} remote-as {remote_as}"
-            - "neighbor {ip_address} next-hop-self?next_hop_self"
-            - "neighbor {ip_address} next-hop-peer?next_hop_peer"
-            - "neighbor {ip_address} shutdown?shutdown"
-            - "neighbor {ip_address} as-path prepend-own disabled?as_path.prepend_own_disabled"
-            - "neighbor {ip_address} as-path remote-as replace out?as_path.remote_as_replace_out"
-            - "neighbor {ip_address} local-as {local_as} no-prepend replace-as"
-            - "neighbor {ip_address} weight {weight}"
-            - "neighbor {ip_address} passive?passive"
-            - "neighbor {ip_address} update-source {update_source}"
-            - "neighbor {ip_address} bfd?bfd"
-            - "neighbor {ip_address} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}?bfd"
-            - "neighbor {ip_address} description {description}"
-            - "neighbor {ip_address} ebgp-multihop {ebgp_multihop}"
-            - "neighbor {ip_address} ttl maximum-hops {ttl_maximum_hops}"
-            - "neighbor {ip_address} route-reflector-client?route_reflector_client"
-            - "neighbor {ip_address} session tracker {session_tracker}"
-            - "neighbor {ip_address} timers {timers}"
-            - "neighbor {ip_address} route-map {route_map_in} in"
-            - "neighbor {ip_address} route-map {route_map_out} out"
-            - "neighbor {ip_address} password shared-secret profile {shared_secret.profile} algorithm {shared_secret.hash_algorithm}"
-            - "neighbor {ip_address} peer-tag in {peer_tag_in}"
-            - "neighbor {ip_address} peer-tag out discard {peer_tag_out_discard}"
+          item_gate: ip_address
         items:
           type: dict
+          cli:
+            lines:
+              - "neighbor {ip_address} peer group {peer_group}?peer_group"
+              - "neighbor {ip_address} remote-as {remote_as}?remote_as"
+              - "neighbor {ip_address} next-hop-self?next_hop_self"
+              - "neighbor {ip_address} next-hop-peer?next_hop_peer"
+              - "neighbor {ip_address} shutdown?shutdown"
+              # remove_private_as
+              - ["neighbor {ip_address} remove-private-as?remove_private_as.enabled == true",
+                 " all?remove_private_as.all",
+                 " replace-as?remove_private_as.replace_as?remove_private_as.all"]
+              - "no neighbor {ip_address} remove-private-as?remove_private_as.enabled == false"
+              - "neighbor {ip_address} as-path prepend-own disabled?as_path.prepend_own_disabled"
+              - "neighbor {ip_address} as-path remote-as replace out?as_path.remote_as_replace_out"
+              - "neighbor {ip_address} local-as {local_as} no-prepend replace-as?local_as"
+              - "neighbor {ip_address} weight {weight}?weight"
+              - "neighbor {ip_address} passive?passive"
+              - "neighbor {ip_address} update-source {update_source}?update_source"
+              # bfd (negation only when neighbor inherits from a peer-group)
+              - "neighbor {ip_address} bfd?bfd == true"
+              - "neighbor {ip_address} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx} multiplier {bfd_timers.multiplier}?bfd == true"
+              - "no neighbor {ip_address} bfd?bfd == false?peer_group"
+              - "neighbor {ip_address} description {description}?description"
+              # allowas_in
+              - ["neighbor {ip_address} allowas-in?allowas_in.enabled == true",
+                 " {allowas_in.times}?allowas_in.times"]
+              # rib_in_pre_policy_retain (neighbors support negation)
+              - ["neighbor {ip_address} rib-in pre-policy retain?rib_in_pre_policy_retain.enabled == true",
+                 " all?rib_in_pre_policy_retain.all"]
+              - "no neighbor {ip_address} rib-in pre-policy retain?rib_in_pre_policy_retain.enabled == false"
+              - "neighbor {ip_address} ebgp-multihop {ebgp_multihop}?ebgp_multihop"
+              - "neighbor {ip_address} ttl maximum-hops {ttl_maximum_hops}?ttl_maximum_hops"
+              # route_reflector_client (neighbors support negation)
+              - "neighbor {ip_address} route-reflector-client?route_reflector_client == true"
+              - "no neighbor {ip_address} route-reflector-client?route_reflector_client == false"
+              - "neighbor {ip_address} session tracker {session_tracker}?session_tracker"
+              - "neighbor {ip_address} timers {timers}?timers"
+              - "neighbor {ip_address} route-map {route_map_in} in?route_map_in"
+              - "neighbor {ip_address} route-map {route_map_out} out?route_map_out"
+              # shared-secret BEFORE password key for neighbors (j2 ordering)
+              - "neighbor {ip_address} password shared-secret profile {shared_secret.profile} algorithm {shared_secret.hash_algorithm}?shared_secret.profile?shared_secret.hash_algorithm"
+              - "neighbor {ip_address} password {password_type} {password|hide_passwords}?password?password_type"
+              - "neighbor {ip_address} password 7 {password|hide_passwords}?password?!password_type"
+              # default_originate
+              - ["neighbor {ip_address} default-originate?default_originate.enabled == true",
+                 " route-map {default_originate.route_map}?default_originate.route_map",
+                 " always?default_originate.always"]
+              # send_community
+              - "neighbor {ip_address} send-community?send_community == 'all'"
+              - "neighbor {ip_address} send-community {send_community}?send_community?send_community != 'all'"
+              # maximum_routes
+              - ["neighbor {ip_address} maximum-routes {maximum_routes}?maximum_routes",
+                 " warning-limit {maximum_routes_warning_limit}?maximum_routes_warning_limit",
+                 " warning-only?maximum_routes_warning_only"]
+              # missing_policy direction in
+              - ["neighbor {ip_address} missing-policy address-family all?missing_policy.direction_in.action",
+                 " include?missing_policy.direction_in.include_community_list || missing_policy.direction_in.include_prefix_list || missing_policy.direction_in.include_sub_route_map",
+                 " community-list?missing_policy.direction_in.include_community_list",
+                 " prefix-list?missing_policy.direction_in.include_prefix_list",
+                 " sub-route-map?missing_policy.direction_in.include_sub_route_map",
+                 " direction in action {missing_policy.direction_in.action}"]
+              # missing_policy direction out
+              - ["neighbor {ip_address} missing-policy address-family all?missing_policy.direction_out.action",
+                 " include?missing_policy.direction_out.include_community_list || missing_policy.direction_out.include_prefix_list || missing_policy.direction_out.include_sub_route_map",
+                 " community-list?missing_policy.direction_out.include_community_list",
+                 " prefix-list?missing_policy.direction_out.include_prefix_list",
+                 " sub-route-map?missing_policy.direction_out.include_sub_route_map",
+                 " direction out action {missing_policy.direction_out.action}"]
+              - "neighbor {ip_address} peer-tag in {peer_tag_in}?peer_tag_in"
+              - "neighbor {ip_address} peer-tag out discard {peer_tag_out_discard}?peer_tag_out_discard"
+              # link_bandwidth
+              - ["neighbor {ip_address} link-bandwidth?link_bandwidth.enabled == true",
+                 " default {link_bandwidth.default}?link_bandwidth.default"]
+              # remove_private_as_ingress
+              - ["neighbor {ip_address} remove-private-as ingress?remove_private_as_ingress.enabled == true",
+                 " replace-as?remove_private_as_ingress.replace_as"]
+              - "no neighbor {ip_address} remove-private-as ingress?remove_private_as_ingress.enabled == false"
           keys:
             ip_address:
               type: str
@@ -1006,6 +1126,15 @@ keys:
       aggregate_addresses:
         type: list
         primary_key: prefix
+        cli:
+          item_line_fragments:
+            - "aggregate-address {prefix}"
+            - " as-set?as_set"
+            - " summary-only?summary_only"
+            - " attribute-map {attribute_map}"
+            - " attribute rcf {attribute.rcf}"
+            - " match-map {match_map}"
+            - " advertise-only?advertise_only"
         items:
           type: dict
           keys:
@@ -1458,8 +1587,16 @@ keys:
       vlans:
         type: list
         primary_key: id
+        cli:
+          item_gate: id
         items:
           type: dict
+          cli:
+            section: "vlan {id}"
+            section_only_if_content: false
+            lines:
+              - "rd {rd}?rd"
+              - "rd evpn domain {rd_evpn_domain.domain} {rd_evpn_domain.rd}?rd_evpn_domain.domain?rd_evpn_domain.rd"
           keys:
             id:
               type: int
@@ -1492,18 +1629,31 @@ keys:
               keys:
                 both:
                   type: list
+                  cli:
+                    item_lines:
+                      - "route-target both {_item}"
                   items:
                     type: str
                 import:
                   type: list
+                  cli:
+                    item_lines:
+                      - "route-target import {_item}"
                   items:
                     type: str
                 export:
                   type: list
+                  cli:
+                    item_lines:
+                      - "route-target export {_item}"
                   items:
                     type: str
                 import_evpn_domains:
                   type: list
+                  cli:
+                    sort_key: domain
+                    item_lines:
+                      - "route-target import evpn domain {domain} {route_target}"
                   items:
                     type: dict
                     keys:
@@ -1516,6 +1666,10 @@ keys:
                         type: str
                 export_evpn_domains:
                   type: list
+                  cli:
+                    sort_key: domain
+                    item_lines:
+                      - "route-target export evpn domain {domain} {route_target}"
                   items:
                     type: dict
                     keys:
@@ -1528,6 +1682,10 @@ keys:
                         type: str
                 import_export_evpn_domains:
                   type: list
+                  cli:
+                    sort_key: domain
+                    item_lines:
+                      - "route-target import export evpn domain {domain} {route_target}"
                   items:
                     type: dict
                     keys:
@@ -1540,15 +1698,24 @@ keys:
                         type: str
             redistribute_routes:
               type: list
+              cli:
+                item_lines:
+                  - "redistribute {_item}"
               items:
                 type: str
             no_redistribute_routes:
               type: list
+              cli:
+                item_lines:
+                  - "no redistribute {_item}"
               items:
                 type: str
             eos_cli:
               type: str
               description: Multiline EOS CLI rendered directly on the Router BGP, VLAN definition in the final EOS configuration.
+              cli:
+                raw_lines:
+                  separator: "!"
       vpws:
         type: list
         primary_key: name

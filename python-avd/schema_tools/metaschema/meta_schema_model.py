@@ -107,17 +107,21 @@ class AvdSchemaBaseModel(BaseModel, ABC):
               - " {keepalive_time} {hold_time}"
               - " min-hold-time {min_hold_time}"
         """
-        lines: list[str] | None = None
+        lines: list[str | list[str]] | None = None
         """
-        Multiple CLI body lines emitted for one dict. Each template is resolved
-        independently from the dict's own data; a line is emitted only if all
-        its placeholders resolve. Templates may carry the '?field_path' truthy-
-        guard suffix from item_lines.
+        Multiple CLI body lines emitted for one dict. Each entry is either a
+        string template (resolved independently from the dict's own data;
+        emitted only if all placeholders resolve and any '?guard' suffixes
+        pass) OR a list of strings, in which case the entry is rendered as a
+        single composite line via the same fragment+anchor semantics as
+        cli.line_fragments. Use the composite form for "anchor + optional
+        suffix fragments" patterns within a lines block.
         Example:
             lines:
-              - "graceful-restart restart-time {restart_time}"
-              - "graceful-restart stalepath-time {stalepath_time}"
-              - "graceful-restart"
+              - "graceful-restart restart-time {restart_time}?restart_time"
+              - ["neighbor {name} maximum-routes {maximum_routes}?maximum_routes",
+                 " warning-limit {maximum_routes_warning_limit}?maximum_routes_warning_limit",
+                 " warning-only?maximum_routes_warning_only"]
         """
         gate: str | list[str] | None = None
         """
@@ -141,13 +145,15 @@ class AvdSchemaBaseModel(BaseModel, ABC):
         Fixed CLI line emitted verbatim when this bool field is False.
         Example: "no bgp default ipv4-unicast"
         """
-        item_lines: list[str] | None = None
+        item_lines: list[str | list[str]] | None = None
         """
-        List of line templates applied to each item in a list field.
-        Variables use {key_name} or {parent.child} dot-notation syntax resolved
-        from the item dict. For scalar list items use the special {_item} variable.
-        A template is only rendered if all its variable references resolve.
-        Example: ["neighbor {name} peer group", "neighbor {name} remote-as {remote_as}"]
+        List of line templates applied to each item in a list field. Variables
+        use {key_name} or {parent.child} dot-notation syntax resolved from the
+        item dict. For scalar list items use the special {_item} variable. A
+        template is only rendered if all its variable references resolve. An
+        entry may be a list of strings instead of a single string — that entry
+        renders as one composite line via cli.line_fragments semantics.
+        Example: ["neighbor {name} peer group", "neighbor {name} remote-as {remote_as}?remote_as"]
         """
         item_line_fragments: list[str] | None = None
         """
@@ -170,6 +176,55 @@ class AvdSchemaBaseModel(BaseModel, ABC):
               - "peer_group"
               - "prefix"
               - "peer_filter || remote_as"
+        """
+
+        class RawLines(BaseModel):
+            """Emit each line of a string field verbatim at the current indent."""
+
+            model_config = ConfigDict(extra="forbid")
+
+            separator: str | None = None
+            """Optional literal line emitted before the raw content (e.g. '!')."""
+
+        raw_lines: RawLines | None = None
+        """
+        Emit each line of a string field verbatim at the current indent
+        (str only). Use for free-text user content like `eos_cli`. Optional
+        `separator` literal is emitted on its own line before the content
+        (typically '!').
+        Example:
+            raw_lines:
+              separator: "!"
+        """
+
+        class LineSwitch(BaseModel):
+            """Pick one of N CLI lines by the value of a sibling field."""
+
+            model_config = ConfigDict(extra="forbid")
+
+            field: str
+            """Path to the sibling field whose value selects the case."""
+            cases: dict[str, str]
+            """Mapping of literal value (as string key in YAML) → CLI line template."""
+            default: str | None = None
+            """Optional fallback template tried when no case matches or the matching case template fails to render."""
+
+        line_switch: LineSwitch | None = None
+        """
+        Pick one of N CLI lines by the value of a sibling field (dict only).
+        The case whose key equals the resolved value of `field` is tried first;
+        if its template renders (placeholders + guards all resolve), that line
+        is emitted. Otherwise the optional `default` template is tried.
+        Templates resolve against the dict's own data and may carry ?guard
+        suffixes.
+        Example:
+            line_switch:
+              field: send
+              cases:
+                disabled: "no bgp additional-paths send"
+                ecmp: "bgp additional-paths send ecmp limit {send_limit}?send_limit"
+                limit: "bgp additional-paths send limit {send_limit}?send_limit"
+              default: "bgp additional-paths send {send}?send"
         """
         sort_key: str | None = None
         """

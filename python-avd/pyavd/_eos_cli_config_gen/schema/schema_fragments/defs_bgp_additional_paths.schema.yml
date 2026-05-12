@@ -8,6 +8,14 @@ type: dict
 $defs:
   bgp_additional_paths:
     type: dict
+    cli:
+      line_switch:
+        field: send
+        cases:
+          disabled: "no bgp additional-paths send"
+          ecmp: "bgp additional-paths send ecmp limit {send_limit}?send_limit"
+          limit: "bgp additional-paths send limit {send_limit}?send_limit"
+        default: "bgp additional-paths send {send}?send"
     keys:
       receive:
         type: bool

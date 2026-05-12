@@ -407,15 +407,16 @@
         },
         "line_fragments": {
           "type": "array",
-          "items": {
-            "type": "string"
-          },
+          "items": {"type": "string"},
           "description": "Ordered fragments concatenated into one CLI line (dict only). The first fragment is the anchor — if it has {placeholders} that don't resolve, the whole line is skipped. Subsequent fragments are appended only when all their placeholders resolve. If no data fragment resolves, the line is skipped."
         },
         "lines": {
           "type": "array",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {"type": "string"},
+              {"type": "array", "items": {"type": "string"}}
+            ]
           },
           "description": "Multiple CLI body lines for one dict (dict only). Each template is resolved independently from the dict's own data. A line is emitted only if all its placeholders resolve. Supports the '?field_path' (truthy-required) and '?!field_path' (truthy-forbidden) guard suffixes from item_lines."
         },
@@ -437,15 +438,16 @@
         "item_lines": {
           "type": "array",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {"type": "string"},
+              {"type": "array", "items": {"type": "string"}}
+            ]
           },
           "description": "List of line templates applied to each list item (list only). For scalar items use {_item}."
         },
         "item_line_fragments": {
           "type": "array",
-          "items": {
-            "type": "string"
-          },
+          "items": {"type": "string"},
           "description": "Per-item version of line_fragments (list only). For each list item, build one composite line from an ordered fragment list. Same anchor + optional fragments + ?guard semantics as line_fragments."
         },
         "item_gate": {
@@ -454,6 +456,38 @@
             {"type": "array", "items": {"type": "string"}}
           ],
           "description": "Per-item gate using the same syntax as cli.gate (supports !, ^, ||). Items where the gate fails are skipped entirely."
+        },
+        "raw_lines": {
+          "type": "object",
+          "description": "Emit each line of a string field verbatim at the current indent (str only). Use for free-text user content like `eos_cli`. Optional `separator` literal is emitted on its own line before the content (typically '!').",
+          "properties": {
+            "separator": {
+              "type": "string",
+              "description": "Optional literal line emitted before the raw content (e.g. '!')."
+            }
+          },
+          "additionalProperties": false
+        },
+        "line_switch": {
+          "type": "object",
+          "description": "Pick one of N CLI lines by the value of a sibling field (dict only). The case whose key equals the resolved value of `field` is tried first; if its template renders (placeholders + guards all resolve), that line is emitted. Otherwise the optional `default` template is tried. Templates resolve against the dict's own data and may carry ?guard suffixes.",
+          "required": ["field", "cases"],
+          "properties": {
+            "field": {
+              "type": "string",
+              "description": "Path to the sibling field whose value selects the case."
+            },
+            "cases": {
+              "type": "object",
+              "description": "Mapping of literal value → CLI line template.",
+              "additionalProperties": {"type": "string"}
+            },
+            "default": {
+              "type": "string",
+              "description": "Optional fallback template tried when no case matches or the matching case template fails to render."
+            }
+          },
+          "additionalProperties": false
         },
         "sort_key": {
           "type": "string",

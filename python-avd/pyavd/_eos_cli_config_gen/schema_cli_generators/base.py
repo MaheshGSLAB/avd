@@ -47,8 +47,45 @@ Supported ``cli`` annotation keys
                             expression is a field path that may be prefixed with
                             ``!`` to negate the truthy check and/or ``^`` to
                             evaluate against the *parent* data context.
+                            Equality form: ``path == LITERAL`` / ``path != LITERAL``
+                            where LITERAL is ``'string'``, ``true``, ``false``,
+                            ``null``, or an integer. The ``^`` parent-context
+                            prefix also applies to the equality form.
                             Examples: ``enabled``, ``!enabled``, ``^enabled``,
-                            ``!^enabled``, ``[enabled, !^enabled]``.
+                            ``!^enabled``, ``[enabled, !^enabled]``,
+                            ``send == 'disabled'``, ``^kind != 'rsvp'``.
+``line_switch``             Dict → pick one of N templates by the value of a
+                            sibling field. Shape: ``{field: <path>, cases:
+                            {<literal>: <template>, ...}, default: <template>}``.
+                            The case whose key equals the resolved value of
+                            ``field`` is tried first; if its template renders
+                            (all placeholders/guards resolve), that line is
+                            emitted. Otherwise the optional ``default``
+                            template is tried. Templates resolve against the
+                            *current* model and may carry ``?guard`` suffixes.
+``raw_lines``               Str → emit the string's split lines verbatim at
+                            the current indent. Shape: ``{separator: "!"}``
+                            optionally inserts a literal ``!`` line before
+                            the content. Used for free-text fields like
+                            ``eos_cli``.
+
+Per-item recursive rendering
+----------------------------
+A list field whose ``items`` schema carries its own ``cli`` annotation drives
+per-item rendering: the renderer iterates the list (sorted by ``sort_key``,
+filtered by ``item_gate``) and calls :func:`render_schema_field` on each item
+with the item as the data context. This lets each item open a section
+(``cli.section: "vlan {id}"``), emit body lines (``cli.lines``), or recurse
+further into its annotated children — anything available to a top-level dict.
+Existing ``cli.item_lines`` / ``cli.item_line_fragments`` on the *list* take
+precedence over ``items.cli`` and continue to work unchanged.
+
+Template filters
+----------------
+``{var|filter_name}`` runs the resolved value through a registered filter
+before stringification. Built-ins: ``hide_passwords`` (masks via
+:func:`pyavd.j2filters.hide_passwords`). Use ``register_template_filter`` to
+add more.
 ``bool_true_line``          Bool → fixed line when value is ``True``
 ``bool_false_line``         Bool → fixed line when value is ``False``
 ``item_lines``              List → one or more line templates per item
@@ -73,8 +110,12 @@ A line is skipped if any referenced variable resolves to ``None``/``Undefined``.
 For ``item_lines`` / ``lines`` / ``line_fragments``, the suffix ``?field_path``
 acts as a boolean guard: the template is skipped unless the named field
 (dot-notation supported) is truthy on the current context. The negated form
-``?!field_path`` skips the template when the field IS truthy. Either suffix is
-stripped from the rendered output.
+``?!field_path`` skips the template when the field IS truthy. The equality
+form ``?field_path == LITERAL`` / ``?field_path != LITERAL`` matches the
+field value against ``'string'``, ``true``, ``false``, ``null``, or an
+integer literal. Multiple guards may be chained at the end of a template
+(``"...?cond1?cond2"``); all must pass. Suffixes are stripped from the
+rendered output.
 
 Example schema::
 
@@ -373,11 +414,41 @@ class CliGenerator(CliGeneratorProtocol):
 
 
 _INDENT = CliSection._INDENT_STR
-# Supports plain {var} and dot-notation {parent.child}
-_TEMPLATE_VAR_RE = re.compile(r"\{([\w.]+)\}")
-# Matches an optional boolean guard suffix like "?shutdown" (truthy) or "?!shutdown"
-# (negated — skip when truthy). Path supports dot-notation: "?bfd_timers.interval".
-_CONDITION_SUFFIX_RE = re.compile(r"\?(!?)([\w][\w.]*)\s*$")
+# Supports plain {var}, dot-notation {parent.child}, and an optional pipe filter {var|filter_name}.
+_TEMPLATE_VAR_RE = re.compile(r"\{([\w.]+)(?:\|(\w+))?\}")
+# Matches one trailing condition suffix. Captures the expression after `?` so
+# `_evaluate_gates` can parse boolean, equality, and ``||``-joined alternatives.
+# Each alternative is one of: `[!]?[^]?path`, `[^]?path == LITERAL`,
+# `[^]?path != LITERAL`. LITERAL is `'string'`, `true`, `false`, `null`, or an
+# integer. Multiple alternatives may be joined with ``||`` (OR) — the guard
+# passes if any alternative is true.
+_CONDITION_SUFFIX_ALT = r"!?\^?[\w][\w.]*(?:\s*(?:==|!=)\s*(?:'[^']*'|true|false|null|-?\d+))?"
+_CONDITION_SUFFIX_RE = re.compile(
+    rf"\?\s*({_CONDITION_SUFFIX_ALT}(?:\s*\|\|\s*{_CONDITION_SUFFIX_ALT})*)\s*$"
+)
+# Equality expression: `[^]?path (==|!=) LITERAL`.
+_EQ_EXPR_RE = re.compile(r"^(\^?)([\w][\w.]*)\s*(==|!=)\s*(.+)$")
+# Boolean expression: `[!]?[^]?path`.
+_BOOL_EXPR_RE = re.compile(r"^(!?)(\^?)([\w][\w.]*)$")
+# Recognised literal forms inside equality expressions.
+_LITERAL_RE = re.compile(r"^(?:'([^']*)'|(true|false|null)|(-?\d+))$")
+
+
+def _parse_literal(s: str) -> Any:
+    """Parse a literal value from a gate/guard expression."""
+    m = _LITERAL_RE.match(s.strip())
+    if m is None:
+        msg = f"Invalid literal in cli annotation: {s!r}"
+        raise ValueError(msg)
+    if m.group(1) is not None:
+        return m.group(1)
+    if m.group(2) == "true":
+        return True
+    if m.group(2) == "false":
+        return False
+    if m.group(2) == "null":
+        return None
+    return int(m.group(3))
 
 
 def _evaluate_gates(gate_spec: str | list[str], data: Any, parent_data: Any) -> bool:
@@ -386,9 +457,10 @@ def _evaluate_gates(gate_spec: str | list[str], data: Any, parent_data: Any) -> 
 
     Each expression is a field path with optional ``!`` (negate) and ``^``
     (parent context) prefixes — e.g. ``enabled``, ``!enabled``, ``^enabled``,
-    ``!^enabled``. Multiple paths joined with ``||`` form an OR group: the
-    expression passes if any alternative evaluates truthy. The list-level
-    semantics is AND: every expression must pass for the gate to open.
+    ``!^enabled`` — or an equality form ``path == LITERAL`` / ``path != LITERAL``.
+    Multiple paths joined with ``||`` form an OR group: the expression passes if
+    any alternative evaluates truthy. The list-level semantics is AND: every
+    expression must pass for the gate to open.
     """
     expressions = [gate_spec] if isinstance(gate_spec, str) else gate_spec
     for expr in expressions:
@@ -399,17 +471,23 @@ def _evaluate_gates(gate_spec: str | list[str], data: Any, parent_data: Any) -> 
 
 
 def _evaluate_single_gate(expr: str, data: Any, parent_data: Any) -> bool:
-    """Evaluate one gate path with optional ``!`` and ``^`` prefixes."""
-    negate = expr.startswith("!")
-    if negate:
-        expr = expr[1:]
-    if expr.startswith("^"):
-        context = parent_data
-        expr = expr[1:]
-    else:
-        context = data
-    value = bool(_resolve_path(context, expr))
-    return value != negate
+    """Evaluate one gate path: boolean (``[!][^]path``) or equality (``[^]path (==|!=) LITERAL``)."""
+    expr = expr.strip()
+    eq = _EQ_EXPR_RE.match(expr)
+    if eq is not None:
+        ctx = parent_data if eq.group(1) == "^" else data
+        path, op, lit_str = eq.group(2), eq.group(3), eq.group(4)
+        literal = _parse_literal(lit_str)
+        value = _resolve_path(ctx, path)
+        return (value == literal) if op == "==" else (value != literal)
+    bm = _BOOL_EXPR_RE.match(expr)
+    if bm is None:
+        msg = f"Invalid cli gate/guard expression: {expr!r}"
+        raise ValueError(msg)
+    negate, parent_pfx, path = bm.group(1), bm.group(2), bm.group(3)
+    ctx = parent_data if parent_pfx == "^" else data
+    value = bool(_resolve_path(ctx, path))
+    return value != bool(negate)
 
 
 def _model_get(context: Any, key: str) -> Any:
@@ -453,21 +531,45 @@ def _resolve_path(context: Any, path: str) -> Any:
     return current
 
 
+_TEMPLATE_FILTERS: dict[str, Any] = {}
+"""Registered placeholder filters. Use ``register_template_filter`` to add."""
+
+
+def register_template_filter(name: str, fn: Any) -> None:
+    """Register a filter callable for use in ``{var|name}`` placeholders."""
+    _TEMPLATE_FILTERS[name] = fn
+
+
 def resolve_template(template: str, context: Any) -> str | None:
     """
     Resolve ``{var}`` (and ``{parent.child}``) placeholders from *context*.
 
+    A pipe filter may follow the variable name: ``{password|hide_passwords}``
+    runs the resolved value through the registered filter before stringifying.
     Returns ``None`` if any referenced variable is absent or ``None`` so that
     callers can skip rendering incomplete lines.
     """
-    variables = _TEMPLATE_VAR_RE.findall(template)
-    result = template
-    for var in variables:
+    matches = list(_TEMPLATE_VAR_RE.finditer(template))
+    if not matches:
+        return template
+    parts: list[str] = []
+    cursor = 0
+    for m in matches:
+        parts.append(template[cursor:m.start()])
+        var, filter_name = m.group(1), m.group(2)
         val = _resolve_path(context, var)
         if val is None:
             return None
-        result = result.replace("{" + var + "}", str(val), 1)
-    return result
+        if filter_name:
+            fn = _TEMPLATE_FILTERS.get(filter_name)
+            if fn is None:
+                msg = f"Unknown template filter: {filter_name!r}"
+                raise ValueError(msg)
+            val = fn(val)
+        parts.append(str(val))
+        cursor = m.end()
+    parts.append(template[cursor:])
+    return "".join(parts)
 
 
 def render_schema_field(
@@ -512,6 +614,11 @@ def render_schema_field(
             return []
         return [_INDENT * indent + rendered]
 
+    # --- Dict with section: named CLI block. _render_section pulls in any sibling
+    # line_fragments / lines / line_switch as the section body, plus annotated children.
+    if "section" in cli and schema_type == "dict" and isinstance(data, AvdModel):
+        return _render_section(schema, cli, data, indent)
+
     # --- cli.line_fragments: one composite line + recurse into annotated children ---
     if "line_fragments" in cli and isinstance(data, AvdModel):
         own = _render_line_fragments(cli["line_fragments"], data, indent, has_gate="gate" in cli)
@@ -520,6 +627,10 @@ def render_schema_field(
     # --- cli.lines: multiple body lines + recurse into annotated children ---
     if "lines" in cli and isinstance(data, AvdModel):
         return _render_lines(cli["lines"], data, indent) + _render_dict_children(schema, data, indent)
+
+    # --- cli.line_switch: pick one of N templates by sibling field value ---
+    if "line_switch" in cli and isinstance(data, AvdModel):
+        return _render_line_switch(cli["line_switch"], data, indent) + _render_dict_children(schema, data, indent)
 
     # --- List with item_lines: one or more lines per list item ---
     if schema_type == "list" and "item_lines" in cli and isinstance(data, (AvdList, AvdIndexedList, list)):
@@ -531,9 +642,15 @@ def render_schema_field(
             cli["item_line_fragments"], _sort_items(data, cli.get("sort_key")), indent, item_gate=cli.get("item_gate")
         )
 
-    # --- Dict with section: named CLI block with indented children ---
-    if "section" in cli and schema_type == "dict" and isinstance(data, AvdModel):
-        return _render_section(schema, cli, data, indent)
+    # --- List whose items.cli drives per-item rendering (sections, lines, etc.) ---
+    if schema_type == "list" and isinstance(data, (AvdList, AvdIndexedList, list)):
+        items_schema = schema.get("items") or {}
+        if items_schema.get("cli"):
+            return _render_items_via_schema(items_schema, _sort_items(data, cli.get("sort_key")), data, indent, item_gate=cli.get("item_gate"))
+
+    # --- Scalar str with raw_lines: emit each split-line verbatim ---
+    if schema_type == "str" and "raw_lines" in cli and isinstance(data, str):
+        return _render_raw_lines(cli["raw_lines"], data, indent)
 
     # --- Dict without CLI section: recurse transparently at same indent ---
     if schema_type == "dict" and isinstance(data, AvdModel):
@@ -547,19 +664,19 @@ def _apply_item_template(template: str, context: Any) -> str | None:
     """
     Apply one item_lines template to a context (model or scalar).
 
-    Strips an optional ``?field_path`` (truthy-required) or ``?!field_path``
-    (truthy-forbidden) guard suffix before resolving ``{var}`` placeholders.
-    Returns ``None`` when the guard fails or any placeholder doesn't resolve.
+    Strips trailing ``?guard`` suffixes (chained left to right at the end of
+    the template) before resolving ``{var}`` placeholders. Each guard is a
+    boolean (``?field``, ``?!field``) or equality (``?field == 'val'``,
+    ``?field != true``) expression evaluated by :func:`_evaluate_single_gate`.
+    Returns ``None`` when any guard fails or any placeholder doesn't resolve.
     """
-    m = _CONDITION_SUFFIX_RE.search(template)
-    if m:
-        negate, path = m.group(1), m.group(2)
-        value = _resolve_path(context, path)
-        if negate and value:
+    while True:
+        m = _CONDITION_SUFFIX_RE.search(template)
+        if m is None:
+            break
+        if not _evaluate_gates(m.group(1), context, None):
             return None
-        if not negate and not value:
-            return None
-        template = template[: m.start()]
+        template = template[: m.start()].rstrip()
     return resolve_template(template, context)
 
 
@@ -616,6 +733,9 @@ def _render_list_items(
         if item_gate is not None and not _evaluate_gates(item_gate, context, None):
             continue
         for tpl in item_line_templates:
+            if isinstance(tpl, list):
+                lines.extend(_render_line_fragments(tpl, context, indent))
+                continue
             rendered = _apply_item_template(tpl, context)
             if rendered is not None:
                 lines.append(_INDENT * indent + rendered)
@@ -649,16 +769,109 @@ def _render_list_item_fragments(
     return lines
 
 
-def _render_lines(line_templates: list[str], context: AvdModel, indent: int) -> list[str]:
+def _render_items_via_schema(
+    items_schema: dict,
+    items: Any,
+    parent_data: Any,
+    indent: int,
+    *,
+    item_gate: str | list[str] | None = None,
+) -> list[str]:
+    """
+    Iterate a list and render each item by recursing through ``render_schema_field``.
+
+    Used when a list's ``items`` schema carries its own ``cli`` annotations
+    (e.g. an ``item_section`` or ``lines`` block). Each item becomes the data
+    context; ``parent_data`` is the list itself. Items skipped by ``item_gate``
+    are excluded.
+    """
+    lines: list[str] = []
+    for item in items:
+        if item_gate is not None and not _evaluate_gates(item_gate, item, None):
+            continue
+        lines.extend(render_schema_field(items_schema, item, parent_data, indent))
+    return lines
+
+
+def _render_raw_lines(spec: dict, data: str, indent: int) -> list[str]:
+    """
+    Emit each line of a multi-line string verbatim at the given indent.
+
+    ``spec`` shape::
+
+        {"separator": "!"}    # optional literal line emitted before content
+
+    Used for fields like ``eos_cli`` where the user-supplied string is dropped
+    into the config as-is (with its own line breaks).
+    """
+    if not data:
+        return []
+    pref = _INDENT * indent
+    lines: list[str] = []
+    sep = spec.get("separator")
+    if sep:
+        lines.append(pref + sep)
+    for line in data.splitlines():
+        lines.append(pref + line)
+    return lines
+
+
+def _render_line_switch(spec: dict, data: AvdModel, indent: int) -> list[str]:
+    """
+    Render one line chosen by the value of a sibling field.
+
+    ``spec`` shape::
+
+        {
+            "field":   <path>,                    # field on `data` to switch on
+            "cases":   {<literal>: <template>, ...},
+            "default": <template>,                # optional fallback
+        }
+
+    The case whose key equals the resolved value of ``field`` is tried first.
+    If its template renders (placeholders + guards all resolve), that line is
+    emitted. Otherwise — including when no case matches — the optional
+    ``default`` template is tried. Templates resolve against ``data`` and may
+    carry ``?guard`` suffixes.
+    """
+    field = spec.get("field")
+    cases: dict = spec.get("cases") or {}
+    default = spec.get("default")
+
+    if field is None:
+        msg = "cli.line_switch requires a 'field' key naming the sibling to switch on"
+        raise ValueError(msg)
+
+    switch_value = _resolve_path(data, field)
+    case_template = cases.get(switch_value) if switch_value is not None else None
+    if case_template is not None:
+        rendered = _apply_item_template(case_template, data)
+        if rendered is not None:
+            return [_INDENT * indent + rendered]
+    if default is not None:
+        rendered = _apply_item_template(default, data)
+        if rendered is not None:
+            return [_INDENT * indent + rendered]
+    return []
+
+
+def _render_lines(line_templates: list, context: AvdModel, indent: int) -> list[str]:
     """
     Render multiple body lines from one dict's own data.
 
-    Each template is resolved independently from *context*; a line is emitted
-    only if all its placeholders resolve. Templates may carry the
-    ``?field_path`` truthy-guard suffix (same syntax as ``item_lines``).
+    Each entry is either a string template (resolved independently from
+    *context* — emitted only if all placeholders resolve and any ``?guard``
+    suffixes pass) OR a list of strings, in which case the entry is rendered
+    as a single composite line via :func:`_render_line_fragments`. The
+    composite form is the per-line equivalent of ``cli.line_fragments`` and is
+    the primary way to express "anchor + optional suffix fragments" patterns
+    inside a ``cli.lines`` block.
     """
     lines: list[str] = []
     for tpl in line_templates:
+        if isinstance(tpl, list):
+            lines.extend(_render_line_fragments(tpl, context, indent))
+            continue
         rendered = _apply_item_template(tpl, context)
         if rendered is not None:
             lines.append(_INDENT * indent + rendered)
@@ -705,7 +918,14 @@ def _render_line_fragments(fragments: list[str], context: AvdModel, indent: int,
 
 
 def _render_section(schema: dict, cli: dict, data: AvdModel, indent: int) -> list[str]:
-    """Render a model field as a CLI section block."""
+    """
+    Render a model field as a CLI section block.
+
+    Body order: any sibling ``lines`` / ``line_fragments`` / ``line_switch`` on the
+    section dict render first, followed by any annotated children. The section is
+    skipped (header omitted) when ``section_only_if_content`` is True (default) and
+    the body is empty.
+    """
     separator: bool = cli.get("separator", True)
     section_only_if_content: bool = cli.get("section_only_if_content", True)
 
@@ -713,16 +933,23 @@ def _render_section(schema: dict, cli: dict, data: AvdModel, indent: int) -> lis
     if header is None:
         return []
 
-    children = _render_dict_children(schema, data, indent + 1)
+    body: list[str] = []
+    if "line_fragments" in cli:
+        body.extend(_render_line_fragments(cli["line_fragments"], data, indent + 1, has_gate="gate" in cli))
+    if "lines" in cli:
+        body.extend(_render_lines(cli["lines"], data, indent + 1))
+    if "line_switch" in cli:
+        body.extend(_render_line_switch(cli["line_switch"], data, indent + 1))
+    body.extend(_render_dict_children(schema, data, indent + 1))
 
-    if not children and section_only_if_content:
+    if not body and section_only_if_content:
         return []
 
     lines: list[str] = []
     if separator:
         lines.append(_INDENT * indent + "!")
     lines.append(_INDENT * indent + header)
-    lines.extend(children)
+    lines.extend(body)
     return lines
 
 

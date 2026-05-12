@@ -15362,6 +15362,10 @@ keys:
         max: 60000
   router_bgp:
     type: dict
+    cli:
+      separator: true
+      section: router bgp {as}
+      section_only_if_content: false
     keys:
       as:
         type: str
@@ -15380,11 +15384,21 @@ keys:
         valid_values:
         - asdot
         - asplain
+        cli:
+          line: bgp asn notation {as_notation}
       router_id:
         type: str
         description: In IP address format A.B.C.D.
+        cli:
+          line: router-id {router_id}
       timers:
         type: dict
+        cli:
+          line_fragments:
+          - timers bgp
+          - ' {keepalive_time} {hold_time}'
+          - ' min-hold-time {min_hold_time}'
+          - ' send-failure hold-time {send_failure_hold_time}'
         keys:
           keepalive_time:
             description: 'Time between BGP keepalive messages in seconds.
@@ -15422,6 +15436,10 @@ keys:
             max: 65535
       distance:
         type: dict
+        cli:
+          line_fragments:
+          - distance bgp {external_routes}
+          - ' {internal_routes} {local_routes}'
         keys:
           external_routes:
             type: int
@@ -15446,6 +15464,12 @@ keys:
             max: 255
       graceful_restart:
         type: dict
+        cli:
+          gate: enabled
+          lines:
+          - graceful-restart restart-time {restart_time}
+          - graceful-restart stalepath-time {stalepath_time}
+          - graceful-restart
         keys:
           enabled:
             type: bool
@@ -15465,6 +15489,11 @@ keys:
             description: Number of seconds.
       graceful_restart_helper:
         type: dict
+        cli:
+          lines:
+          - no graceful-restart-helper?enabled == false
+          - graceful-restart-helper restart-time {restart_time}?enabled == true?restart_time
+          - graceful-restart-helper long-lived?enabled == true?long_lived?!restart_time
         keys:
           enabled:
             type: bool
@@ -15492,6 +15521,10 @@ keys:
               '
       maximum_paths:
         type: dict
+        cli:
+          line_fragments:
+          - maximum-paths {paths}
+          - ' ecmp {ecmp}'
         keys:
           paths:
             type: int
@@ -15560,6 +15593,8 @@ keys:
               instance is initiated until the BGP convergence state is reached.
 
               '
+            cli:
+              bool_true_line: update wait-for-convergence
           wait_install:
             type: bool
             description: 'Do not advertise reachability to a prefix until that prefix
@@ -15570,12 +15605,19 @@ keys:
               plane.
 
               '
+            cli:
+              bool_true_line: update wait-install
       bgp_cluster_id:
         type: str
         description: IP Address A.B.C.D.
+        cli:
+          line: bgp cluster-id {bgp_cluster_id}
       bgp_defaults:
         type: list
         description: BGP command as string.
+        cli:
+          item_lines:
+          - '{_item}'
         items:
           type: str
       bgp:
@@ -15588,12 +15630,23 @@ keys:
                 type: bool
                 description: Default activation of IPv4 unicast address-family on
                   all IPv4 neighbors (EOS default = True).
+                cli:
+                  bool_true_line: bgp default ipv4-unicast
+                  bool_false_line: no bgp default ipv4-unicast
               ipv4_unicast_transport_ipv6:
                 type: bool
                 description: Default activation of IPv4 unicast address-family on
                   all IPv6 neighbors (EOS default == False).
+                cli:
+                  bool_true_line: bgp default ipv4-unicast transport ipv6
+                  bool_false_line: no bgp default ipv4-unicast transport ipv6
           route_reflector_preserve_attributes:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - bgp route-reflector preserve-attributes
+              - ' always?always'
             keys:
               enabled:
                 type: bool
@@ -15604,6 +15657,8 @@ keys:
             keys:
               d_path:
                 type: bool
+                cli:
+                  bool_true_line: bgp bestpath d-path
           additional_paths:
             type: dict
             $ref: eos_cli_config_gen#/$defs/bgp_additional_paths
@@ -15611,12 +15666,23 @@ keys:
             type: bool
             description: Allow redistribution of iBGP routes into an Interior Gateway
               Protocol (IGP). EOS default is true.
+            cli:
+              bool_true_line: bgp redistribute-internal
+              bool_false_line: no bgp redistribute-internal
           labeled_unicast:
             type: dict
             keys:
               rib:
                 type: dict
                 description: Configure LU RIB behavior for ip and/or tunnel.
+                cli:
+                  gate: ip.enabled || tunnel.enabled
+                  line_fragments:
+                  - bgp labeled-unicast rib
+                  - ' ip?ip.enabled'
+                  - ' route-map {ip.route_map}?ip.enabled'
+                  - ' tunnel?tunnel.enabled'
+                  - ' route-map {tunnel.route_map}?tunnel.enabled'
                 keys:
                   ip:
                     type: dict
@@ -15644,6 +15710,18 @@ keys:
           ranges and additional filter capabilities.
 
           '
+        cli:
+          sort_key: peer_group
+          item_gate:
+          - peer_group
+          - prefix
+          - peer_filter || remote_as
+          item_line_fragments:
+          - bgp listen range {prefix}
+          - ' peer-id include router-id?peer_id_include_router_id'
+          - ' peer-group {peer_group}'
+          - ' peer-filter {peer_filter}'
+          - ' remote-as {remote_as}?!peer_filter'
         items:
           type: dict
           keys:
@@ -15675,6 +15753,11 @@ keys:
                 to prevent it from being interpreted as a float number.'
       neighbor_default:
         type: dict
+        cli:
+          lines:
+          - neighbor default send-community?send_community == 'all'
+          - neighbor default send-community {send_community}?send_community?send_community
+            != 'all'
         keys:
           send_community:
             type: str
@@ -15690,8 +15773,80 @@ keys:
       peer_groups:
         type: list
         primary_key: name
+        cli:
+          item_gate: name
         items:
           type: dict
+          cli:
+            lines:
+            - neighbor {name} peer group
+            - neighbor {name} remote-as {remote_as}?remote_as
+            - neighbor {name} next-hop-self?next_hop_self
+            - neighbor {name} next-hop-peer?next_hop_peer
+            - neighbor {name} next-hop-unchanged?next_hop_unchanged
+            - neighbor {name} shutdown?shutdown
+            - - neighbor {name} remove-private-as?remove_private_as.enabled == true
+              - ' all?remove_private_as.all'
+              - ' replace-as?remove_private_as.replace_as?remove_private_as.all'
+            - no neighbor {name} remove-private-as?remove_private_as.enabled == false
+            - neighbor {name} as-path prepend-own disabled?as_path.prepend_own_disabled
+            - neighbor {name} as-path remote-as replace out?as_path.remote_as_replace_out
+            - neighbor {name} local-as {local_as} no-prepend replace-as?local_as
+            - neighbor {name} weight {weight}?weight
+            - neighbor {name} passive?passive
+            - neighbor {name} update-source {update_source}?update_source
+            - neighbor {name} bfd?bfd == true
+            - neighbor {name} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx}
+              multiplier {bfd_timers.multiplier}?bfd == true
+            - neighbor {name} description {description}?description
+            - - neighbor {name} allowas-in?allowas_in.enabled == true
+              - ' {allowas_in.times}?allowas_in.times'
+            - - neighbor {name} rib-in pre-policy retain?rib_in_pre_policy_retain.enabled
+                == true
+              - ' all?rib_in_pre_policy_retain.all'
+            - neighbor {name} ebgp-multihop {ebgp_multihop}?ebgp_multihop
+            - neighbor {name} ttl maximum-hops {ttl_maximum_hops}?ttl_maximum_hops
+            - neighbor {name} route-reflector-client?route_reflector_client
+            - neighbor {name} session tracker {session_tracker}?session_tracker
+            - neighbor {name} timers {timers}?timers
+            - neighbor {name} route-map {route_map_in} in?route_map_in
+            - neighbor {name} route-map {route_map_out} out?route_map_out
+            - neighbor {name} password {password_type} {password|hide_passwords}?password?password_type
+            - neighbor {name} password 7 {password|hide_passwords}?password?!password_type
+            - neighbor {name} password shared-secret profile {shared_secret.profile}
+              algorithm {shared_secret.hash_algorithm}?shared_secret.profile?shared_secret.hash_algorithm
+            - - neighbor {name} default-originate?default_originate.enabled == true
+              - ' route-map {default_originate.route_map}?default_originate.route_map'
+              - ' always?default_originate.always'
+            - neighbor {name} send-community?send_community == 'all'
+            - neighbor {name} send-community {send_community}?send_community?send_community
+              != 'all'
+            - - neighbor {name} maximum-routes {maximum_routes}?maximum_routes
+              - ' warning-limit {maximum_routes_warning_limit}?maximum_routes_warning_limit'
+              - ' warning-only?maximum_routes_warning_only'
+            - - neighbor {name} missing-policy address-family all?missing_policy.direction_in.action
+              - ' include?missing_policy.direction_in.include_community_list || missing_policy.direction_in.include_prefix_list
+                || missing_policy.direction_in.include_sub_route_map'
+              - ' community-list?missing_policy.direction_in.include_community_list'
+              - ' prefix-list?missing_policy.direction_in.include_prefix_list'
+              - ' sub-route-map?missing_policy.direction_in.include_sub_route_map'
+              - ' direction in action {missing_policy.direction_in.action}'
+            - - neighbor {name} missing-policy address-family all?missing_policy.direction_out.action
+              - ' include?missing_policy.direction_out.include_community_list || missing_policy.direction_out.include_prefix_list
+                || missing_policy.direction_out.include_sub_route_map'
+              - ' community-list?missing_policy.direction_out.include_community_list'
+              - ' prefix-list?missing_policy.direction_out.include_prefix_list'
+              - ' sub-route-map?missing_policy.direction_out.include_sub_route_map'
+              - ' direction out action {missing_policy.direction_out.action}'
+            - neighbor {name} peer-tag in {peer_tag_in}?peer_tag_in
+            - neighbor {name} peer-tag out discard {peer_tag_out_discard}?peer_tag_out_discard
+            - - neighbor {name} link-bandwidth?link_bandwidth.enabled == true
+              - ' default {link_bandwidth.default}?link_bandwidth.default'
+            - - neighbor {name} remove-private-as ingress?remove_private_as_ingress.enabled
+                == true
+              - ' replace-as?remove_private_as_ingress.replace_as'
+            - no neighbor {name} remove-private-as ingress?remove_private_as_ingress.enabled
+              == false
           keys:
             name:
               type: str
@@ -15973,8 +16128,88 @@ keys:
       neighbors:
         type: list
         primary_key: ip_address
+        cli:
+          item_gate: ip_address
         items:
           type: dict
+          cli:
+            lines:
+            - neighbor {ip_address} peer group {peer_group}?peer_group
+            - neighbor {ip_address} remote-as {remote_as}?remote_as
+            - neighbor {ip_address} next-hop-self?next_hop_self
+            - neighbor {ip_address} next-hop-peer?next_hop_peer
+            - neighbor {ip_address} shutdown?shutdown
+            - - neighbor {ip_address} remove-private-as?remove_private_as.enabled
+                == true
+              - ' all?remove_private_as.all'
+              - ' replace-as?remove_private_as.replace_as?remove_private_as.all'
+            - no neighbor {ip_address} remove-private-as?remove_private_as.enabled
+              == false
+            - neighbor {ip_address} as-path prepend-own disabled?as_path.prepend_own_disabled
+            - neighbor {ip_address} as-path remote-as replace out?as_path.remote_as_replace_out
+            - neighbor {ip_address} local-as {local_as} no-prepend replace-as?local_as
+            - neighbor {ip_address} weight {weight}?weight
+            - neighbor {ip_address} passive?passive
+            - neighbor {ip_address} update-source {update_source}?update_source
+            - neighbor {ip_address} bfd?bfd == true
+            - neighbor {ip_address} bfd interval {bfd_timers.interval} min-rx {bfd_timers.min_rx}
+              multiplier {bfd_timers.multiplier}?bfd == true
+            - no neighbor {ip_address} bfd?bfd == false?peer_group
+            - neighbor {ip_address} description {description}?description
+            - - neighbor {ip_address} allowas-in?allowas_in.enabled == true
+              - ' {allowas_in.times}?allowas_in.times'
+            - - neighbor {ip_address} rib-in pre-policy retain?rib_in_pre_policy_retain.enabled
+                == true
+              - ' all?rib_in_pre_policy_retain.all'
+            - no neighbor {ip_address} rib-in pre-policy retain?rib_in_pre_policy_retain.enabled
+              == false
+            - neighbor {ip_address} ebgp-multihop {ebgp_multihop}?ebgp_multihop
+            - neighbor {ip_address} ttl maximum-hops {ttl_maximum_hops}?ttl_maximum_hops
+            - neighbor {ip_address} route-reflector-client?route_reflector_client
+              == true
+            - no neighbor {ip_address} route-reflector-client?route_reflector_client
+              == false
+            - neighbor {ip_address} session tracker {session_tracker}?session_tracker
+            - neighbor {ip_address} timers {timers}?timers
+            - neighbor {ip_address} route-map {route_map_in} in?route_map_in
+            - neighbor {ip_address} route-map {route_map_out} out?route_map_out
+            - neighbor {ip_address} password shared-secret profile {shared_secret.profile}
+              algorithm {shared_secret.hash_algorithm}?shared_secret.profile?shared_secret.hash_algorithm
+            - neighbor {ip_address} password {password_type} {password|hide_passwords}?password?password_type
+            - neighbor {ip_address} password 7 {password|hide_passwords}?password?!password_type
+            - - neighbor {ip_address} default-originate?default_originate.enabled
+                == true
+              - ' route-map {default_originate.route_map}?default_originate.route_map'
+              - ' always?default_originate.always'
+            - neighbor {ip_address} send-community?send_community == 'all'
+            - neighbor {ip_address} send-community {send_community}?send_community?send_community
+              != 'all'
+            - - neighbor {ip_address} maximum-routes {maximum_routes}?maximum_routes
+              - ' warning-limit {maximum_routes_warning_limit}?maximum_routes_warning_limit'
+              - ' warning-only?maximum_routes_warning_only'
+            - - neighbor {ip_address} missing-policy address-family all?missing_policy.direction_in.action
+              - ' include?missing_policy.direction_in.include_community_list || missing_policy.direction_in.include_prefix_list
+                || missing_policy.direction_in.include_sub_route_map'
+              - ' community-list?missing_policy.direction_in.include_community_list'
+              - ' prefix-list?missing_policy.direction_in.include_prefix_list'
+              - ' sub-route-map?missing_policy.direction_in.include_sub_route_map'
+              - ' direction in action {missing_policy.direction_in.action}'
+            - - neighbor {ip_address} missing-policy address-family all?missing_policy.direction_out.action
+              - ' include?missing_policy.direction_out.include_community_list || missing_policy.direction_out.include_prefix_list
+                || missing_policy.direction_out.include_sub_route_map'
+              - ' community-list?missing_policy.direction_out.include_community_list'
+              - ' prefix-list?missing_policy.direction_out.include_prefix_list'
+              - ' sub-route-map?missing_policy.direction_out.include_sub_route_map'
+              - ' direction out action {missing_policy.direction_out.action}'
+            - neighbor {ip_address} peer-tag in {peer_tag_in}?peer_tag_in
+            - neighbor {ip_address} peer-tag out discard {peer_tag_out_discard}?peer_tag_out_discard
+            - - neighbor {ip_address} link-bandwidth?link_bandwidth.enabled == true
+              - ' default {link_bandwidth.default}?link_bandwidth.default'
+            - - neighbor {ip_address} remove-private-as ingress?remove_private_as_ingress.enabled
+                == true
+              - ' replace-as?remove_private_as_ingress.replace_as'
+            - no neighbor {ip_address} remove-private-as ingress?remove_private_as_ingress.enabled
+              == false
           keys:
             ip_address:
               type: str
@@ -16258,6 +16493,10 @@ keys:
       neighbor_interfaces:
         type: list
         primary_key: name
+        cli:
+          item_lines:
+          - neighbor interface {name} peer-group {peer_group} remote-as {remote_as}
+          - neighbor interface {name} peer-group {peer_group} peer-filter {peer_filter}
         items:
           type: dict
           keys:
@@ -16293,6 +16532,15 @@ keys:
       aggregate_addresses:
         type: list
         primary_key: prefix
+        cli:
+          item_line_fragments:
+          - aggregate-address {prefix}
+          - ' as-set?as_set'
+          - ' summary-only?summary_only'
+          - ' attribute-map {attribute_map}'
+          - ' attribute rcf {attribute.rcf}'
+          - ' match-map {match_map}'
+          - ' advertise-only?advertise_only'
         items:
           type: dict
           keys:
@@ -16323,6 +16571,11 @@ keys:
         keys:
           attached_host:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute attached-host
+              - ' route-map {route_map}'
             keys:
               enabled:
                 type: bool
@@ -16331,6 +16584,11 @@ keys:
                 type: str
           bgp:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute bgp leaked
+              - ' route-map {route_map}'
             keys:
               enabled:
                 type: bool
@@ -16339,6 +16597,13 @@ keys:
                 type: str
           connected:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute connected
+              - ' include leaked?include_leaked'
+              - ' route-map {route_map}'
+              - ' rcf {rcf}?!route_map'
             keys:
               enabled:
                 type: bool
@@ -16358,6 +16623,12 @@ keys:
                 type: bool
           dynamic:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute dynamic
+              - ' route-map {route_map}'
+              - ' rcf {rcf}?!route_map'
             keys:
               enabled:
                 type: bool
@@ -16374,6 +16645,14 @@ keys:
                   precedence.'
           isis:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute isis
+              - ' {isis_level}'
+              - ' include leaked?include_leaked'
+              - ' route-map {route_map}'
+              - ' rcf {rcf}?!route_map'
             keys:
               enabled:
                 type: bool
@@ -16400,6 +16679,12 @@ keys:
                 type: bool
           ospf:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute ospf
+              - ' include leaked?include_leaked'
+              - ' route-map {route_map}'
             keys:
               enabled:
                 type: bool
@@ -16407,6 +16692,12 @@ keys:
               match_external:
                 description: Redistribute OSPF routes learned from external sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                  - redistribute ospf match external
+                  - ' include leaked?include_leaked'
+                  - ' route-map {route_map}'
                 keys:
                   enabled:
                     type: bool
@@ -16419,6 +16710,14 @@ keys:
               match_internal:
                 description: Redistribute OSPF routes learned from internal sources.
                 type: dict
+                cli:
+                  gate:
+                  - enabled
+                  - '!^enabled'
+                  line_fragments:
+                  - redistribute ospf match internal
+                  - ' include leaked?include_leaked'
+                  - ' route-map {route_map}'
                 keys:
                   enabled:
                     type: bool
@@ -16431,6 +16730,13 @@ keys:
               match_nssa_external:
                 description: Redistribute OSPF routes learned from external NSSA sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                  - redistribute ospf match nssa-external
+                  - ' {nssa_type}'
+                  - ' include leaked?include_leaked'
+                  - ' route-map {route_map}'
                 keys:
                   enabled:
                     type: bool
@@ -16455,6 +16761,12 @@ keys:
                 type: bool
           ospfv3:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute ospfv3
+              - ' include leaked?include_leaked'
+              - ' route-map {route_map}'
             keys:
               enabled:
                 type: bool
@@ -16462,6 +16774,12 @@ keys:
               match_external:
                 description: Redistribute OSPFv3 routes learned from external sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                  - redistribute ospfv3 match external
+                  - ' include leaked?include_leaked'
+                  - ' route-map {route_map}'
                 keys:
                   enabled:
                     type: bool
@@ -16474,6 +16792,14 @@ keys:
               match_internal:
                 description: Redistribute OSPFv3 routes learned from internal sources.
                 type: dict
+                cli:
+                  gate:
+                  - enabled
+                  - '!^enabled'
+                  line_fragments:
+                  - redistribute ospfv3 match internal
+                  - ' include leaked?include_leaked'
+                  - ' route-map {route_map}'
                 keys:
                   enabled:
                     type: bool
@@ -16487,6 +16813,13 @@ keys:
                 description: Redistribute OSPFv3 routes learned from external NSSA
                   sources.
                 type: dict
+                cli:
+                  gate: enabled
+                  line_fragments:
+                  - redistribute ospfv3 match nssa-external
+                  - ' {nssa_type}'
+                  - ' include leaked?include_leaked'
+                  - ' route-map {route_map}'
                 keys:
                   enabled:
                     type: bool
@@ -16511,6 +16844,11 @@ keys:
                 type: bool
           rip:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute rip
+              - ' route-map {route_map}'
             keys:
               enabled:
                 type: bool
@@ -16519,6 +16857,13 @@ keys:
                 type: str
           static:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute static
+              - ' include leaked?include_leaked'
+              - ' route-map {route_map}'
+              - ' rcf {rcf}?!route_map'
             keys:
               enabled:
                 type: bool
@@ -16538,6 +16883,11 @@ keys:
                 description: Include following routes while redistributing.
           user:
             type: dict
+            cli:
+              gate: enabled
+              line_fragments:
+              - redistribute user
+              - ' rcf {rcf}'
             keys:
               enabled:
                 type: bool
@@ -16656,8 +17006,16 @@ keys:
       vlans:
         type: list
         primary_key: id
+        cli:
+          item_gate: id
         items:
           type: dict
+          cli:
+            section: vlan {id}
+            section_only_if_content: false
+            lines:
+            - rd {rd}?rd
+            - rd evpn domain {rd_evpn_domain.domain} {rd_evpn_domain.rd}?rd_evpn_domain.domain?rd_evpn_domain.rd
           keys:
             id:
               type: int
@@ -16691,18 +17049,31 @@ keys:
               keys:
                 both:
                   type: list
+                  cli:
+                    item_lines:
+                    - route-target both {_item}
                   items:
                     type: str
                 import:
                   type: list
+                  cli:
+                    item_lines:
+                    - route-target import {_item}
                   items:
                     type: str
                 export:
                   type: list
+                  cli:
+                    item_lines:
+                    - route-target export {_item}
                   items:
                     type: str
                 import_evpn_domains:
                   type: list
+                  cli:
+                    sort_key: domain
+                    item_lines:
+                    - route-target import evpn domain {domain} {route_target}
                   items:
                     type: dict
                     keys:
@@ -16715,6 +17086,10 @@ keys:
                         type: str
                 export_evpn_domains:
                   type: list
+                  cli:
+                    sort_key: domain
+                    item_lines:
+                    - route-target export evpn domain {domain} {route_target}
                   items:
                     type: dict
                     keys:
@@ -16727,6 +17102,10 @@ keys:
                         type: str
                 import_export_evpn_domains:
                   type: list
+                  cli:
+                    sort_key: domain
+                    item_lines:
+                    - route-target import export evpn domain {domain} {route_target}
                   items:
                     type: dict
                     keys:
@@ -16739,16 +17118,25 @@ keys:
                         type: str
             redistribute_routes:
               type: list
+              cli:
+                item_lines:
+                - redistribute {_item}
               items:
                 type: str
             no_redistribute_routes:
               type: list
+              cli:
+                item_lines:
+                - no redistribute {_item}
               items:
                 type: str
             eos_cli:
               type: str
               description: Multiline EOS CLI rendered directly on the Router BGP,
                 VLAN definition in the final EOS configuration.
+              cli:
+                raw_lines:
+                  separator: '!'
       vpws:
         type: list
         primary_key: name
@@ -26324,10 +26712,21 @@ $defs:
           must be the same as `udp_dest_port_set_name`.'
   bgp_additional_paths:
     type: dict
+    cli:
+      line_switch:
+        field: send
+        cases:
+          disabled: no bgp additional-paths send
+          ecmp: bgp additional-paths send ecmp limit {send_limit}?send_limit
+          limit: bgp additional-paths send limit {send_limit}?send_limit
+        default: bgp additional-paths send {send}?send
     keys:
       receive:
         type: bool
         description: Enable or disable reception of additional-paths.
+        cli:
+          bool_true_line: bgp additional-paths receive
+          bool_false_line: no bgp additional-paths receive
       send:
         type: str
         description: 'Select an option to send multiple paths for same prefix through
