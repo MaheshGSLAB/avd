@@ -10,22 +10,16 @@
 __PYTHON_GENERATOR__ConfigCommentGenerator__
 {# System Boot Configuration - rendered by Python BootGenerator #}
 __PYTHON_GENERATOR__BootGenerator__
-{# enable password #}
-{% include 'eos/enable-password.j2' %}
-{# aaa root #}
-{% include 'eos/aaa-root.j2' %}
-{# aaa authentication policy nopassword #}
-{% include 'eos/aaa-authentication-policy-nopassword.j2' %}
-{# aaa authorization policy local default-role #}
-{% include 'eos/aaa-authorization-default-role.j2' %}
-{# users #}
-{% include 'eos/local-users.j2' %}
+{# enable password / aaa root / aaa authentication policy nopassword / aaa authorization default-role - rendered by Python AaaSecurityBootstrapGenerator (shared leading '!' separator) #}
+__PYTHON_GENERATOR__AaaSecurityBootstrapGenerator__
+{# users - rendered by Python LocalUsersGenerator #}
+__PYTHON_GENERATOR__LocalUsersGenerator__
 {# address locking #}
 {% include 'eos/address-locking.j2' %}
 {# Agents with environment #}
 {% include 'eos/agents-environment.j2' %}
-{# hardware configuration #}
-{% include 'eos/hardware.j2' %}
+{# hardware port-group / counter feature / access-list mechanism - rendered by Python HardwareGenerator #}
+__PYTHON_GENERATOR__HardwareGenerator__
 {# service routing configuration #}
 {% include 'eos/service-routing-configuration-bgp.j2' %}
 {# cfm #}

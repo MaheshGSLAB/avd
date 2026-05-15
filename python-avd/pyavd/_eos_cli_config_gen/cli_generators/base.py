@@ -58,6 +58,9 @@ class CliConfig:
         # Sections are declared in EOS config output order.
         self.config_comment = CliModel()
         self.boot = CliModel()
+        self.aaa_security_bootstrap = CliModel()
+        self.local_users = CliModel()
+        self.hardware = CliModel()
         self.ethernet_interfaces = CliModel()
         self.router_bgp = CliModel()
 

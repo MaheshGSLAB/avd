@@ -12,14 +12,20 @@ decorator to mark methods that generate CLI configuration snippets.
 
 from __future__ import annotations
 
+from .aaa_security_bootstrap import AaaSecurityBootstrapGenerator
 from .boot import BootGenerator
 from .config_comment import ConfigCommentGenerator
 from .ethernet_interfaces import EthernetInterfacesGenerator
+from .hardware import HardwareGenerator
+from .local_users import LocalUsersGenerator
 from .router_bgp import RouterBgpGenerator
 
 __all__ = [  # noqa: RUF022
     "ConfigCommentGenerator",
     "BootGenerator",
+    "AaaSecurityBootstrapGenerator",
+    "LocalUsersGenerator",
+    "HardwareGenerator",
     "EthernetInterfacesGenerator",
     "RouterBgpGenerator",
 ]
