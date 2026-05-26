@@ -15,6 +15,7 @@ from __future__ import annotations
 from .aaa_security_bootstrap import AaaSecurityBootstrapGenerator
 from .boot import BootGenerator
 from .config_comment import ConfigCommentGenerator
+from .dhcp_servers import DhcpServersGenerator
 from .ethernet_interfaces import EthernetInterfacesGenerator
 from .hardware import HardwareGenerator
 from .local_users import LocalUsersGenerator
@@ -26,6 +27,7 @@ __all__ = [  # noqa: RUF022
     "AaaSecurityBootstrapGenerator",
     "LocalUsersGenerator",
     "HardwareGenerator",
+    "DhcpServersGenerator",
     "EthernetInterfacesGenerator",
     "RouterBgpGenerator",
 ]

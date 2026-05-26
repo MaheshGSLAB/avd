@@ -61,6 +61,7 @@ class CliConfig:
         self.aaa_security_bootstrap = CliModel()
         self.local_users = CliModel()
         self.hardware = CliModel()
+        self.dhcp_servers = CliModel()
         self.ethernet_interfaces = CliModel()
         self.router_bgp = CliModel()
 
@@ -109,7 +110,7 @@ class CliSection:
     separator: bool = True
     _INDENT_STR: str = "   "
 
-    def render(self, indent: int = 0) -> list[str]:
+    def render(self, indent: int = 0, *, skip_separator: bool = False) -> list[str]:
         """
         Execute :meth:`_generate` and return lines, optionally prefixed with ``!``.
 
@@ -117,12 +118,16 @@ class CliSection:
             indent: The indent level at which this section's header is written.
                     Body lines are written at ``indent + 1``; sub-sections start
                     at ``indent + 1`` (their own headers) with bodies at ``indent + 2``.
+            skip_separator: If True, suppress the leading ``!`` for this render
+                    call even when :attr:`separator` is True. Useful for the first
+                    item in a sequence of repeated sub-sections that should be
+                    separated by ``!`` between entries but not before the first.
         """
         self._output_lines: list[str] = []
         self._indent = indent
         self._generate()
         result = self._output_lines
-        if result and self.separator:
+        if result and self.separator and not skip_separator:
             return [self._INDENT_STR * indent + "!", *result]
         return result
 
@@ -149,9 +154,18 @@ class CliSection:
         elif template:
             self._output_lines.append(f"{prefix}{template}")
 
-    def _sub(self, section: CliSection) -> None:
-        """Render *section* at ``_indent + 1`` and extend :attr:`_out`."""
-        self._output_lines.extend(section.render(self._indent + 1))
+    def _sub(self, section: CliSection, *, skip_separator: bool = False) -> None:
+        """
+        Render *section* at ``_indent + 1`` and extend :attr:`_out`.
+
+        Args:
+            section: The child :class:`CliSection` to render.
+            skip_separator: If True, suppress the leading ``!`` for this child render
+                even when ``section.separator`` is True. Use this for the first item
+                in a sequence of repeated sub-sections where ``!`` should appear
+                *between* entries but not *before* the first.
+        """
+        self._output_lines.extend(section.render(self._indent + 1, skip_separator=skip_separator))
 
 
 # Overload when assigned with args.

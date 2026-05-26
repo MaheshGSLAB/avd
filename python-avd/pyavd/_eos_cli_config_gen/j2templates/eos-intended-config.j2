@@ -42,8 +42,8 @@ __PYTHON_GENERATOR__HardwareGenerator__
 {% include 'eos/ip-dhcp-relay.j2' %}
 {# IPv6 DHCP Relay #}
 {% include 'eos/ipv6-dhcp-relay.j2' %}
-{# dhcp servers #}
-{% include 'eos/dhcp-servers.j2' %}
+{# dhcp servers - rendered by Python DhcpServersGenerator #}
+__PYTHON_GENERATOR__DhcpServersGenerator__
 {# IP DHCP Snooping #}
 {% include 'eos/ip-dhcp-snooping.j2' %}
 {# switchport default #}
