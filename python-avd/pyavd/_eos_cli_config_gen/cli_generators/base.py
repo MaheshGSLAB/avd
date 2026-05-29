@@ -5,11 +5,9 @@
 
 from __future__ import annotations
 
-from functools import wraps
-from typing import TYPE_CHECKING, Protocol, overload
+from typing import TYPE_CHECKING, Protocol
 
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
-from pyavd._utils.get import get_v2
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -20,69 +18,13 @@ if TYPE_CHECKING:
     T_CliGeneratorSubclass = TypeVar("T_CliGeneratorSubclass", bound="CliGeneratorProtocol")
 
 
-class CliModel:
-    """
-    Accumulator for a single named section of CLI configuration.
-
-    Multi-line strings are automatically split on newlines. None values are ignored.
-    Lines are appended via :meth:`extend` from :class:`CliSection` render results.
-    """
-
-    def __init__(self) -> None:
-        self._lines: list[str] = []
-
-    def extend(self, lines: list[str]) -> None:
-        """Extend from a CliSection render result."""
-        self._lines.extend(lines)
-
-    def get_config(self) -> str:
-        """Return accumulated lines joined with newlines."""
-        return "\n".join(self._lines)
-
-    def __bool__(self) -> bool:
-        return bool(self._lines)
-
-    def __str__(self) -> str:
-        return self.get_config()
-
-
-class CliConfig:
-    """
-    Container of named CLI config sections rendered in declaration order.
-
-    Each section is a :class:`CliModel` that generators write to via
-    their ``_model`` property (e.g. ``return self.cli_config.router_bgp``).
-    """
-
-    def __init__(self) -> None:
-        # Sections are declared in EOS config output order.
-        self.config_comment = CliModel()
-        self.boot = CliModel()
-        self.aaa_security_bootstrap = CliModel()
-        self.local_users = CliModel()
-        self.hardware = CliModel()
-        self.dhcp_servers = CliModel()
-        self.ethernet_interfaces = CliModel()
-        self.router_bgp = CliModel()
-
-    def get_config(self) -> str:
-        """Return all non-empty sections joined with newlines, in declaration order."""
-        return "\n".join(section.get_config() for section in self.__dict__.values() if isinstance(section, CliModel) and section)
-
-    def __bool__(self) -> bool:
-        return any(isinstance(section, CliModel) and bool(section) for section in self.__dict__.values())
-
-    def __str__(self) -> str:
-        return self.get_config()
-
-
 class CliSection:
     """
     Base class for self-contained CLI config sections.
 
     Each subclass renders one named block (e.g. ``vrf PROD``, ``address-family ipv4``)
     into a list of strings via :meth:`render`. The caller can compose sections by
-    calling :meth:`_sub` inside :meth:`_generate`, which renders a child section at
+    calling :meth:`_sub_section` inside :meth:`_section`, which renders a child section at
     the next indent level and appends its lines.
 
     By default (:attr:`separator` is ``True``) a ``!`` line is prepended when the
@@ -96,10 +38,10 @@ class CliSection:
             def __init__(self, vrf: ...) -> None:
                 self.vrf = vrf
 
-            def _generate(self) -> None:
-                self._header(f"vrf {self.vrf.name}")
-                self._add("rd {}", self.vrf.rd)
-                self._sub(RouterBgpVrfAddressFamilyIpv4(self.vrf))
+            def _section(self) -> None:
+                self._section_heading(f"vrf {self.vrf.name}")
+                self._cli_line("rd {}", self.vrf.rd)
+                self._sub_section(RouterBgpVrfAddressFamilyIpv4(self.vrf))
 
 
         # caller inside RouterBgpGenerator:
@@ -112,7 +54,7 @@ class CliSection:
 
     def render(self, indent: int = 0, *, skip_separator: bool = False) -> list[str]:
         """
-        Execute :meth:`_generate` and return lines, optionally prefixed with ``!``.
+        Execute :meth:`_section` and return lines, optionally prefixed with ``!``.
 
         Args:
             indent: The indent level at which this section's header is written.
@@ -125,21 +67,21 @@ class CliSection:
         """
         self._output_lines: list[str] = []
         self._indent = indent
-        self._generate()
+        self._section()
         result = self._output_lines
         if result and self.separator and not skip_separator:
             return [self._INDENT_STR * indent + "!", *result]
         return result
 
-    def _generate(self) -> None:
-        """Override to build output using :meth:`_header`, :meth:`_add`, :meth:`_sub`."""
+    def _section(self) -> None:
+        """Override to build output using :meth:`_section_heading`, :meth:`_cli_line`, :meth:`_sub_section`."""
         raise NotImplementedError
 
-    def _header(self, text: str) -> None:
+    def _section_heading(self, text: str) -> None:
         """Write the section header line at :attr:`_indent`."""
         self._output_lines.append(f"{self._INDENT_STR * self._indent}{text}")
 
-    def _add(self, template: str | None, /, *values: object) -> None:
+    def _cli_line(self, template: str | None, /, *values: object) -> None:
         """
         Write a body line at ``_indent + 1``.
 
@@ -154,7 +96,7 @@ class CliSection:
         elif template:
             self._output_lines.append(f"{prefix}{template}")
 
-    def _sub(self, section: CliSection, *, skip_separator: bool = False) -> None:
+    def _sub_section(self, section: CliSection, *, skip_separator: bool = False) -> None:
         """
         Render *section* at ``_indent + 1`` and extend :attr:`_out`.
 
@@ -168,56 +110,16 @@ class CliSection:
         self._output_lines.extend(section.render(self._indent + 1, skip_separator=skip_separator))
 
 
-# Overload when assigned with args.
-@overload
-def cli_config_contributor(
-    func: None = None, *, toggle_and_value: tuple[str, bool] | None = None
-) -> Callable[[Callable[[T_CliGeneratorSubclass], None]], Callable[[T_CliGeneratorSubclass], None]]: ...
-
-
-# Overload when assigned without args.
-@overload
-def cli_config_contributor(func: Callable[[T_CliGeneratorSubclass], None]) -> Callable[[T_CliGeneratorSubclass], None]: ...
-
-
-def cli_config_contributor(
-    func: Callable[[T_CliGeneratorSubclass], None] | None = None, *, toggle_and_value: tuple[str, bool] | None = None
-) -> Callable[[T_CliGeneratorSubclass], None] | Callable[[Callable[[T_CliGeneratorSubclass], None]], Callable[[T_CliGeneratorSubclass], None]]:
+def cli_config_contributor(func: Callable[[T_CliGeneratorSubclass], None]) -> Callable[[T_CliGeneratorSubclass], None]:
     """
-    Mark methods as CLI config contributors that get called during render().
+    Mark a method as a CLI config contributor called during :meth:`CliGeneratorProtocol.render`.
 
-    Methods should append to self.cli_config instead of returning strings.
-
-    Args:
-        func: The method to decorate.
-        toggle_and_value: Optional (attribute_path, expected_value) tuple for conditional
-            execution. Path can be nested like 'vlan_settings.enabled'. Method only runs
-            if self.data.{path} == expected_value.
+    Methods should append to ``self._model`` instead of returning strings.
 
     TODO: Store the functions in a class variable on CliGeneratorProtocol instead of modifying the func.
     """
-
-    def decorator(contributor: Callable[[T_CliGeneratorSubclass], None]) -> Callable[[T_CliGeneratorSubclass], None]:
-        contributor._is_cli_config_contributor = True  # pyright: ignore [reportFunctionMemberAccess]
-
-        if toggle_and_value is None:
-            return contributor
-
-        toggle, toggle_value = toggle_and_value
-
-        @wraps(contributor)
-        def wrapped_contributor(self: T_CliGeneratorSubclass) -> None:
-            if get_v2(self.data, toggle, default=None) == toggle_value:
-                return contributor(self)
-
-            return None
-
-        return wrapped_contributor
-
-    if func is not None:
-        return decorator(func)
-
-    return decorator
+    func._is_cli_config_contributor = True  # pyright: ignore [reportFunctionMemberAccess]
+    return func
 
 
 class CliGeneratorProtocol(Protocol):
@@ -225,15 +127,15 @@ class CliGeneratorProtocol(Protocol):
     Protocol for CLI generators.
 
     Generators render EOS config sections using contributor methods that append
-    to self.cli_config. The render() method executes all contributors and returns
-    the final config string.
+    to ``self._model``. The :meth:`render` method executes all contributors and
+    returns the final config string.
     """
 
-    data: EosCliConfigGen
+    inputs: EosCliConfigGen
     """Structured configuration data."""
 
-    cli_config: CliConfig
-    """Config accumulator."""
+    _model: list[str]
+    """Accumulator the generator writes lines into."""
 
     def render(self) -> str:
         """
@@ -245,7 +147,7 @@ class CliGeneratorProtocol(Protocol):
         for method in self.cli_config_methods():
             method(self)
 
-        return self.cli_config.get_config()
+        return "\n".join(self._model)
 
     @classmethod
     def cli_config_methods(cls) -> list[Callable[[Self], None]]:
@@ -275,8 +177,8 @@ class CliGenerator(CliGeneratorProtocol):
             structured_config: Dict or EosCliConfigGen model. Dicts are converted to the model.
         """
         if isinstance(structured_config, dict):
-            self.data = EosCliConfigGen._from_dict(structured_config)
+            self.inputs = EosCliConfigGen._from_dict(structured_config)
         else:
-            self.data = structured_config
+            self.inputs = structured_config
 
-        self.cli_config = CliConfig()
+        self._model: list[str] = []

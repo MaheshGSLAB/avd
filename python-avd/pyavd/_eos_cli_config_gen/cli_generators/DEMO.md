@@ -8,132 +8,124 @@
 
 ## Context
 
-AVD generates EOS device configurations from structured YAML data.
-Previously this was done via **209 Jinja2 templates** (`.j2` files).
-The migration replaces them with **Python generator classes** — one per config section.
+AVD generates EOS device configurations from structured YAML data. Historically every
+section was rendered by a Jinja2 template (`.j2`) — 208 templates under
+`j2templates/eos/`. This package replaces them, one section at a time, with **Python
+generator classes** that consume the typed `EosCliConfigGen` model and emit the same CLI text.
 
-**Current state:** 2 generators done (`boot.py`, `config_comment.py`), 207 remaining.
+**Migration progress:** 8 generators ported (`config_comment`, `boot`, the four-block
+`aaa_security_bootstrap` group, `local_users`, `hardware`, `dhcp_servers`,
+`ethernet_interfaces`, `router_bgp`). The remaining templates continue to render
+through Jinja2 and are stitched into the right position by the orchestrator (see
+[Orchestration](#orchestration)).
 
 ---
 
 ## Directory Structure
 
 ```
-cli_generators/          ← NEW (Python approach)
-├── base.py              ← Framework: CliConfig, CliGenerator, @cli_config_contributor
-├── boot.py              ← Migrated from boot.j2
-├── config_comment.py    ← Migrated from config_comment.j2
-└── __init__.py
+cli_generators/                           ← Python generators
+├── base.py                               ← Framework (CliGenerator, CliSection, @cli_config_contributor)
+├── config_comment.py                     ← Migrated: config_comment.j2
+├── boot.py                               ← Migrated: boot.j2
+├── aaa_security_bootstrap.py             ← Group orchestrator for the 4 blocks below
+├── enable_password.py                    ← Migrated: enable-password.j2  (block, no contributor)
+├── aaa_root.py                           ← Migrated: aaa-root.j2        (block, no contributor)
+├── aaa_authentication_policy_nopassword.py
+├── aaa_authorization_default_role.py
+├── local_users.py                        ← Migrated: local-users.j2
+├── hardware.py                           ← Combines 3 hardware-* templates
+├── dhcp_servers.py                       ← Migrated: dhcp-servers.j2 (deep nesting)
+├── ethernet_interfaces.py                ← Migrated: ethernet-interfaces.j2
+├── router_bgp.py                         ← Migrated: router-bgp.j2 (largest example)
+└── __init__.py                           ← Exports all generators in __all__
 
-j2templates/eos/         ← LEGACY (being replaced)
-├── boot.j2
-├── aaa.j2
-└── ... (209 files total)
+j2templates/eos/                          ← Remaining Jinja2 templates
+└── … 208 .j2 files still to migrate
+
+j2templates/eos-intended-config.j2        ← Canonical section order. Includes either
+                                            a {% include 'eos/X.j2' %} or a
+                                            __PYTHON_GENERATOR__ClassName__ placeholder.
 ```
 
 ---
 
-## Core Framework (`base.py`)
+## Core framework (`base.py`)
 
-### 1. `CliConfig` — Output Accumulator
+The framework is intentionally small — three pieces.
 
-Builds the final config string incrementally.
+### 1. `CliSection` — one block of CLI output
 
-```python
-class CliConfig:
-    def __init__(self) -> None:
-        self._lines: list[str] = []
+A subclass renders a single named block (e.g. `vrf PROD`, `router bgp 65001`) by
+implementing `_section()`. Output is built with three helpers:
 
-    def append(self, line: str | None) -> None:
-        """Adds a line. Multi-line strings are auto-split on \\n."""
-        if line:
-            if "\n" in line:
-                self._lines.extend(line.split("\n"))
-            else:
-                self._lines.append(line)
+| Helper | Indent | Skips on falsy? | Purpose |
+|---|---|---|---|
+| `self._section_heading(text)` | current indent | no | Write the block header line |
+| `self._cli_line(template, *values)` | +1 | yes — drops if any value is falsy | Write a body line; `template.format(*values)` |
+| `self._sub_section(child, *, skip_separator=False)` | +1 | n/a | Render a child `CliSection` |
 
-    def get_config(self) -> str:
-        return "\n".join(self._lines)
-```
+`CliSection.render(indent=0)` calls `_section()`, captures the lines, and prepends a `!`
+when `separator = True` (the default) and the section produced any output. Setting
+`separator = False` on a subclass suppresses that — useful for inline sub-blocks like
+`reservations` inside a DHCP subnet.
 
-### 2. `@cli_config_contributor` — Decorator
+### 2. `@cli_config_contributor` — discovered render method
 
-Marks methods as config contributors so `render()` can discover and call them automatically.
+Marks a method on a `CliGenerator` subclass as a contributor. `render()` discovers
+all decorated methods via `dir(cls)` and calls them in attribute order. A contributor
+appends lines to `self._model` (the generator's `list[str]` accumulator) — typically by
+extending it with the result of a `CliSection.render()` call.
 
-```python
-@cli_config_contributor
-def boot(self) -> None:
-    ...
+### 3. `CliGenerator` + `CliGeneratorProtocol`
 
-# With optional conditional execution:
-@cli_config_contributor(toggle_and_value=("event_monitor.enabled", True))
-def event_monitor(self) -> None:
-    ...
-```
-
-The decorator sets `_is_cli_config_contributor = True` on the method.
-The `toggle_and_value` variant wraps the method to skip it unless the condition is met.
-
-### 3. `CliGeneratorProtocol` + `CliGenerator`
-
-Two separate classes following the same pattern as `StructuredConfigGenerator` in `_eos_designs`:
-
-- **`CliGeneratorProtocol`** — Python `Protocol` (structural type for type checkers). Defines `data`, `cli_config`, `render()`, `cli_config_methods()`, `_keys()`.
-- **`CliGenerator`** — Concrete base class. Inherits from the Protocol. Only adds `__init__` — everything else is inherited.
+`CliGeneratorProtocol` defines the contract (typed `inputs: EosCliConfigGen`,
+`_model: list[str]`, `render()`, `cli_config_methods()`). `CliGenerator` is the
+concrete base subclasses inherit from — its `__init__` accepts either a dict
+(converted via `EosCliConfigGen._from_dict`) or an already-built model, and
+initializes `self._model = []`.
 
 ```python
-class CliGeneratorProtocol(Protocol):
-    data: EosCliConfigGen
-    cli_config: CliConfig
-
-    def render(self) -> str:
-        for method in self.cli_config_methods():
-            method(self)
-        return self.cli_config.get_config()
-
-    @classmethod
-    def cli_config_methods(cls) -> list:
-        return [method for key in cls._keys()
-                if getattr(method := getattr(cls, key), "_is_cli_config_contributor", False)]
-
-    @classmethod
-    def _keys(cls) -> list[str]:
-        return dir(cls)
-
-
 class CliGenerator(CliGeneratorProtocol):
     def __init__(self, structured_config: EosCliConfigGen | dict) -> None:
         if isinstance(structured_config, dict):
-            self.data = EosCliConfigGen(**structured_config)
+            self.inputs = EosCliConfigGen._from_dict(structured_config)
         else:
-            self.data = structured_config
-        self.cli_config = CliConfig()
-    # render(), cli_config_methods(), _keys() → all inherited from CliGeneratorProtocol
+            self.inputs = structured_config
+        self._model: list[str] = []
+```
+
+The protocol's `render()` is inherited:
+
+```python
+def render(self) -> str:
+    for method in self.cli_config_methods():
+        method(self)
+    return "\n".join(self._model)
 ```
 
 ---
 
-## Execution Flow
+## Execution flow
 
 ```
-BootGenerator(config_dict)
+BootGenerator(structured_config)
     │
-    ├── __init__: converts dict → EosCliConfigGen (Pydantic model)
-    │             creates empty CliConfig()
+    ├── __init__: stores inputs (EosCliConfigGen), creates empty self._model
     │
     └── render()
-        ├── discover @cli_config_contributor methods via reflection
-        ├── call each method → method appends to self.cli_config
-        └── return cli_config.get_config()  →  "!\nboot secret sha512 mykey"
+        ├── cli_config_methods() — reflection over dir(cls)
+        ├── for each contributor method: method(self) appends to self._model
+        └── return "\n".join(self._model)
 ```
 
-Each generator is **single-use by design** — one instantiation, one `render()` call.
+Each generator is **single-use by design** — one instance, one `render()`.
 
 ---
 
-## Side-by-Side: `boot.j2` vs `boot.py`
+## Side-by-side: `boot.j2` → `boot.py`
 
-### Jinja2 (`boot.j2`) — 15 lines
+### Jinja2 (`j2templates/eos/boot.j2`)
 
 ```jinja2
 {% if boot is arista.avd.defined %}
@@ -143,172 +135,106 @@ Each generator is **single-use by design** — one instantiation, one `render()`
 {%             set hash_algorithm = 5 %}
 {%         endif %}
 boot secret {{ hash_algorithm | arista.avd.default('sha512') }} {{ boot.secret.key | arista.avd.hide_passwords(hide_passwords) }}
-{%     endif %}
 {% endif %}
 ```
 
-### Python (`boot.py`) — same logic
+### Python (`cli_generators/boot.py`)
 
 ```python
 class BootGenerator(CliGenerator):
-
     @cli_config_contributor
     def boot(self) -> None:
-        if not get_v2(self.data, "boot.secret.key"):
+        self._model.extend(BootBlock(self.inputs).render())
+
+
+@dataclass
+class BootBlock(CliSection):
+    inputs: EosCliConfigGen
+
+    def _section(self) -> None:
+        secret = self.inputs.boot.secret
+        if not secret.key:
             return
-
-        hide_passwords_enabled = get_v2(self.data, "eos_cli_config_gen_configuration.hide_passwords", default=False)
-
-        hash_algorithm = "sha512"
-        if get_v2(self.data, "boot.secret.hash_algorithm") == "md5":
-            hash_algorithm = "5"
-
-        key = hide_passwords(get_v2(self.data, "boot.secret.key"), hide_passwords_enabled)
-
-        self.cli_config.append("!")
-        self.cli_config.append(f"boot secret {hash_algorithm} {key}")
+        hash_algorithm = "5" if secret.hash_algorithm == "md5" else secret.hash_algorithm
+        key = hide_passwords(secret.key, self.inputs.eos_cli_config_gen_configuration.hide_passwords)
+        self._section_heading(f"boot secret {hash_algorithm} {key}")
 ```
 
-**Same output. Standard Python. No custom template syntax.**
+Same output. Standard Python, no custom template syntax, fully typed access into
+`self.inputs.boot.secret` via the schema.
 
 ---
 
-## Migration Benefits
+## Why we did this
 
-| Pain Point in Jinja2 | Python Solution |
-|----------------------|-----------------|
-| Custom filters (`arista.avd.defined`, `arista.avd.default`) | Standard Python (`if not x`, `or default`) |
-| No IDE autocomplete | Full type hints + Pydantic models (`self.data.boot.secret.key`) |
-| Runtime template errors | Type errors caught at import/lint time |
-| Cannot unit test templates directly | Unit test each generator class independently |
-| Nested `{% if %}{% for %}` becomes unreadable | Clean Python control flow |
-| No Python debugger support | Standard `pdb` / IDE breakpoints work |
-
----
-
-## Migration Pattern (for each new generator)
-
-```python
-from pyavd._utils.get import get_v2
-from .base import CliGenerator, cli_config_contributor
-
-
-class [Feature]Generator(CliGenerator):
-    """Generator for [feature] CLI configuration. Migrated from [feature].j2"""
-
-    @cli_config_contributor
-    def [feature](self) -> None:
-        # 1. Guard: return early if config not present
-        if not get_v2(self.data, "path.to.key"):
-            return
-
-        # 2. Extract values with defaults
-        value = get_v2(self.data, "path.to.key", default="default_val")
-
-        # 3. Build CLI output
-        self.cli_config.append("!")
-        self.cli_config.append(f"feature {value}")
-```
+| Pain point in Jinja2 | Python solution |
+|---|---|
+| `arista.avd.defined`, `arista.avd.default` everywhere | Standard `if x is None`, `or default` |
+| No IDE autocomplete on `boot.secret.key` | Full type hints + Pydantic models |
+| Runtime template errors | Type errors at import/lint time |
+| Templates aren't directly unit-testable | Each `CliGenerator` / `CliSection` is a plain class — instantiate and call `.render()` |
+| Nested `{% if %}{% for %}` becomes unreadable | Plain Python control flow |
+| No debugger | `pdb` / breakpoints work normally |
+| String concatenation is positional and silent | `_cli_line()` skips on falsy; `_sub_section()` composes blocks cleanly |
 
 ---
 
-## Enhancement Points
+## Orchestration
 
-### 1. Generator discovery is manual
-
-Generators must be manually imported in `__init__.py` and added to `__all__`. This could be automated via a plugin/registry pattern as the number of generators grows.
-
-### 2. `get_v2()` vs direct model access in generator methods
-
-`get_v2(self.data, "boot.secret.key")` works but bypasses Pydantic's type system.
-Direct access (`self.data.boot.secret.key`) gives IDE autocomplete and type checking — preferred where possible.
-
-### 3. Config section order breaks during mid-migration (Critical)
-
-**The Problem:**
-
-The current orchestrator in `get_device_config_python.py` works in two hard blocks:
+`get_device_config_python.py` is the entry point. It instantiates every generator
+listed in `cli_generators.__all__`, renders each one, and stitches the outputs into
+the legacy Jinja2 output via `__PYTHON_GENERATOR__<ClassName>__` placeholder lines
+in `eos-intended-config.j2`.
 
 ```
-BLOCK 1: ALL Python generators  (ConfigCommentGenerator, BootGenerator, ...)
-BLOCK 2: ALL Jinja2 templates   (eos-intended-config.j2 → 209 includes in order)
+eos-intended-config.j2
+─────────────────────────────────────────
+__PYTHON_GENERATOR__ConfigCommentGenerator__   ← replaced with ConfigCommentGenerator output
+__PYTHON_GENERATOR__BootGenerator__            ← replaced with BootGenerator output
+__PYTHON_GENERATOR__AaaSecurityBootstrapGenerator__
+{% include 'eos/vlan-internal-order.j2' %}     ← still Jinja2
+{% include 'eos/transceiver-qsfp-default-mode.j2' %}
+…
+__PYTHON_GENERATOR__RouterBgpGenerator__       ← replaced inline at the BGP position
+{% include 'eos/management-…' %}
 ```
 
-`eos-intended-config.j2` is the **source of truth** for the canonical EOS config section order. For example:
+This means a section's position in the final config is governed by `eos-intended-config.j2`,
+not by whether it has been migrated yet. Migrating a template is a two-step swap:
+delete the `{% include %}` line, add the `__PYTHON_GENERATOR__…__` placeholder in
+the same position.
 
-```
-Position  1: enable-password.j2
-Position  2: aaa-root.j2
-...
-Position 50: ip-dhcp-snooping.j2     ← if migrated to Python today
-...
-Position 115: hostname.j2            ← if migrated to Python today
-...
-Position 209: end.j2
-```
-
-If a developer migrates `hostname.j2` (position 115) to `HostnameGenerator`, the output becomes:
-
-```
-[Python block]
-  HostnameGenerator output          ← appears at TOP, wrong!
-
-[J2 block]
-  enable-password output
-  aaa-root output
-  ...                               ← positions 1-114, 116-209
-```
-
-The `hostname` config now appears BEFORE `enable-password` — breaking EOS config order.
-
-**The Fix:**
-
-Build a single unified ordered list from `eos-intended-config.j2`, then for each module check: Python generator available → use it, otherwise → render J2 template. Config order is preserved throughout the entire migration.
-
-```
-Unified ordered pipeline (based on eos-intended-config.j2):
-
-Position  1: enable-password  → no Python generator → render enable-password.j2
-Position  2: aaa-root         → no Python generator → render aaa-root.j2
-...
-Position 50: ip-dhcp-snooping → IpDhcpSnoopingGenerator exists → generator.render()
-...
-Position115: hostname         → HostnameGenerator exists       → generator.render()
-...
-Position209: end              → no Python generator → render end.j2
-```
-
-Each module's output lands in its **correct position** — the final config order is always identical to the J2-only order, regardless of which modules have been migrated.
-
-**In code terms**, the orchestrator changes from:
-
-```python
-# CURRENT: two hard blocks — order breaks mid-migration
-for generator in python_generators:          # block 1: ALL python first
-    sections.append(generator.render())
-sections.append(get_device_config(...))      # block 2: ALL j2 after
-
-# PROPOSED: one ordered pipeline — order always preserved
-for module in ordered_module_list:           # driven by eos-intended-config.j2 order
-    if module in python_generator_registry:
-        sections.append(python_generator_registry[module](config).render())
-    else:
-        sections.append(render_j2_template(module, config))
-```
+If a generator's output isn't empty and its placeholder is missing, the orchestrator
+falls back to **prepending** the output — see
+[`get_device_config_python.py`](../../get_device_config_python.py).
 
 ---
 
-## Key Files
+## Examples by complexity
+
+| Generator | Why it's interesting |
+|---|---|
+| [`boot.py`](boot.py) | Smallest end-to-end example. One contributor, one `CliSection`. |
+| [`config_comment.py`](config_comment.py) | `separator = False` — emits raw lines, no `!` prefix. |
+| [`local_users.py`](local_users.py) | Iterates over a sorted list, builds variable-length headers. |
+| [`hardware.py`](hardware.py) | One contributor that renders three independent blocks in order, each with its own `!`. |
+| [`aaa_security_bootstrap.py`](aaa_security_bootstrap.py) | Four blocks sharing a single leading `!` — uses `bool(self._model)` to decide which block prepends it. |
+| [`dhcp_servers.py`](dhcp_servers.py) | Deeply nested: server → subnet → reservations → mac. Uses `_sub_section()` and `skip_separator=` for ordering. |
+| [`ethernet_interfaces.py`](ethernet_interfaces.py) | Largest single-block migration. Many small sub-section classes for distinct interface features. |
+| [`router_bgp.py`](router_bgp.py) | The reference example. Top-level `RouterBgpBlock` composes ~30 sub-section classes covering every BGP knob, VRF, address-family, VPWS, etc. |
+
+---
+
+## Where to look for what
 
 | File | Purpose |
-|------|---------|
-| `cli_generators/base.py` | Framework: `CliConfig`, `CliGenerator`, `@cli_config_contributor` |
-| `cli_generators/boot.py` | Example: boot secret generator |
-| `cli_generators/config_comment.py` | Example: config comment generator |
-| `j2templates/eos/boot.j2` | Legacy template (reference for migration) |
-| `j2templates/eos-intended-config.j2` | **Canonical config section order** — 209 includes, source of truth |
-| `pyavd/get_device_config_python.py` | Orchestrator: currently renders Python block first, then J2 block |
-| `pyavd/get_device_config.py` | J2 renderer: renders full `eos-intended-config.j2` |
-| `pyavd/_utils/get.py` | `get_v2()` — safe nested attribute access |
-| `pyavd/j2filters/hide_passwords.py` | Password hiding utility (reused in Python generators) |
-| `schema/__init__.py` | Pydantic models (`EosCliConfigGen`) — structured config data |
+|---|---|
+| `cli_generators/base.py` | `CliSection`, `CliGenerator`, `@cli_config_contributor` |
+| `cli_generators/CONTRIBUTING.md` | **Step-by-step guide for porting a Jinja2 template** |
+| `cli_generators/__init__.py` | Exports — add new generators to `__all__` |
+| `pyavd/get_device_config_python.py` | Orchestrator — placeholder substitution + prepend fallback |
+| `pyavd/get_device_config.py` | Pure-Jinja2 renderer (still used for un-migrated sections) |
+| `pyavd/j2filters/hide_passwords.py` | Password masking; reused unchanged |
+| `pyavd/_eos_cli_config_gen/schema/__init__.py` | Pydantic models (`EosCliConfigGen`) |
+| `pyavd/_eos_cli_config_gen/j2templates/eos/` | Remaining Jinja2 templates |
+| `pyavd/_eos_cli_config_gen/j2templates/eos-intended-config.j2` | Canonical section order; placeholders live here |

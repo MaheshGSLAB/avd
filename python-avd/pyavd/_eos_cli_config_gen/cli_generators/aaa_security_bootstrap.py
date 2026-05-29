@@ -12,9 +12,9 @@ Covers, in EOS output order:
 
 These four sections share a single leading ``!`` separator: only the first
 block that actually emits content prepends the ``!``. To make that decision
-without checking inputs twice or re-rendering, all four blocks write into a
-single shared :class:`CliModel`; each block's ``separator`` is set based on
-whether that shared model already has any lines.
+without checking inputs twice or re-rendering, all four blocks write into the
+generator's shared ``self._model`` list; each block's ``separator`` is set based on
+whether that shared list already has any lines.
 """
 
 from __future__ import annotations
@@ -22,16 +22,12 @@ from __future__ import annotations
 from .aaa_authentication_policy_nopassword import AaaAuthenticationPolicyNopasswordBlock
 from .aaa_authorization_default_role import AaaAuthorizationDefaultRoleBlock
 from .aaa_root import AaaRootBlock
-from .base import CliGenerator, CliModel, cli_config_contributor
+from .base import CliGenerator, cli_config_contributor
 from .enable_password import EnablePasswordBlock
 
 
 class AaaSecurityBootstrapGenerator(CliGenerator):
     """Generator for the enable-password / aaa-root / aaa-authentication-policy / aaa-authorization-default-role group."""
-
-    @property
-    def _model(self) -> CliModel:
-        return self.cli_config.aaa_security_bootstrap
 
     @cli_config_contributor
     def aaa_security_bootstrap(self) -> None:
@@ -42,7 +38,7 @@ class AaaSecurityBootstrapGenerator(CliGenerator):
             AaaAuthenticationPolicyNopasswordBlock,
             AaaAuthorizationDefaultRoleBlock,
         ):
-            block = block_cls(self.data)
+            block = block_cls(self.inputs)
             # Only the first block to actually emit anything gets the leading '!'.
             block.separator = not bool(self._model)
             self._model.extend(block.render())

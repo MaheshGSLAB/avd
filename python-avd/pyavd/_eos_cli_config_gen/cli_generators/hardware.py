@@ -17,11 +17,12 @@ when it actually emits content (default CliSection.separator=True behavior).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pyavd.j2filters import natural_sort
 
-from .base import CliGenerator, CliModel, CliSection, cli_config_contributor
+from .base import CliGenerator, CliSection, cli_config_contributor
 
 if TYPE_CHECKING:
     from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
@@ -29,10 +30,6 @@ if TYPE_CHECKING:
 
 class HardwareGenerator(CliGenerator):
     """Generator for the three hardware sections, rendered in EOS output order."""
-
-    @property
-    def _model(self) -> CliModel:
-        return self.cli_config.hardware
 
     @cli_config_contributor
     def hardware(self) -> None:
@@ -42,33 +39,33 @@ class HardwareGenerator(CliGenerator):
             HardwareCounterFeatureBlock,
             HardwareAccessListMechanismBlock,
         ):
-            self._model.extend(block_cls(self.data).render(indent=0))
+            self._model.extend(block_cls(self.inputs).render())
 
 
+@dataclass
 class HardwarePortGroupBlock(CliSection):
     """Renders `hardware port-group X select Y` lines (one per port group)."""
 
-    def __init__(self, data: EosCliConfigGen) -> None:
-        self.data = data
+    inputs: EosCliConfigGen
 
-    def _generate(self) -> None:
-        port_groups = self.data.hardware.port_groups
+    def _section(self) -> None:
+        port_groups = self.inputs.hardware.port_groups
         if not port_groups:
             return
         for port_group in port_groups:
             if not port_group.select:
                 continue
-            self._header(f"hardware port-group {port_group.port_group} select {port_group.select}")
+            self._section_heading(f"hardware port-group {port_group.port_group} select {port_group.select}")
 
 
+@dataclass
 class HardwareCounterFeatureBlock(CliSection):
     """Renders one `hardware counter feature ...` line per configured feature."""
 
-    def __init__(self, data: EosCliConfigGen) -> None:
-        self.data = data
+    inputs: EosCliConfigGen
 
-    def _generate(self) -> None:
-        features = self.data.hardware_counters.features
+    def _section(self) -> None:
+        features = self.inputs.hardware_counters.features
         if not features:
             return
         for feature in natural_sort(features, sort_key="name"):
@@ -88,17 +85,17 @@ class HardwareCounterFeatureBlock(CliSection):
             line = " ".join(parts)
             if feature.enabled is False:
                 line = f"no {line}"
-            self._header(line)
+            self._section_heading(line)
 
 
+@dataclass
 class HardwareAccessListMechanismBlock(CliSection):
     """Renders the single-line `hardware access-list mechanism <value>`."""
 
-    def __init__(self, data: EosCliConfigGen) -> None:
-        self.data = data
+    inputs: EosCliConfigGen
 
-    def _generate(self) -> None:
-        mechanism = self.data.hardware.access_list.mechanism
+    def _section(self) -> None:
+        mechanism = self.inputs.hardware.access_list.mechanism
         if not mechanism:
             return
-        self._header(f"hardware access-list mechanism {mechanism}")
+        self._section_heading(f"hardware access-list mechanism {mechanism}")

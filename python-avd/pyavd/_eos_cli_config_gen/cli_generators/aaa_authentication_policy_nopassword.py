@@ -10,6 +10,7 @@ aaa-authentication-policy-nopassword / aaa-authorization-default-role.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .base import CliSection
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 
 
+@dataclass
 class AaaAuthenticationPolicyNopasswordBlock(CliSection):
     """
     Renders 'aaa authentication policy local allow-nopassword-remote-login'.
@@ -25,9 +27,8 @@ class AaaAuthenticationPolicyNopasswordBlock(CliSection):
     Separator is set by the AaaSecurityBootstrapGenerator orchestrator.
     """
 
-    def __init__(self, data: EosCliConfigGen) -> None:
-        self.data = data
+    inputs: EosCliConfigGen
 
-    def _generate(self) -> None:
-        if self.data.aaa_authentication.policies.local.allow_nopassword:
-            self._header("aaa authentication policy local allow-nopassword-remote-login")
+    def _section(self) -> None:
+        if self.inputs.aaa_authentication.policies.local.allow_nopassword:
+            self._section_heading("aaa authentication policy local allow-nopassword-remote-login")

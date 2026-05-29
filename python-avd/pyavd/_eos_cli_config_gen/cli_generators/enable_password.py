@@ -10,6 +10,7 @@ aaa-authentication-policy-nopassword / aaa-authorization-default-role.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pyavd.j2filters import hide_passwords
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 
 
+@dataclass
 class EnablePasswordBlock(CliSection):
     """
     Renders 'enable password ...' or 'no enable password'.
@@ -27,13 +29,12 @@ class EnablePasswordBlock(CliSection):
     Separator is set by the AaaSecurityBootstrapGenerator orchestrator.
     """
 
-    def __init__(self, data: EosCliConfigGen) -> None:
-        self.data = data
+    inputs: EosCliConfigGen
 
-    def _generate(self) -> None:
-        enable_password = self.data.enable_password
+    def _section(self) -> None:
+        enable_password = self.inputs.enable_password
         if enable_password.disabled:
-            self._header("no enable password")
+            self._section_heading("no enable password")
             return
         if not enable_password.key:
             return
@@ -43,5 +44,5 @@ class EnablePasswordBlock(CliSection):
             algorithm_token = "sha512"
         else:
             return
-        key = hide_passwords(enable_password.key, self.data.eos_cli_config_gen_configuration.hide_passwords)
-        self._header(f"enable password {algorithm_token} {key}")
+        key = hide_passwords(enable_password.key, self.inputs.eos_cli_config_gen_configuration.hide_passwords)
+        self._section_heading(f"enable password {algorithm_token} {key}")
