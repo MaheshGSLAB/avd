@@ -72,6 +72,15 @@ def _alphanum_key(item: Any, sort_key: str | None = None, *, strict: bool = True
             val = default_value if default_value is not None else f"~{str(item).lstrip('<')}"
         return [_convert(c, ignore_case) for c in re.split(SPLIT_PATTERN, str(val))]
 
+    if sort_key is not None and hasattr(item, sort_key):
+        val = getattr(item, sort_key, None)
+        if val is None:
+            if strict and default_value is None:
+                msg = f"Missing attribute '{sort_key}' in item to sort {item}."
+                raise KeyError(msg)
+            val = default_value if default_value is not None else f"~{str(item).lstrip('<')}"
+        return [_convert(c, ignore_case) for c in re.split(SPLIT_PATTERN, str(val))]
+
     return [_convert(c, ignore_case) for c in re.split(SPLIT_PATTERN, str(item))]
 
 

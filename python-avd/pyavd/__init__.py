@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 from .get_avd_facts import get_avd_facts
 from .get_device_config import get_device_config
+from .get_device_config_python import get_device_config_python
 from .get_device_doc import get_device_doc
 from .get_device_structured_config import get_device_structured_config
 from .get_device_test_catalog import get_device_test_catalog
@@ -23,6 +24,7 @@ __version__ = "6.4.0.dev0"
 __all__ = [
     "get_avd_facts",
     "get_device_config",
+    "get_device_config_python",
     "get_device_doc",
     "get_device_structured_config",
     "get_device_test_catalog",

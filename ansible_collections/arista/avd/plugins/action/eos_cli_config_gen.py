@@ -25,12 +25,12 @@ from ansible_collections.arista.avd.plugins.plugin_utils.utils import (
 )
 
 if TYPE_CHECKING:
-    from pyavd import get_device_config, get_device_doc
+    from pyavd import get_device_config_python, get_device_doc
     from pyavd._utils import strip_empties_from_dict, template
     from pyavd.j2filters import add_md_toc
 
 try:
-    from pyavd import get_device_config, get_device_doc
+    from pyavd import get_device_config_python, get_device_doc
     from pyavd._utils import strip_empties_from_dict, template
     from pyavd.j2filters import add_md_toc
 
@@ -99,7 +99,7 @@ class ActionModule(ActionBase):
         try:
             if validated_args["generate_device_config"]:
                 LOGGER.debug("Rendering configuration...")
-                device_config = get_device_config(structured_config)
+                device_config = get_device_config_python(structured_config)
 
                 if has_custom_templates:
                     LOGGER.debug("Rendering config custom templates...")

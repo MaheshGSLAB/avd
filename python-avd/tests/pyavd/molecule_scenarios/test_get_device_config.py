@@ -4,7 +4,7 @@
 
 import pytest
 
-from pyavd import get_device_config, validate_structured_config
+from pyavd import get_device_config_python, validate_structured_config
 from pyavd._utils import get
 from tests.models import MoleculeHost
 
@@ -43,7 +43,7 @@ def test_get_device_config(molecule_host: MoleculeHost) -> None:
 
     validated_data_result = validate_structured_config(structured_config)
     assert validated_data_result.validated_data is not None
-    device_config = get_device_config(validated_data_result.validated_data)
+    device_config = get_device_config_python(validated_data_result.validated_data)
 
     assert isinstance(device_config, str)
     assert device_config == expected_config
