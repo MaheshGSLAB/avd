@@ -2405,8 +2405,16 @@ keys:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            new_key: switchport.access_vlan or switchport.trunk.allowed_vlan
-            upgrade_handler: switchport_mode
+            new_key: switchport.trunk.allowed_vlan
+            new_key_from_data_paths:
+              - switchport.mode
+              - mode
+            new_key_by_data_value:
+              access: switchport.access_vlan
+              dot1q-tunnel: switchport.access_vlan
+              trunk: switchport.trunk.allowed_vlan
+              trunk phone: switchport.trunk.allowed_vlan
+            upgrade_handler: simple
         native_vlan:
           type: int
           convert_types:
@@ -2454,7 +2462,12 @@ keys:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            upgrade_handler: type
+            new_key: switchport.enabled
+            new_value_by_old_value:
+              switched: true
+              routed: false
+            drop_unmapped_values: true
+            upgrade_handler: simple
             url: https://avd.arista.com/5.x/docs/porting-guides/5.x.x.html#removal-of-type-key-dependency-for-rendering-ethernetport-channel-interfaces-configuration-and-documentation
           valid_values:
             ["routed", "switched", "l3dot1q", "l2dot1q", "port-channel-member"]

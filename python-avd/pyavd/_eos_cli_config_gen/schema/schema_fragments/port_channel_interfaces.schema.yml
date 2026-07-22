@@ -1400,15 +1400,32 @@ keys:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            new_key: switchport.access_vlan or switchport.trunk.allowed_vlan
-            upgrade_handler: switchport_mode
+            new_key: switchport.trunk.allowed_vlan
+            new_key_from_data_paths:
+              - switchport.mode
+              - mode
+            new_key_by_data_value:
+              access: switchport.access_vlan
+              dot1q-tunnel: switchport.access_vlan
+              trunk: switchport.trunk.allowed_vlan
+              trunk phone: switchport.trunk.allowed_vlan
+            cleanup_data_paths_by_data_value:
+              access:
+                - switchport.mode
+                - mode
+            upgrade_handler: simple
         type:
           type: str
           deprecation:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            upgrade_handler: type
+            new_key: switchport.enabled
+            new_value_by_old_value:
+              switched: true
+              routed: false
+            drop_unmapped_values: true
+            upgrade_handler: simple
         encapsulation_dot1q_vlan:
           type: int
           deprecation:

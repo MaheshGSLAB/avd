@@ -412,6 +412,58 @@
         "upgrade_handler": {
           "type": "string",
           "description": "Optional upgrade handler name used by automation tools when migrating deprecated keys"
+        },
+        "new_key_from_data_path": {
+          "type": "string",
+          "description": "Relative selector path used to choose replacement key from `new_key_by_data_value`."
+        },
+        "new_key_from_data_paths": {
+          "type": "array",
+          "description": "Ordered relative selector paths used to choose replacement key from `new_key_by_data_value`.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "new_key_by_data_value": {
+          "type": "object",
+          "description": "Map selector values to replacement keys for schema-driven migrations.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "new_value_by_old_value": {
+          "type": "object",
+          "description": "Map deprecated values to replacement values before writing to the new key.",
+          "additionalProperties": true
+        },
+        "drop_unmapped_values": {
+          "type": "boolean",
+          "description": "Drop deprecated key if value is not found in `new_value_by_old_value`.",
+          "default": false
+        },
+        "cleanup_data_paths": {
+          "type": "array",
+          "description": "Relative data paths to remove after setting the replacement key.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cleanup_data_paths_by_data_value": {
+          "type": "object",
+          "description": "Map selector values to relative data paths that should be removed after migration.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
         }
       }
     }

@@ -36,7 +36,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_console_group
+                  upgrade_handler: aaa_group_logging_methods
               logging:
                 type: bool
                 deprecation:
@@ -44,7 +44,7 @@ keys:
                   warning: true
                   new_key: methods.method
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_console_logging
+                  upgrade_handler: aaa_group_logging_methods
           default:
             type: dict
             keys:
@@ -66,7 +66,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_default_group
+                  upgrade_handler: aaa_group_logging_methods
               logging:
                 type: bool
                 deprecation:
@@ -74,7 +74,7 @@ keys:
                   warning: true
                   new_key: methods.method
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_default_logging
+                  upgrade_handler: aaa_group_logging_methods
       system:
         type: dict
         keys:
@@ -99,7 +99,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: system_default_group
+                  upgrade_handler: aaa_group_logging_methods
       dot1x:
         type: dict
         keys:
@@ -134,7 +134,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: dot1x_default_group
+                  upgrade_handler: aaa_group_logging_methods
       commands:
         type: dict
         keys:
@@ -167,7 +167,7 @@ keys:
                     warning: true
                     new_key: methods.group
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_console_group
+                    upgrade_handler: aaa_group_logging_methods
                 logging:
                   type: bool
                   deprecation:
@@ -175,7 +175,7 @@ keys:
                     warning: true
                     new_key: methods.method
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_console_logging
+                    upgrade_handler: aaa_group_logging_methods
           default:
             type: list
             items:
@@ -205,7 +205,7 @@ keys:
                     warning: true
                     new_key: methods.group
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_default_group
+                    upgrade_handler: aaa_group_logging_methods
                 logging:
                   type: bool
                   deprecation:
@@ -213,7 +213,7 @@ keys:
                     warning: true
                     new_key: methods.method
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_default_logging
+                    upgrade_handler: aaa_group_logging_methods
   aaa_authentication:
     type: dict
     keys:
@@ -5996,8 +5996,16 @@ keys:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            new_key: switchport.access_vlan or switchport.trunk.allowed_vlan
-            upgrade_handler: switchport_mode
+            new_key: switchport.trunk.allowed_vlan
+            new_key_from_data_paths:
+            - switchport.mode
+            - mode
+            new_key_by_data_value:
+              access: switchport.access_vlan
+              dot1q-tunnel: switchport.access_vlan
+              trunk: switchport.trunk.allowed_vlan
+              trunk phone: switchport.trunk.allowed_vlan
+            upgrade_handler: simple
         native_vlan:
           type: int
           convert_types:
@@ -6050,7 +6058,12 @@ keys:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            upgrade_handler: type
+            new_key: switchport.enabled
+            new_value_by_old_value:
+              switched: true
+              routed: false
+            drop_unmapped_values: true
+            upgrade_handler: simple
             url: https://avd.arista.com/5.x/docs/porting-guides/5.x.x.html#removal-of-type-key-dependency-for-rendering-ethernetport-channel-interfaces-configuration-and-documentation
           valid_values:
           - routed
@@ -10705,7 +10718,7 @@ keys:
           removed: true
           remove_in_version: 6.0.0
           new_key: ip_access_group_in or vrfs.ip_access_group_in
-          upgrade_handler: access_groups
+          upgrade_handler: management_ssh_access_groups
       ipv6_access_groups:
         type: list
         deprecation:
@@ -10713,7 +10726,7 @@ keys:
           removed: true
           remove_in_version: 6.0.0
           new_key: ipv6_access_group_in or vrfs.ipv6_access_group_in
-          upgrade_handler: ipv6_access_groups
+          upgrade_handler: management_ssh_access_groups
   management_tech_support:
     type: dict
     keys:
@@ -15034,15 +15047,32 @@ keys:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            new_key: switchport.access_vlan or switchport.trunk.allowed_vlan
-            upgrade_handler: switchport_mode
+            new_key: switchport.trunk.allowed_vlan
+            new_key_from_data_paths:
+            - switchport.mode
+            - mode
+            new_key_by_data_value:
+              access: switchport.access_vlan
+              dot1q-tunnel: switchport.access_vlan
+              trunk: switchport.trunk.allowed_vlan
+              trunk phone: switchport.trunk.allowed_vlan
+            cleanup_data_paths_by_data_value:
+              access:
+              - switchport.mode
+              - mode
+            upgrade_handler: simple
         type:
           type: str
           deprecation:
             warning: true
             removed: true
             remove_in_version: 6.0.0
-            upgrade_handler: type
+            new_key: switchport.enabled
+            new_value_by_old_value:
+              switched: true
+              routed: false
+            drop_unmapped_values: true
+            upgrade_handler: simple
         encapsulation_dot1q_vlan:
           type: int
           deprecation:

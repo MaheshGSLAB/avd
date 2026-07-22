@@ -30,7 +30,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_console_group
+                  upgrade_handler: aaa_group_logging_methods
               logging:
                 type: bool
                 deprecation:
@@ -38,7 +38,7 @@ keys:
                   warning: true
                   new_key: methods.method
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_console_logging
+                  upgrade_handler: aaa_group_logging_methods
           default:
             type: dict
             keys:
@@ -57,7 +57,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_default_group
+                  upgrade_handler: aaa_group_logging_methods
               logging:
                 type: bool
                 deprecation:
@@ -65,7 +65,7 @@ keys:
                   warning: true
                   new_key: methods.method
                   remove_in_version: 6.0.0
-                  upgrade_handler: exec_default_logging
+                  upgrade_handler: aaa_group_logging_methods
       system:
         type: dict
         keys:
@@ -87,7 +87,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: system_default_group
+                  upgrade_handler: aaa_group_logging_methods
       dot1x:
         type: dict
         keys:
@@ -118,7 +118,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
-                  upgrade_handler: dot1x_default_group
+                  upgrade_handler: aaa_group_logging_methods
       commands:
         type: dict
         keys:
@@ -147,7 +147,7 @@ keys:
                     warning: true
                     new_key: methods.group
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_console_group
+                    upgrade_handler: aaa_group_logging_methods
                 logging:
                   type: bool
                   deprecation:
@@ -155,7 +155,7 @@ keys:
                     warning: true
                     new_key: methods.method
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_console_logging
+                    upgrade_handler: aaa_group_logging_methods
           default:
             type: list
             items:
@@ -181,7 +181,7 @@ keys:
                     warning: true
                     new_key: methods.group
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_default_group
+                    upgrade_handler: aaa_group_logging_methods
                 logging:
                   type: bool
                   deprecation:
@@ -189,4 +189,4 @@ keys:
                     warning: true
                     new_key: methods.method
                     remove_in_version: 6.0.0
-                    upgrade_handler: commands_default_logging
+                    upgrade_handler: aaa_group_logging_methods

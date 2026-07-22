@@ -149,7 +149,7 @@ keys:
           removed: true
           remove_in_version: 6.0.0
           new_key: ip_access_group_in or vrfs.ip_access_group_in
-          upgrade_handler: access_groups
+          upgrade_handler: management_ssh_access_groups
       ipv6_access_groups:
         type: list
         deprecation:
@@ -157,4 +157,4 @@ keys:
           removed: true
           remove_in_version: 6.0.0
           new_key: ipv6_access_group_in or vrfs.ipv6_access_group_in
-          upgrade_handler: ipv6_access_groups
+          upgrade_handler: management_ssh_access_groups
