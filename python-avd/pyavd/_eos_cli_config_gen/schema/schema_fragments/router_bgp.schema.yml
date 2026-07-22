@@ -1630,6 +1630,7 @@ keys:
               removed: true
               remove_in_version: 6.0.0
               new_key: bgp.additional_paths
+              upgrade_handler: address_family_evpn_bgp_additional_paths
       address_family_rtc:
         type: dict
         keys:

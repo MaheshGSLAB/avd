@@ -36,6 +36,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
+                  upgrade_handler: exec_console_group
               logging:
                 type: bool
                 deprecation:
@@ -43,6 +44,7 @@ keys:
                   warning: true
                   new_key: methods.method
                   remove_in_version: 6.0.0
+                  upgrade_handler: exec_console_logging
           default:
             type: dict
             keys:
@@ -64,6 +66,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
+                  upgrade_handler: exec_default_group
               logging:
                 type: bool
                 deprecation:
@@ -71,6 +74,7 @@ keys:
                   warning: true
                   new_key: methods.method
                   remove_in_version: 6.0.0
+                  upgrade_handler: exec_default_logging
       system:
         type: dict
         keys:
@@ -95,6 +99,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
+                  upgrade_handler: system_default_group
       dot1x:
         type: dict
         keys:
@@ -129,6 +134,7 @@ keys:
                   warning: true
                   new_key: methods.group
                   remove_in_version: 6.0.0
+                  upgrade_handler: dot1x_default_group
       commands:
         type: dict
         keys:
@@ -161,6 +167,7 @@ keys:
                     warning: true
                     new_key: methods.group
                     remove_in_version: 6.0.0
+                    upgrade_handler: commands_console_group
                 logging:
                   type: bool
                   deprecation:
@@ -168,6 +175,7 @@ keys:
                     warning: true
                     new_key: methods.method
                     remove_in_version: 6.0.0
+                    upgrade_handler: commands_console_logging
           default:
             type: list
             items:
@@ -197,6 +205,7 @@ keys:
                     warning: true
                     new_key: methods.group
                     remove_in_version: 6.0.0
+                    upgrade_handler: commands_default_group
                 logging:
                   type: bool
                   deprecation:
@@ -204,6 +213,7 @@ keys:
                     warning: true
                     new_key: methods.method
                     remove_in_version: 6.0.0
+                    upgrade_handler: commands_default_logging
   aaa_authentication:
     type: dict
     keys:
@@ -3727,6 +3737,7 @@ keys:
                     removed: true
                     remove_in_version: 6.0.0
                     new_key: encapsulation
+                    upgrade_handler: encapsulation_vlan_client_dot1q
                   type: dict
                 unmatched:
                   type: bool
@@ -3735,6 +3746,7 @@ keys:
                     removed: true
                     remove_in_version: 6.0.0
                     new_key: encapsulation
+                    upgrade_handler: encapsulation_vlan_client_unmatched
             network:
               type: dict
               description: Network encapsulations are all optional and skipped if
@@ -3789,6 +3801,7 @@ keys:
                     removed: true
                     remove_in_version: 6.0.0
                     new_key: encapsulation
+                    upgrade_handler: encapsulation_vlan_network_dot1q
                   type: dict
                 client:
                   type: bool
@@ -3797,6 +3810,7 @@ keys:
                     removed: true
                     remove_in_version: 6.0.0
                     new_key: encapsulation
+                    upgrade_handler: encapsulation_vlan_network_client
         vlan_id:
           description: This setting can only be applied to sub-interfaces on EOS.
           type: int
@@ -5983,6 +5997,7 @@ keys:
             removed: true
             remove_in_version: 6.0.0
             new_key: switchport.access_vlan or switchport.trunk.allowed_vlan
+            upgrade_handler: switchport_mode
         native_vlan:
           type: int
           convert_types:
@@ -6035,6 +6050,7 @@ keys:
             warning: true
             removed: true
             remove_in_version: 6.0.0
+            upgrade_handler: type
             url: https://avd.arista.com/5.x/docs/porting-guides/5.x.x.html#removal-of-type-key-dependency-for-rendering-ethernetport-channel-interfaces-configuration-and-documentation
           valid_values:
           - routed
@@ -6066,6 +6082,7 @@ keys:
             remove_in_version: v6.0.0
             new_key: isis_authentication.both.mode or isis_authentication.level_1.mode
               or isis_authentication.level_2.mode
+            upgrade_handler: isis_authentication_mode
           valid_values:
           - text
           - md5
@@ -6077,6 +6094,7 @@ keys:
             remove_in_version: v6.0.0
             new_key: isis_authentication.both.key or isis_authentication.level_1.key
               or isis_authentication.level_2.key
+            upgrade_handler: isis_authentication_key
           description: Type-7 encrypted password.
         trunk_private_vlan_secondary:
           type: bool
@@ -6101,6 +6119,7 @@ keys:
             removed: true
             remove_in_version: 6.0.0
             new_key: switchport.vlan_translations
+            upgrade_handler: vlan_translations
           type: list
         monitor_link_flap_profiles:
           type: list
@@ -9647,6 +9666,7 @@ keys:
           removed: true
           new_key: provider
           remove_in_version: 6.0.0
+          upgrade_handler: providers
   management_console:
     type: dict
     keys:
@@ -10685,6 +10705,7 @@ keys:
           removed: true
           remove_in_version: 6.0.0
           new_key: ip_access_group_in or vrfs.ip_access_group_in
+          upgrade_handler: access_groups
       ipv6_access_groups:
         type: list
         deprecation:
@@ -10692,6 +10713,7 @@ keys:
           removed: true
           remove_in_version: 6.0.0
           new_key: ipv6_access_group_in or vrfs.ipv6_access_group_in
+          upgrade_handler: ipv6_access_groups
   management_tech_support:
     type: dict
     keys:
@@ -13700,6 +13722,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_client_dot1q
                   type: dict
                 unmatched:
                   type: bool
@@ -13707,6 +13730,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_client_unmatched
             network:
               type: dict
               description: Network encapsulation are all optional, and skipped if
@@ -13760,6 +13784,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_network_dot1q
                   type: dict
                 client:
                   type: bool
@@ -13767,6 +13792,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_network_client
         vlan_id:
           description: This setting can only be applied to sub-interfaces on EOS.
           type: int
@@ -15009,12 +15035,14 @@ keys:
             removed: true
             remove_in_version: 6.0.0
             new_key: switchport.access_vlan or switchport.trunk.allowed_vlan
+            upgrade_handler: switchport_mode
         type:
           type: str
           deprecation:
             warning: true
             removed: true
             remove_in_version: 6.0.0
+            upgrade_handler: type
         encapsulation_dot1q_vlan:
           type: int
           deprecation:
@@ -15079,6 +15107,7 @@ keys:
             removed: true
             remove_in_version: 6.0.0
             new_key: switchport.vlan_translations
+            upgrade_handler: vlan_translations
           type: list
           items:
             type: dict
@@ -15090,6 +15119,7 @@ keys:
             remove_in_version: v6.0.0
             new_key: port_channel_interfaces[].isis_authentication.both.mode or port_channel_interfaces[].isis_authentication.level_1.mode
               or port_channel_interfaces[].isis_authentication.level_2.mode
+            upgrade_handler: isis_authentication_mode
         isis_authentication_key:
           type: str
           deprecation:
@@ -15098,6 +15128,7 @@ keys:
             remove_in_version: v6.0.0
             new_key: port_channel_interfaces[].isis_authentication.both.key or port_channel_interfaces[].isis_authentication.level_1.key
               or port_channel_interfaces[].isis_authentication.level_2.key
+            upgrade_handler: isis_authentication_key
         eos_cli:
           type: str
           description: Multiline EOS CLI rendered directly on the port-channel interface
@@ -18401,6 +18432,7 @@ keys:
               removed: true
               remove_in_version: 6.0.0
               new_key: bgp.additional_paths
+              upgrade_handler: address_family_evpn_bgp_additional_paths
       address_family_rtc:
         type: dict
         keys:

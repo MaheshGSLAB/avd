@@ -408,6 +408,10 @@
           "type": "boolean",
           "description": "Allow the deprecated key to be used in parallel with the new key without raising a conflict error",
           "default": false
+        },
+        "upgrade_handler": {
+          "type": "string",
+          "description": "Optional upgrade handler name used by automation tools when migrating deprecated keys"
         }
       }
     }

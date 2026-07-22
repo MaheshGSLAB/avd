@@ -15,3 +15,4 @@ keys:
       removed: true
       new_key: cv_settings
       remove_in_version: 6.0.0
+      upgrade_handler: transform

@@ -148,6 +148,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_client_dot1q
                   type: dict
                 unmatched:
                   type: bool
@@ -155,6 +156,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_client_unmatched
             network:
               type: dict
               description: Network encapsulation are all optional, and skipped if using client unmatched.
@@ -205,6 +207,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_network_dot1q
                   type: dict
                 client:
                   type: bool
@@ -212,6 +215,7 @@ keys:
                     warning: true
                     removed: true
                     remove_in_version: 6.0.0
+                    upgrade_handler: encapsulation_vlan_network_client
         vlan_id:
           description: |-
             This setting can only be applied to sub-interfaces on EOS.
@@ -1397,12 +1401,14 @@ keys:
             removed: true
             remove_in_version: 6.0.0
             new_key: switchport.access_vlan or switchport.trunk.allowed_vlan
+            upgrade_handler: switchport_mode
         type:
           type: str
           deprecation:
             warning: true
             removed: true
             remove_in_version: 6.0.0
+            upgrade_handler: type
         encapsulation_dot1q_vlan:
           type: int
           deprecation:
@@ -1467,6 +1473,7 @@ keys:
             removed: true
             remove_in_version: 6.0.0
             new_key: switchport.vlan_translations
+            upgrade_handler: vlan_translations
           type: list
           items:
             type: dict
@@ -1477,6 +1484,7 @@ keys:
             removed: true
             remove_in_version: v6.0.0
             new_key: port_channel_interfaces[].isis_authentication.both.mode or port_channel_interfaces[].isis_authentication.level_1.mode or port_channel_interfaces[].isis_authentication.level_2.mode
+            upgrade_handler: isis_authentication_mode
         isis_authentication_key:
           type: str
           deprecation:
@@ -1484,6 +1492,7 @@ keys:
             removed: true
             remove_in_version: v6.0.0
             new_key: port_channel_interfaces[].isis_authentication.both.key or port_channel_interfaces[].isis_authentication.level_1.key or port_channel_interfaces[].isis_authentication.level_2.key
+            upgrade_handler: isis_authentication_key
         eos_cli:
           type: str
           description: Multiline EOS CLI rendered directly on the port-channel interface in the final EOS configuration.
