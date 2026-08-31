@@ -14,4 +14,5 @@ keys:
       warning: true
       removed: true
       remove_in_version: 6.0.0
-      new_key: dns_settings.servers
+      new_key: dns_settings.servers[].ip_address
+      upgrade_handler: simple

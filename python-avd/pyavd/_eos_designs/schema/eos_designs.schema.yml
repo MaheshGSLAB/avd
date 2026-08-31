@@ -1998,6 +1998,7 @@ keys:
       removed: true
       new_key: cv_settings
       remove_in_version: 6.0.0
+      upgrade_handler: transform
   cvp_token_file:
     documentation_options:
       table: cloudvision-settings
@@ -2007,6 +2008,7 @@ keys:
       removed: true
       new_key: cv_settings
       remove_in_version: 6.0.0
+      upgrade_handler: transform
   dc_name:
     documentation_options:
       table: fabric-topology
@@ -5034,7 +5036,8 @@ keys:
       warning: true
       removed: true
       remove_in_version: 6.0.0
-      new_key: dns_settings.servers
+      new_key: dns_settings.servers[].ip_address
+      upgrade_handler: simple
   network_ports:
     type: list
     items:

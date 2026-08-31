@@ -74,6 +74,22 @@ class AvdSchemaBaseModel(BaseModel, ABC):
         """URL detailing the deprecation and migration guidelines."""
         allow_with_new_key: bool | None = False
         """Allow the deprecated key to be used in parallel with the new key without raising a conflict error."""
+        upgrade_handler: str | None = None
+        """Optional upgrade handler name used by automation tools when migrating deprecated keys."""
+        new_key_from_data_path: str | None = None
+        """Relative selector path used to choose replacement key from `new_key_by_data_value`."""
+        new_key_from_data_paths: list[str] | None = None
+        """Ordered relative selector paths used to choose replacement key from `new_key_by_data_value`."""
+        new_key_by_data_value: dict[str, str] | None = None
+        """Map selector values to replacement keys for schema-driven migrations."""
+        new_value_by_old_value: dict[str, Any] | None = None
+        """Map deprecated values to replacement values before writing to the new key."""
+        drop_unmapped_values: bool | None = False
+        """Drop deprecated key if value is not found in `new_value_by_old_value`."""
+        cleanup_data_paths: list[str] | None = None
+        """Relative data paths to remove after setting the replacement key."""
+        cleanup_data_paths_by_data_value: dict[str, list[str] | str] | None = None
+        """Map selector values to relative data paths that should be removed after migration."""
 
     class DocumentationOptions(BaseModel):
         """Schema field options used for controlling documentation generation."""
